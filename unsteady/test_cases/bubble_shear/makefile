@@ -16,7 +16,7 @@ on_the_fly:
 	python3 run_on_the_fly.py 3
 
 metric_advection:
-	python3 run_on_the_fly.py 0 -metric_advection 1
-	python3 run_on_the_fly.py 1 -metric_advection 1
-	python3 run_on_the_fly.py 2 -metric_advection 1
-	python3 run_on_the_fly.py 3 -metric_advection 1
+	python3 run_on_the_fly.py 0 -metric_advection 1 -num_meshes 100
+	python3 run_on_the_fly.py 1 -metric_advection 1 -num_meshes 100
+	python3 run_on_the_fly.py 2 -metric_advection 1 -num_meshes 100
+	python3 run_on_the_fly.py 3 -metric_advection 1 -num_meshes 100

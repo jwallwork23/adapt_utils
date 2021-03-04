@@ -63,8 +63,8 @@ try:
         if control in op.active_controls:
             op.control_parameters[control] = opt_controls[i::2]
             i += 1
-    if 'rake' in op.active_controls and op.control_parameters['rake'].max() > 90.0:
-        print("WARNING: Unrealistic rake {:.2f}".format(op.control_parameters['rake'].max()))
+    if 'slip' in op.active_controls and op.control_parameters['slip'].min() < 0.0:
+        print("WARNING: Unrealistic slip {:.2f}".format(op.control_parameters['slip'].min()))
     if 'dip' in op.active_controls and op.control_parameters['dip'].max() > 90.0:
         print("WARNING: Unrealistic dip {:.2f}".format(op.control_parameters['dip'].max()))
     loaded = True

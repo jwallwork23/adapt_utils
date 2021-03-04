@@ -68,15 +68,13 @@ for control in op.active_controls:
     std = np.std(op.control_parameters[control])
     kwargs['control_parameters'][control] += np.random.normal(loc=0, scale=std/2, size=size)
 kwargs['control_parameters']['slip'] = np.abs(kwargs['control_parameters']['slip'])
-for i, rake in enumerate(kwargs['control_parameters']['rake']):
-    kwargs['control_parameters']['rake'][i] = rake % 90
 tape_tag = 0
 op = TohokuOkadaBasisOptions(**kwargs)
 op._data_to_interpolate = eta
 op.active_controls = active_controls
 op.create_topography(annotate=True, interpolate=True, tag=tape_tag)
 print("QoI = {:.4e}".format(op.J.val))
-assert np.isclose(op.J.val, 3.5062e+00, rtol=1.0e-04)  # from previous run
+assert np.isclose(op.J.val, 7.1307e-01, rtol=1.0e-04)  # from previous run
 op.J_progress = []
 op.dJdm_progress = []
 
@@ -104,7 +102,7 @@ assert np.isclose(J, op.J.val)
 g = gradient(op.input_vector)
 assert len(g) == len(op.input_vector)
 print("J = {:.4e}  ||dJdm|| = {:.4e}".format(op.J_progress[-1], op.dJdm_progress[-1]))
-assert np.isclose(op.dJdm_progress[-1], 1.1288e-02, rtol=1.0e-04)  # from previous run
+assert np.isclose(op.dJdm_progress[-1], 4.6331e-03, rtol=1.0e-04)  # from previous run
 
 # Plot optimum and initial guess
 eta_pert = op.fault.dtopo.dZ.copy()
@@ -151,7 +149,7 @@ def opt_cb(m):
 # Inversion
 op.J_progress = []
 op.dJdm_progress = []
-bounds = [bound for subfault in op.subfaults for bound in [(0, np.Inf), (0, 90)]]
+bounds = [bound for subfault in op.subfaults for bound in [(0, np.Inf), (-np.Inf, np.Inf)]]
 opt_parameters = {
     'maxiter': 40000,
     'disp': True,
@@ -219,7 +217,7 @@ for i, (control, colour, marker) in enumerate(zip(op.active_controls, colours, m
 axes.grid(True)
 axes.set_xlabel(r"Target slip [$\mathrm m$]")
 axes.set_ylabel("Relative difference")
-axes.set_yticks([-80, -40, 0, 40, 80])
+axes.set_yticks([-40, -20, 0, 20, 40])
 use_percent(axes, x=False, y=True)
 axes.legend()
 savefig("slip_vs_diff", "plots", extensions=["pdf"])
