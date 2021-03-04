@@ -190,24 +190,24 @@ if bool(args.taylor_test or False):
     assert minconv > 1.90, minconv
 
 
-def cb_post(j, dj, mm):
-    op.control_trajectory.append(mm.dat.data[0])
+def cb_post(j, dj, control):
+    op.control_trajectory.append(control.dat.data[0])
     op.functional_trajectory.append(j)
     op.gradient_trajectory.append(dj.dat.data[0])
     msg = "control {:12.8f} functional {:15.8e} gradient {:15.8e}"
-    print(msg.format(mm.dat.data[0], j, dj.dat.data[0]))
+    print(msg.format(control.dat.data[0], j, dj.dat.data[0]))
     np.save('data/opt_progress_discrete_{:d}_ctrl'.format(level), op.control_trajectory)
     np.save('data/opt_progress_discrete_{:d}_func'.format(level), op.functional_trajectory)
     np.save('data/opt_progress_discrete_{:d}_grad'.format(level), op.gradient_trajectory)
     if abs(dj.dat.data[0]) < gtol:
-        op.line_search_trajectory.append(mm.dat.data[0])
+        op.line_search_trajectory.append(control.dat.data[0])
         np.save('data/opt_progress_discrete_{:d}_ls'.format(level), op.line_search_trajectory)
         raise GradientConverged
 
 
-def cb(mm):
+def cb(control):
     print("Line search complete")
-    op.line_search_trajectory.append(mm[0])
+    op.line_search_trajectory.append(control[0])
     np.save('data/opt_progress_discrete_{:d}_ls'.format(level), op.line_search_trajectory)
 
 

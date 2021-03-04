@@ -170,7 +170,7 @@ def solve_forward(control, store=False, keep=False):
     return None if store else J
 
 
-# Solve forward to get 'data'
+# Get 'data'
 print("Solve forward to get 'data'...")
 times = np.linspace(0, op.end_time, int(op.end_time/op.dt)+1)
 solve_forward(m, store=True)
