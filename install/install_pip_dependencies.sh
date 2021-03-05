@@ -15,6 +15,7 @@
 #  * pandas                                                              #
 #  * pyvista                                                             #
 #  * scipy                                                               #
+#  * sphinx                                                              #
 #  * triangle                                                            #
 #  * utide                                                               #
 #  * utm                                                                 #
@@ -38,7 +39,7 @@ fi
 
 # Install pip dependencies for adapt_utils
 python3 -m pip install gmsh jupyter matplotlib meshio mpltools netCDF4 nose pandas pyvista scipy \
-	triangle utide utm wurlitzer
+	sphinx triangle utide utm wurlitzer
 # python3 -m pip install qmesh
 if [ -e "$CLAW" ]; then
 	python3 -c "import clawpack"
