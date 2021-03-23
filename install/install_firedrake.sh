@@ -17,12 +17,12 @@
 unset PYTHONPATH
 
 # Environment variables for MPI
-export MPICC=/usr/bin/mpicc
-export MPICXX=/usr/bin/mpicxx
-export MPIEXEC=/usr/bin/mpiexec
-export MPIF90=/usr/bin/mpif90
-for mpi in mpicc mpicxx mpiexec mpif90; do
-	if [ ! -f /usr/bin/$mpi ]; then
+export MPICC=/usr/bin/mpicc.mpich
+export MPICXX=/usr/bin/mpicxx.mpich
+export MPIEXEC=/usr/bin/mpiexec.mpich
+export MPIF90=/usr/bin/mpif90.mpich
+for mpi in $MPICC $MPICXX $MPIEXEC $MPIF90; do
+	if [ ! -f $mpi ]; then
 		echo "Cannot find $mpi in /usr/bin."
 		exit 1
 	fi
