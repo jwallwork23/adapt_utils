@@ -33,5 +33,10 @@ configure_options = [
     # '--download-exodusii',
     '--download-eigen',
     '--download-pragmatic',
+
+    '--with-mpiexec=/usr/bin/mpiexec.mpich',
+    '--CC=/usr/bin/mpicc.mpich',
+    '--CXX=/usr/bin/mpicxx.mpich',
+    '--FC=/usr/bin/mpif90.mpich',
 ]
 configure.petsc_configure(configure_options)
