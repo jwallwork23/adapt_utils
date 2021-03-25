@@ -365,8 +365,8 @@ class HorizontalViscosityGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMoment
         alpha = self.options.sipg_parameter
         assert alpha is not None
         sigma = avg(alpha/self.cellsize)
-        flux_terms += -2*inner(sigma*avg(nu)*avg(uv), self.restrict(z))*self.dS  # Penalisation
-        flux_terms += 0.5*inner(stress_jump, self.restrict(grad(z)))*self.dS   # Symmetrisation
+        flux_terms += -inner(sigma*avg(nu)*jump(outer(uv, n)), self.restrict(outer(z, n)))*self.dS  # Penalisation
+        flux_terms += 0.5*inner(stress_jump, self.restrict(grad(z)))*self.dS                        # Symmetrisation
 
         return flux_terms
 
@@ -406,8 +406,9 @@ class HorizontalViscosityGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMoment
                 else:
                     stress_jump = nu*outer(delta_uv, self.normal)
 
+                # flux_terms += self.p0test*inner(dot(stress, n), z)*ds_bnd  # NOTE: Cancels!
                 flux_terms += -self.p0test*sigma*inner(nu*delta_uv, z)*ds_bnd  # Penalisation
-                flux_terms += self.p0test*inner(stress_jump, grad(z))*ds_bnd         # Symmetrisation
+                flux_terms += self.p0test*inner(stress_jump, grad(z))*ds_bnd   # Symmetrisation
 
         return flux_terms
 
