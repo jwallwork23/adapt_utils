@@ -5,7 +5,7 @@ import numpy as np
 import os
 import scipy.interpolate as si
 
-from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
 from adapt_utils.io import readfile
 
 
@@ -16,7 +16,7 @@ parser.add_argument('-debug', help="Toggle debugging mode")
 args = parser.parse_args()
 
 # Create an Options class for convenience
-op = TohokuOptions(debug=bool(args.debug or False))
+op = TohokuInversionOptions(debug=bool(args.debug or False))
 
 # Get gauge names
 gauges = [gauge.upper() for gauge in args.gauges]
@@ -36,7 +36,7 @@ for gauge in gauges:
     # Pressure gauge data is converted to free surface elevation so we need to know the total water
     # depth. We interpolate it from ETOPO1 bathymetry if it is unknown.
     op.print_debug("GAUGES: Getting depth for gauge {:s}".format(gauge))
-    if gauge in op.pressure_gauges:
+    if gauge[:2] != '80':
         if "depth" in op.gauges[gauge]:
             b = op.gauges[gauge]["depth"]
         else:
@@ -65,14 +65,14 @@ for gauge in gauges:
             if 'PG' not in gauge:
 
                 # Get time in hours, minutes and seconds
-                if gauge in op.pressure_gauges:
+                if gauge[:2] == '80':
+                    day = int(words[0][6:8])
+                    hms = words[0][-7:-1]
+                else:
                     hms = ''.join([words[3], words[4], words[5]])
                     day = int(words[2])
                     if gauge[0] == '2' and int(words[6]) == 1:
                         continue
-                else:
-                    day = int(words[0][6:8])
-                    hms = words[0][-7:-1]
                 if day < 11:
                     continue
                 elif day > 11:
