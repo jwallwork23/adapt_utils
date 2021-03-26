@@ -1,7 +1,6 @@
 from firedrake import *
 
 import matplotlib.pyplot as plt
-import numpy as np
 import os
 import pytest
 from wurlitzer import pipes

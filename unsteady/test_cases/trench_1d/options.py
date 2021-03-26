@@ -2,8 +2,6 @@ from thetis import *
 from thetis.configuration import *
 from thetis.options import ModelOptions2d
 
-import numpy as np
-
 from adapt_utils.io import initialise_hydrodynamics
 from adapt_utils.options import CoupledOptions
 from adapt_utils.sediment.sediments_model import SedimentModel

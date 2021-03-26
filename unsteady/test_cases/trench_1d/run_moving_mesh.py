@@ -8,7 +8,6 @@ from thetis import *
 
 import argparse
 import datetime
-import numpy as np
 import os
 import pandas as pd
 import time

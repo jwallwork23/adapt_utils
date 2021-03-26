@@ -6,7 +6,6 @@ from adapt_utils.io import initialise_hydrodynamics
 from adapt_utils.options import CoupledOptions
 from adapt_utils.sediment.sediments_model import SedimentModel
 
-import numpy as np
 
 __all__ = ["TrenchSlantOptions"]
 

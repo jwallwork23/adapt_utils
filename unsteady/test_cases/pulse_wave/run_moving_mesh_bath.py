@@ -2,7 +2,6 @@ import firedrake as fire
 from thetis import *
 
 import datetime
-import numpy as np
 import pandas as pd
 import os
 import time

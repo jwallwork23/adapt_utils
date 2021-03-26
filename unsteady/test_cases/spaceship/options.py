@@ -2,7 +2,6 @@ from thetis import *
 from thetis.configuration import *
 
 from math import e
-import numpy as np
 import os
 
 from adapt_utils.swe.turbine.options import TurbineOptions

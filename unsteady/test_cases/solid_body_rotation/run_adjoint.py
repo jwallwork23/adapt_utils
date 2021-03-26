@@ -1,9 +1,8 @@
 from thetis import *
 from firedrake_adjoint import *
 
-import os
-import numpy as np
 import argparse
+import os
 
 from adapt_utils.unsteady.test_cases.solid_body_rotation.options import LeVequeOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem

@@ -114,7 +114,7 @@ for gauge in gauges:
                     elev -= b
 
             # Convert other pressure gauge data under hydrostatic assumptions
-            elif gauge in op.pressure_gauges:
+            elif gauge[:2] != '80':
                 g = 9.81                    # Gravitational acceleration
                 rho = 1030.0                # Density of seawater
                 pressure = float(meas)*100  # Convert to Pa

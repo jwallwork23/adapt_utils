@@ -1,7 +1,5 @@
 from thetis import *
 
-import numpy as np
-
 from adapt_utils.plotting import *
 
 
