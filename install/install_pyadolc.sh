@@ -32,7 +32,7 @@ fi
 
 # KNOWN INSTALL BUG:
 #   You will need to remove the NULL return statement and then comment out these lines
-echo "Remove the 'return NULL;' satement in $VIRTUAL_ENV/lib/python3.6/site-packages/numpy/core/include/numpy/__multiarray_api.h."
+echo "Remove the 'return NULL;' satement in $VIRTUAL_ENV/lib/python$(python3 -c "print('$(python3 --version)'[-5:-2])")/site-packages/numpy/core/include/numpy/__multiarray_api.h."
 exit
 
 # Install dependencies

@@ -15,10 +15,10 @@ if [ ! -e "$SOFTWARE" ]; then
 fi
 
 # Environment variables for MPI
-export MPICC=/usr/bin/mpicc
-export MPICXX=/usr/bin/mpicxx
-export MPIF90=/usr/bin/mpif90
-export MPIEXEC=/usr/bin/mpiexec
+export MPICC=/usr/bin/mpicc.mpich
+export MPICXX=/usr/bin/mpicxx.mpich
+export MPIF90=/usr/bin/mpif90.mpich
+export MPIEXEC=/usr/bin/mpiexec.mpich
 
 # Environment variables for Firedrake installation
 export FIREDRAKE_ENV=firedrake-no-adapt
@@ -38,7 +38,8 @@ read chk
 # Install Firedrake
 curl -O https://raw.githubusercontent.com/firedrakeproject/firedrake/master/scripts/firedrake-install
 python3 firedrake-install --install thetis --venv-name $FIREDRAKE_ENV \
-	--mpicc $MPICC --mpicxx $MPICXX --mpif90 $MPIF90 --mpiexec $MPIEXEC
+	--mpicc $MPICC --mpicxx $MPICXX --mpif90 $MPIF90 --mpiexec $MPIEXEC \
+	--pip-install cython --pip-install tensorflow
 source $FIREDRAKE_DIR/bin/activate
 
 # Very basic test of installation
