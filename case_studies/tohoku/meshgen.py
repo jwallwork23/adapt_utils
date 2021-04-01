@@ -61,8 +61,6 @@ class MeshSetup:
         Generate mesh for Tohoku domain using QMESH.
         """
         boundary_dir = os.path.join(self.di, 'boundaries')
-        # if self.level == 0:
-        #     boundary_dir += '_coarse'
 
         # Read shapefile describing domain boundaries
         boundaries = qmesh.vector.Shapes()

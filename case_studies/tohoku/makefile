@@ -3,7 +3,9 @@ all: dir mesh gauges clean
 
 dir:
 	@echo "Creating output directory..."
-	@mkdir -p outputs
+	@mkdir -p resources/bathymetry
+	@mkdir -p resources/meshes
+	@mkdir -p resources/surf
 
 
 # --- Meshes
