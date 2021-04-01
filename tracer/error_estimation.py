@@ -3,7 +3,7 @@ Goal-oriented error indicators for the tracer transport model. See [Wallwork et 
 on the formulation.
 
 [Wallwork et al. 2021] J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, "Goal-Oriented Error
-    Estimation and Mesh Adaptation for Tracer Transport Problems", to be submitted to Computer
+    Estimation and Mesh Adaptation for Tracer Transport Problems", submitted to Computer
     Aided Design.
 """
 from __future__ import absolute_import

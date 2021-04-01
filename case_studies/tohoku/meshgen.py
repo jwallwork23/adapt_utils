@@ -1,8 +1,8 @@
 """
 Generate a hierarchy of meshes for the Tohoku tsunami problem.
 
-The bathymetry files used to extract contours were taken from both GEBCO (https://www.gebco.net/)
-and ETOPO1 (https://www.ngdc.noaa.gov/mgg/global/).
+The bathymetry files used to extract contours were taken from
+ETOPO1 (https://www.ngdc.noaa.gov/mgg/global/).
 """
 import os
 import qmesh

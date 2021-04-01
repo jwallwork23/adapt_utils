@@ -103,9 +103,6 @@ kwargs = {
     'end_time': float(args.end_time or 1440.0),
     'num_meshes': int(args.num_meshes or 24),
 
-    # Timestepping
-    'dt_per_export': 1,
-
     # Physics
     'bathymetry_cap': 30.0,
     'base_viscosity': float(args.base_viscosity or 1.0e-03),
@@ -147,6 +144,7 @@ save_meshes = bool(args.save_meshes or False)
 op = TohokuHazardOptions(**kwargs)
 if args.dt is not None:
     op.dt = float(args.dt)
+op.dt_per_export = 1
 
 if bool(args.lu or False):
     from adapt_utils.params import lu_params

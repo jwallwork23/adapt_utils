@@ -1947,7 +1947,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
           * Maximum number of iterations reached (`op.max_adapt`).
 
         [Wallwork et al. 2021] J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, "Goal-Oriented
-            Error Estimation and Mesh Adaptation for Tracer Transport Problems", to be submitted to
+            Error Estimation and Mesh Adaptation for Tracer Transport Problems", submitted to
             Computer Aided Design.
         """
         op = self.op
@@ -2158,7 +2158,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
           * Maximum number of iterations reached (`op.max_adapt`).
 
         [Wallwork et al. 2021] J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, "Goal-Oriented
-            Error Estimation and Mesh Adaptation for Tracer Transport Problems", to be submitted to
+            Error Estimation and Mesh Adaptation for Tracer Transport Problems", submitted to
             Computer Aided Design.
         """
         if self.approach == 'weighted_hessian':
