@@ -25,7 +25,7 @@ qmesh: qmesh_linear qmesh_nonlinear
 
 fixed_mesh:
 	@echo "Solving Tohoku tsunami problem on a fixed mesh..."
-	@python3 run_fixed_mesh.py -plot_pvd 1
+	@python3 run_fixed_mesh.py -plot_pvd 1 -level 1
 
 #  NOTE: There are three boundary segments, on which we can specify gradation parameters (in km):
 #    * Artificial open ocean (tag 100);
@@ -33,27 +33,29 @@ fixed_mesh:
 #    * Coast around Fukushima (tag 300).
 #   The -dm_plex_remesh_bd option can also be used, but note that it deforms the domain boundary.
 
+adapt: hessian dwp dwr weighted_hessian
+
 hessian:
 	@echo "Solving Tohoku tsunami problem using anisotropic 'Hessian based' adaptation..."
-	@python3 run_adapt.py -approach hessian -plot_pvd 1 \
+	@python3 run_adapt.py -approach hessian -plot_pvd 1 -level 1 \
 		-dm_plex_prescribed_boundary_labels 200,300 \
 		-dm_plex_prescribed_boundary_sizes 10e3,5e3
 
 dwp:
 	@echo "Solving Tohoku tsunami problem using isotropic 'dual weighted primal' adaptation..."
-	@python3 run_adapt.py -approach dwp -plot_pvd 1 \
+	@python3 run_adapt.py -approach dwp -plot_pvd 1 -level 1 \
 		-dm_plex_prescribed_boundary_labels 200,300 \
 		-dm_plex_prescribed_boundary_sizes 10e3,5e3
 
 dwr:
 	@echo "Solving Tohoku tsunami problem using isotropic 'dual weighted residual' adaptation..."
-	@python3 run_adapt.py -approach dwr -plot_pvd 1 \
+	@python3 run_adapt.py -approach dwr -plot_pvd 1 -level 1 \
 		-dm_plex_prescribed_boundary_labels 200,300 \
 		-dm_plex_prescribed_boundary_sizes 10e3,5e3
 
 weighted_hessian:
 	@echo "Solving Tohoku tsunami problem using anisotropic 'weighted Hessian' adaptation..."
-	@python3 run_adapt.py -approach weighted_hessian -plot_pvd 1 \
+	@python3 run_adapt.py -approach weighted_hessian -plot_pvd 1 -level 1 \
 		-dm_plex_prescribed_boundary_labels 200,300 \
 		-dm_plex_prescribed_boundary_sizes 10e3,5e3
 
