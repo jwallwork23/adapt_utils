@@ -43,10 +43,6 @@ class BubbleOptions(CoupledOptions):
         boundary_conditions = {
             'tracer': {
                 'on_boundary': {'value': Constant(0.0)}
-                # 1: {'value': Constant(0.0)},
-                # 2: {'value': Constant(0.0)},
-                # 3: {'value': Constant(0.0)},
-                # 4: {'value': Constant(0.0)},
             },
         }
         return boundary_conditions

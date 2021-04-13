@@ -70,12 +70,6 @@ def monitor(mesh):
 mesh_mover = MeshMover(tp.meshes[0], monitor, method='monge_ampere', op=op)
 mesh_mover.adapt()
 tp.__init__(op, meshes=[Mesh(mesh_mover.x)])
-# for i in range(op.max_adapt):
-#     tp.set_initial_condition()
-#     M = tp.get_static_hessian_metric('tracer')
-#     space_normalise(M, op=op)
-#     enforce_element_constraints(M, op=op)
-#     tp.__init__(op, meshes=[adapt(tp.meshes[0], M)])
 
 
 # --- Solve the tracer transport problem
