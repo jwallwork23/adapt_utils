@@ -183,9 +183,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         assert mode in ('hp', 'h', 'p')
         eop = op.copy()
         if 'p' in mode:
-            eop.increase_degree(field)              # Apply p-refinement
-            if op.stabilisation in ('su', 'supg'):  # These don't extend well under p-refinement
-                eop.stabilisation = None
+            eop.increase_degree(field)  # Apply p-refinement
         mesh = self.mesh
         if 'h' in mode:
             mesh = MeshHierarchy(mesh, op.num_refinements)[1]  # Apply h-refinement
