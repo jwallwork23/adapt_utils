@@ -115,28 +115,28 @@ adjoint: dwr_adjoint isotropic_dwr_adjoint anisotropic_dwr_adjoint weighted_hess
 
 dwr_adjoint:
 	@echo "Running vertexwise isotropic adjoint DWR adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach dwr_adjoint
-	@python3 run_adaptation_loop.py -approach dwr_adjoint -offset 1
+	@python3 run_adaptation_loop.py -approach dwr_adjoint -discrete_adjoint 0
+	@python3 run_adaptation_loop.py -approach dwr_adjoint -offset 1 -discrete_adjoint 0
 
 isotropic_dwr_adjoint:
 	@echo "Running elementwise anisotropic adjoint DWR adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach isotropic_dwr_adjoint
-	@python3 run_adaptation_loop.py -approach isotropic_dwr_adjoint -offset 1
+	@python3 run_adaptation_loop.py -approach isotropic_dwr_adjoint -discrete_adjoint 0
+	@python3 run_adaptation_loop.py -approach isotropic_dwr_adjoint -offset 1 -discrete_adjoint 0
 
 anisotropic_dwr_adjoint:
 	@echo "Running anisotropic adjoint DWR adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach anisotropic_dwr_adjoint
-	@python3 run_adaptation_loop.py -approach anisotropic_dwr_adjoint -offset 1
+	@python3 run_adaptation_loop.py -approach anisotropic_dwr_adjoint -discrete_adjoint 0
+	@python3 run_adaptation_loop.py -approach anisotropic_dwr_adjoint -offset 1 -discrete_adjoint 0
 
 weighted_hessian_adjoint:
 	@echo "Running adjoint 'weighted Hessian' anisotropic adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach weighted_hessian_adjoint
-	@python3 run_adaptation_loop.py -approach weighted_hessian_adjoint -offset 1
+	@python3 run_adaptation_loop.py -approach weighted_hessian_adjoint -discrete_adjoint 0
+	@python3 run_adaptation_loop.py -approach weighted_hessian_adjoint -offset 1 -discrete_adjoint 0
 
 weighted_gradient_adjoint:
 	@echo "Running adjoint 'weighted gradient' anisotropic adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach weighted_gradient_adjoint
-	@python3 run_adaptation_loop.py -approach weighted_gradient_adjoint -offset 1
+	@python3 run_adaptation_loop.py -approach weighted_gradient_adjoint -discrete_adjoint 0
+	@python3 run_adaptation_loop.py -approach weighted_gradient_adjoint -offset 1 -discrete_adjoint 0
 
 # --- Adaptation runs based on 2nd order result / combinations of first order results
 
@@ -148,58 +148,58 @@ second_order: dwr_both avg int
 
 dwr_both:
 	@echo "Running vertexwise second order isotropic DWR adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach dwr_both
-	@python3 run_adaptation_loop.py -approach dwr_both -offset 1
+	@python3 run_adaptation_loop.py -approach dwr_both -discrete_adjoint 0
+	@python3 run_adaptation_loop.py -approach dwr_both -offset 1 -discrete_adjoint 0
 
 dwr_avg:
 	@echo "Running vertexwise second order isotropic DWR adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach dwr_avg
-	@python3 run_adaptation_loop.py -approach dwr_avg -offset 1
+	@python3 run_adaptation_loop.py -approach dwr_avg -discrete_adjoint 0
+	@python3 run_adaptation_loop.py -approach dwr_avg -offset 1 -discrete_adjoint 0
 
 isotropic_dwr_avg:
 	@echo "Running elementwise second order isotropic DWR adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach isotropic_dwr_avg
-	@python3 run_adaptation_loop.py -approach isotropic_dwr_avg -offset 1
+	@python3 run_adaptation_loop.py -approach isotropic_dwr_avg -discrete_adjoint 0
+	@python3 run_adaptation_loop.py -approach isotropic_dwr_avg -offset 1 -discrete_adjoint 0
 
 anisotropic_dwr_avg:
 	@echo "Running averaged first order anisotropic DWR adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach anisotropic_dwr_avg
-	@python3 run_adaptation_loop.py -approach anisotropic_dwr_avg -offset 1
+	@python3 run_adaptation_loop.py -approach anisotropic_dwr_avg -discrete_adjoint 0
+	@python3 run_adaptation_loop.py -approach anisotropic_dwr_avg -offset 1 -discrete_adjoint 0
 
 weighted_hessian_avg:
 	@echo "Running averaged 'weighted Hessian' adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach weighted_hessian_avg
-	@python3 run_adaptation_loop.py -approach weighted_hessian_avg -offset 1
+	@python3 run_adaptation_loop.py -approach weighted_hessian_avg -discrete_adjoint 0
+	@python3 run_adaptation_loop.py -approach weighted_hessian_avg -offset 1 -discrete_adjoint 0
 
 weighted_gradient_avg:
 	@echo "Running averaged 'weighted gradient' adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach weighted_gradient_avg
-	@python3 run_adaptation_loop.py -approach weighted_gradient_avg -offset 1
+	@python3 run_adaptation_loop.py -approach weighted_gradient_avg -discrete_adjoint 0
+	@python3 run_adaptation_loop.py -approach weighted_gradient_avg -offset 1 -discrete_adjoint 0
 
 dwr_int:
 	@echo "Running vertexwise intersected first order isotropic DWR adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach dwr_int
-	@python3 run_adaptation_loop.py -approach dwr_int -offset 1
+	@python3 run_adaptation_loop.py -approach dwr_int -discrete_adjoint 0
+	@python3 run_adaptation_loop.py -approach dwr_int -offset 1 -discrete_adjoint 0
 
 isotropic_dwr_int:
 	@echo "Running elementwise intersected first order anisotropic DWR adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach isotropic_dwr_int
-	@python3 run_adaptation_loop.py -approach isotropic_dwr_int -offset 1
+	@python3 run_adaptation_loop.py -approach isotropic_dwr_int -discrete_adjoint 0
+	@python3 run_adaptation_loop.py -approach isotropic_dwr_int -offset 1 -discrete_adjoint 0
 
 anisotropic_dwr_int:
 	@echo "Running intersected first order anisotropic DWR adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach anisotropic_dwr_int
-	@python3 run_adaptation_loop.py -approach anisotropic_dwr_int -offset 1
+	@python3 run_adaptation_loop.py -approach anisotropic_dwr_int -discrete_adjoint 0
+	@python3 run_adaptation_loop.py -approach anisotropic_dwr_int -offset 1 -discrete_adjoint 0
 
 weighted_hessian_int:
 	@echo "Running intersected 'weighted Hessian' adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach weighted_hessian_int
-	@python3 run_adaptation_loop.py -approach weighted_hessian_int -offset 1
+	@python3 run_adaptation_loop.py -approach weighted_hessian_int -discrete_adjoint 0
+	@python3 run_adaptation_loop.py -approach weighted_hessian_int -offset 1 -discrete_adjoint 0
 
 weighted_gradient_int:
 	@echo "Running intersected 'weighted gradient' adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach weighted_gradient_int -target 250
-	@python3 run_adaptation_loop.py -approach weighted_gradient_int -target 250 -offset 1
+	@python3 run_adaptation_loop.py -approach weighted_gradient_int -target 250 -discrete_adjoint 0
+	@python3 run_adaptation_loop.py -approach weighted_gradient_int -target 250 -offset 1 -discrete_adjoint 0
 
 # --- Convergence plots
 

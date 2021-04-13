@@ -621,7 +621,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
         # Interior source Hessian term
         if source:
-            S = self.kernels_tracer[0]
+            S = self.op.set_qoi_kernel_tracer(self, 0)
             interior_hessians.append(interpolate(steady_metric(S, **kwargs)*abs(c), P1_ten))
 
         # Average interior Hessians
