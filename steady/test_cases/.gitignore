@@ -12,6 +12,8 @@ point_discharge3d/screenshots/
 point_discharge3d/__pycache__/
 spacetime_ripple/
 spacetime_ripple/
+turbine_array/run.py
+turbine_array/run-noid.py
 turbine_array/outputs/
 turbine_array/resources/
 turbine_array/screenshots/

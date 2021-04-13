@@ -8,7 +8,7 @@ dir:
 lint:
 	@echo "Checking lint..."
 	@flake8 --ignore=E501,E226,E402,E731,E741,F403,F405,F999,N803,N806,W503 \
-		--exclude=*/test_cases/spaceship/nic*
+		--exclude=*/test_cases/spaceship/nic*,steady/test_cases/turbine_array/run.py,steady/test_cases/turbine_array/run-noid.py
 	@echo "PASS"
 
 test_all: clean
