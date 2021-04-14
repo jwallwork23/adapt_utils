@@ -31,7 +31,7 @@ else:
 fname = 'qoi_{:s}'.format(ext)
 
 # Arrays etc.
-num_levels = 5
+num_levels = 7
 di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs', 'fixed_mesh', 'hdf5'))
 qois = {'aligned': [], 'offset': []}
 num_cells = []

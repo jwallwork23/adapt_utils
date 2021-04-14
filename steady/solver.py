@@ -697,11 +697,11 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
         # Compute error indicators
         self.indicate_error(adapt_field, approach=approach)
-        dwr = self.indicator[self.op.enrichment_method]
+        dwr = abs(self.indicator[self.op.enrichment_method])
 
         # Get current element volume
         K = Function(self.P0[0], name="Element volume")
-        K_hat = 0.5  # Area of a triangular reference element
+        K_hat = 0.5 if dim == 2 else 1/3  # Area of simplicial reference element
         K.interpolate(K_hat*abs(JacobianDeterminant(self.mesh)))
 
         # Get optimal element volume
