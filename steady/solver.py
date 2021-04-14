@@ -421,6 +421,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             # Sum cell and flux contributions
             self.indicator['DQ'] += interpolate(
                 (sqrt(abs(cell)) + sqrt(abs(flux/h)))*sqrt(abs(laplacian)), self.P0[0])
+            self.indicator['dwr'] = interpolate(
+                (sqrt(abs(cell)) + sqrt(abs(flux/h)))*sqrt(abs(laplacian)), self.P1[0])
 
         if adjoint:
 
@@ -453,6 +455,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             # Sum cell and flux contributions
             self.indicator['DQ'] += interpolate(
                 (sqrt(abs(cell)) + sqrt(abs(flux/h)))*sqrt(abs(laplacian)), self.P0[0])
+            self.indicator['dwr_adjoint'] = interpolate(
+                (sqrt(abs(cell)) + sqrt(abs(flux/h)))*sqrt(abs(laplacian)), self.P1[0])
 
         if both:
             self.indicator['cell'] *= 0.5
