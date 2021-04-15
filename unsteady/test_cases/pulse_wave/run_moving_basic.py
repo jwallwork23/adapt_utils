@@ -1,4 +1,5 @@
 from thetis import *
+<<<<<<< HEAD
 from firedrake.petsc import PETSc
 import firedrake as fire
 
@@ -43,6 +44,15 @@ def initialise_fields(mesh2d, inputdir):
         chk.close()
 
     return bath
+=======
+
+import datetime
+import time
+
+from adapt_utils.io import export_bathymetry
+from adapt_utils.unsteady.solver import AdaptiveProblem
+from adapt_utils.unsteady.test_cases.beach_pulse_wave.options import BeachOptions
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 nx = 0.5
 ny = 0.5
@@ -51,26 +61,40 @@ alpha = 1
 beta = 1
 gamma = 1
 
+<<<<<<< HEAD
 kappa = 100 #12.5
+=======
+kappa = 100
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
+<<<<<<< HEAD
 inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220))
 print(inputdir)
+=======
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 kwargs = {
     'approach': 'monge_ampere',
     'nx': nx,
     'ny': ny,
     'plot_pvd': True,
+<<<<<<< HEAD
     'input_dir': inputdir,
+=======
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     'output_dir': outputdir,
     'nonlinear_method': 'relaxation',
     'r_adapt_rtol': 1.0e-3,
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
+<<<<<<< HEAD
+=======
+    'stabilisation_sediment': None,
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     'use_automatic_sipg_parameter': True,
     'friction': 'manning'
 }
@@ -78,20 +102,34 @@ kwargs = {
 op = BeachOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
+<<<<<<< HEAD
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
 def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
+=======
+
+
+def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kappa):
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     P1 = FunctionSpace(mesh, "CG", 1)
     b = swp.fwd_solutions_bathymetry[0]
 
     if b is not None:
+<<<<<<< HEAD
     	abs_hor_vel_norm = Function(b.function_space()).project(conditional(b > 0.0, Constant(1.0), Constant(0.0)))
+=======
+        abs_hor_vel_norm = Function(b.function_space()).project(conditional(b > 0.0, Constant(1.0), Constant(0.0)))
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     else:
         abs_hor_vel_norm = Function(swp.bathymetry[0].function_space()).project(conditional(swp.bathymetry[0] > 0.0, Constant(2.0), Constant(0.0)))
     comp_new = project(abs_hor_vel_norm, P1)
     mon_init = project(1.0 + alpha * comp_new, P1)
     return mon_init
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 swp.set_monitor_functions(velocity_monitor)
 
 t1 = time.time()
@@ -100,6 +138,7 @@ t2 = time.time()
 
 print(t2-t1)
 
+<<<<<<< HEAD
 #new_mesh = RectangleMesh(880, 20, 220, 10)
 
 #bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
@@ -129,3 +168,7 @@ print(alpha)
 print(beta)
 print(gamma)
 """
+=======
+fpath = "hydrodynamics_beach_bath_new_{:d}_test".format(int(nx*220))
+export_bathymetry(swp.fwd_solutions_bathymetry[0], fpath, op=op)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a

@@ -1,9 +1,15 @@
 """
 Runs the steady test case scripts found in `steady/test_cases/`. In some cases these examples include
+<<<<<<< HEAD
 assertions which verify desired behaviour, but in most cases it is just verified that the solve does not
 crash.
 
 The code used in this script was largely copied from `thetis/test/examples.py`.
+=======
+assertions which verify desired behaviour, but in most cases it is just verified that the solve does not crash.
+
+The code used in this script was largely copied from `thetis/test/test_examples.py`.
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 """
 import pytest
 import os
@@ -13,6 +19,7 @@ import subprocess
 import shutil
 
 
+<<<<<<< HEAD
 examples = [
     # TODO: 'box_discharge2d/run.py',
     # TODO: 'point_discharge2d/run.py',
@@ -24,6 +31,18 @@ examples = [
     # TODO: 'turbine_array/run_adaptive_convergence.py',
 ]
 
+=======
+# Collate a list of all examples to be tested
+examples = [
+    # TODO: 'box_discharge2d/run_fixed_mesh.py',
+    'point_discharge2d/run_fixed_mesh.py',
+    'point_discharge2d/run_adapt.py',
+    'point_discharge3d/run_fixed_mesh.py',
+    # TODO: 'space_time_ripple/run_fixed_mesh.py',
+    'turbine_array/run_fixed_mesh.py',
+    # TODO: 'turbine_array/run_adapt.py',
+]
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 cwd = os.path.abspath(os.path.dirname(__file__))
 unsteady_dir = os.path.abspath(os.path.join(cwd, '..', 'steady', 'test_cases'))
 examples = [os.path.join(unsteady_dir, f) for f in examples]

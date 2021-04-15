@@ -3,7 +3,11 @@ from firedrake import *
 import numpy as np
 import warnings
 
+<<<<<<< HEAD:unsteady/swe/tsunami/tsunami1d/options.py
 from adapt_utils.unsteady.options import CoupledOptions
+=======
+from adapt_utils.options import CoupledOptions
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a:test_cases/tsunami1d/options.py
 
 
 __all__ = ["Tsunami1dOptions"]

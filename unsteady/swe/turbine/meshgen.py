@@ -1,26 +1,36 @@
+import argparse
 import os
 
+from adapt_utils.steady.test_cases.turbine_array.options import TurbineArrayOptions
 
-__all__ = ["generate_geo_file"]
+
+# --- Parse arguments
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-level', help='Mesh resolution')
+args = parser.parse_args()
+levels = ('xcoarse', 'coarse', 'medium', 'fine', 'xfine')
 
 
-def generate_geo_file(op, level='xcoarse', filepath='.'):
+# --- Function definitions
+
+def generate_geo_file(offset, level):
     """
     Generate domain geometry file using the specifications in `op`.
 
-    :arg op: Parameter class.
-    :kwarg level: Desired level of mesh resolution.
-    :kwarg filepath: Where to save .geo file.
+    :arg offset: offset of turbines to the south and north in terms of number of turbine diameters.
+    :arg level: Desired level of mesh resolution.
     """
     try:
         assert level in ('xcoarse', 'coarse', 'medium', 'fine', 'xfine')
     except AssertionError:
         raise ValueError("Mesh resolution level '{:s}' not recognised.".format(level))
+    op = TurbineArrayOptions(offset=offset)
 
     # Get number of turbines
     locs = op.region_of_interest
     n = len(locs)
-    assert n >= 0
+    assert n > 0
 
     # Get turbine diameter
     d = locs[0][2]
@@ -31,8 +41,9 @@ def generate_geo_file(op, level='xcoarse', filepath='.'):
             raise NotImplementedError("Turbines of different diameter not considered.")
     D = 2*d
 
-    # Create mesh file and define parameters
-    f = open(os.path.join(filepath, '{:s}_{:d}.geo'.format(level, op.offset)), 'w+')
+    # Create mesh geometry file and define parameters
+    fpath = os.path.dirname(op.mesh_file)
+    f = open(os.path.join(fpath, '{:s}_{:d}.geo'.format(level, op.offset)), 'w+')
     f.write('W={:.1f};     // width of channel\n'.format(op.domain_width))
     f.write('L={:.1f};      // length of channel\n'.format(op.domain_length))
     f.write('D={:.1f};     // turbine diameter\n'.format(D))
@@ -54,6 +65,7 @@ def generate_geo_file(op, level='xcoarse', filepath='.'):
         f.write('Point({:d}) = {{xt{:d}+D/2, yt{:d}-D/2, 0., dx2}};\n'.format(5+4*i+1, i, i))
         f.write('Point({:d}) = {{xt{:d}+D/2, yt{:d}+D/2, 0., dx2}};\n'.format(5+4*i+2, i, i))
         f.write('Point({:d}) = {{xt{:d}-D/2, yt{:d}+D/2, 0., dx2}};\n'.format(5+4*i+3, i, i))
+
     for j in range(1, 5):
         f.write('Line({:d}) = {{{:d}, {:d}}};\n'.format(j, j, j % 4+1))
     for i in range(n):
@@ -93,3 +105,11 @@ def generate_geo_file(op, level='xcoarse', filepath='.'):
         f.write('// id inside turbine{:d}\n'.format(i+1))
         f.write('Physical Surface({:d}) = {{{:d}}};\n'.format(i+2, i+2))
     f.close()
+
+
+for offset in (0, 1, 2):
+    if args.level is not None:
+        generate_geo_file(offset, args.level)
+    else:
+        for level in levels:
+            generate_geo_file(offset, level)

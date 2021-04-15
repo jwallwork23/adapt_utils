@@ -1,9 +1,17 @@
 """
+<<<<<<< HEAD
 Runs the unsteady test case scripts found in `unsteady/test_cases/`. In some cases these examples include
 assertions which verify desired behaviour, but in most cases it is just verified that the solve does not
 crash and reaches the end of the required time period.
 
 The code used in this script was largely copied from `thetis/test/examples.py`.
+=======
+Runs the unsteady test case scripts found in `unsteady/test_cases/`. In some cases these examples
+include assertions which verify desired behaviour, but in most cases it is just verified that the
+solve does not crash and reaches the end of the simulation.
+
+The code used in this script was largely copied from `thetis/test/test_examples.py`.
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 """
 import pytest
 import os
@@ -13,6 +21,7 @@ import subprocess
 import shutil
 
 
+<<<<<<< HEAD
 examples = [
     'cosine_prescribed_velocity/run.py',
     'solid_body_rotation/run_fixed_mesh.py',
@@ -27,6 +36,42 @@ examples = [
     # 'turbine_array/run.py',  # TODO
 ]
 
+=======
+# Set environment flag so indicate shorter tests
+os.environ['REGRESSION_TEST'] = "1"
+
+# Collate a list of all examples to be tested
+examples = [
+
+    # Fixed mesh
+    'balzano/run_fixed_mesh.py',              # Has been cut short
+    'beach_slope/run_fixed_mesh.py',          # Has been cut (very) short
+    'beach_wall/run_fixed_mesh.py',           # Has been cut (very) short
+    'bubble_shear/run_fixed_mesh.py',         # Has been cut short
+    'pulse_wave/run_fixed_mesh.py',           # Has been cut (very) short
+    'rossby_wave/run_fixed_mesh.py',          # Has been cut short
+    'solid_body_rotation/run_fixed_mesh.py',
+    # 'spaceship/run_fixed_mesh.py',          # Takes too long to run
+    'trench_1d/run_fixed_mesh.py',            # Has been cut (very) short
+    'trench_slant/run_fixed_mesh.py',         # Has been cut (very) short
+    # 'turbine_array/run_fixed_mesh.py',      # Takes too long to run
+
+    # Moving mesh
+    'balzano/run_moving_mesh.py',               # Has been cut short
+    # 'beach_slope/run_moving_mesh.py',         # TODO
+    # 'beach_wall/run_moving_mesh.py',          # TODO
+    # 'bubble_shear/run_lagrangian.py',         # TODO: xfail it
+    # 'bubble_shear/run_moving_mesh.py',        # TODO
+    # 'cosine_prescribed_velocity/compare.py',  # FIXME: Lagrangian coords do not match
+    # 'pulse_wave/run_moving_mesh.py',          # TODO
+    'rossby_wave/run_moving_mesh.py',           # Has been cut (very) short
+    'solid_body_rotation/run_lagrangian.py',
+    # 'trench_1d/run_moving_mesh.py',           # TODO
+    # 'trench_slant/run_moving_mesh.py',        # TODO
+
+    # Metric-based  # TODO
+]
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 cwd = os.path.abspath(os.path.dirname(__file__))
 unsteady_dir = os.path.abspath(os.path.join(cwd, '..', 'unsteady', 'test_cases'))
 examples = [os.path.join(unsteady_dir, f) for f in examples]

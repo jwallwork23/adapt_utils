@@ -5,7 +5,10 @@ import os
 
 from adapt_utils.maths import bessk0
 from adapt_utils.options import CoupledOptions
+<<<<<<< HEAD
 from adapt_utils.params import *
+=======
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 
 __all__ = ["PointDischarge2dOptions"]
@@ -26,13 +29,21 @@ class PointDischarge2dOptions(CoupledOptions):
     :kwarg shift: Shift in x-direction for source location.
     :kwarg aligned: Toggle whether receiver is positioned in the centre of the flow or not.
     """
+<<<<<<< HEAD
     def __init__(self, level=0, shift=1.0, aligned=True, direct=True, **kwargs):
         self.timestepper = 'SteadyState'
+=======
+    def __init__(self, level=0, shift=1.0, aligned=True, **kwargs):
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         super(PointDischarge2dOptions, self).__init__(**kwargs)
         self.solve_swe = False
         self.solve_tracer = True
 
         # Steady state
+<<<<<<< HEAD
+=======
+        self.timestepper = 'SteadyState'
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         self.start_time = 0.0
         self.end_time = 20.0
         self.dt = 20.0
@@ -46,13 +57,21 @@ class PointDischarge2dOptions(CoupledOptions):
         # FEM
         self.degree_tracer = 1
         self.tracer_family = 'cg'
+<<<<<<< HEAD
         self.stabilisation_tracer = 'SUPG'
         self.use_automatic_sipg_parameter = True
         self.use_limiter_for_tracers = False
+=======
+        self.stabilisation = 'SUPG'
+        self.use_automatic_sipg_parameter = True
+        self.use_limiter_for_tracers = False
+        self.lax_friedrichs_tracer_scaling_factor = Constant(1.0)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
         # Hydrodynamics
         self.base_velocity = [1.0, 0.0]
         self.base_diffusivity = 0.1
+<<<<<<< HEAD
         self.diffusivity_space_family = "R"
         self.diffusivity_space_degree = 0
         self.characteristic_speed = Constant(1.0)
@@ -67,15 +86,39 @@ class PointDischarge2dOptions(CoupledOptions):
 
         # Mesh adaptation
         rtol = 0.005
+=======
+
+        # Source / receiver
+        self.source_value = 100.0
+        self.source_discharge = 0.1
+        self.region_of_interest = [(20.0, 5.0, 0.5)] if aligned else [(20.0, 7.5, 0.5)]
+
+        # Goal-oriented error estimation
+        self.degree_increase_tracer = 1
+        self.adapt_field = 'tracer'
+
+        # Mesh adaptation
+        rtol = 0.001
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         self.element_rtol = rtol
         self.estimator_rtol = rtol
         self.qoi_rtol = rtol
         self.h_min = 1.0e-10
         self.h_max = 1.0e+02
 
+<<<<<<< HEAD
         # Solver parameters
         self.solver_parameters['tracer'] = direct_tracer_params if direct else iterative_tracer_params
         self.adjoint_solver_parameters['tracer'] = self.solver_parameters['tracer']
+=======
+        # Robust solver parameters
+        self.solver_parameters['tracer'] = {
+            'mat_type': 'aij',
+            'ksp_type': 'preonly',
+            'pc_type': 'lu',
+            'pc_factor_mat_solver_type': 'mumps',
+        }
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     def set_boundary_conditions(self, prob, i):
         zero = Constant(0.0)
@@ -98,7 +141,11 @@ class PointDischarge2dOptions(CoupledOptions):
 
         Note that the calibrated radii are computed on mesh level 4 in the hierarchy.
         """
+<<<<<<< HEAD
         stabilisation = self.stabilisation_tracer
+=======
+        stabilisation = self.stabilisation
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         calibration_results = {
             'cg': {
                 None: 0.05606309,
@@ -126,9 +173,12 @@ class PointDischarge2dOptions(CoupledOptions):
     def set_tracer_source(self, fs):
         return self.gaussian(fs.mesh(), source=True, scale=self.source_value)
 
+<<<<<<< HEAD
     def get_velocity(self, t):
         return as_vector(self.base_velocity)
 
+=======
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     def set_qoi_kernel_tracer(self, prob, i):
         return self.set_qoi_kernel(prob.meshes[i])
 
@@ -136,7 +186,11 @@ class PointDischarge2dOptions(CoupledOptions):
         b = self.ball(mesh, source=False)
         area = assemble(b*dx)
         area_analytical = pi*self.region_of_interest[0][2]**2
+<<<<<<< HEAD
         rescaling = Constant(1.0 if np.isclose(area, 0.0) else area_analytical/area)
+=======
+        rescaling = 1.0 if np.allclose(area, 0.0) else area_analytical/area
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         return rescaling*b
 
     def analytical_solution(self, fs):

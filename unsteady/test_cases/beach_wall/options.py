@@ -1,5 +1,6 @@
 from thetis import *
 from thetis.configuration import *
+<<<<<<< HEAD
 
 from adapt_utils.unsteady.options import CoupledOptions
 from adapt_utils.unsteady.swe.utils import heaviside_approx
@@ -14,6 +15,15 @@ from matplotlib import rc
 
 rc('text', usetex=True)
 
+=======
+from thetis.options import ModelOptions2d
+
+from adapt_utils.io import initialise_hydrodynamics
+from adapt_utils.options import CoupledOptions
+from adapt_utils.sediment.sediments_model import SedimentModel
+
+import numpy as np
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 __all__ = ["BeachOptions"]
 
@@ -26,9 +36,14 @@ class BeachOptions(CoupledOptions):
     the effect of tidal currents and waves on the profile shape of intertidal
     mudflats." Continental Shelf Research 20.10-11 (2000): 1079-1097.
     """
+<<<<<<< HEAD
 
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny=1, mesh = None, input_dir = None, output_dir = None, **kwargs):
 
+=======
+    def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny=1, mesh=None, input_dir=None, output_dir=None, **kwargs):
+        self.timestepper = 'CrankNicolson'
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         super(BeachOptions, self).__init__(**kwargs)
 
         try:
@@ -52,12 +67,19 @@ class BeachOptions(CoupledOptions):
         self.set_up_morph_model(self.default_mesh)
 
         # Initial
+<<<<<<< HEAD
         self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
         #self.elev_init = Constant(0.0)
         #self.uv_init = as_vector((10**(-7), 0.0))
 
         self.plot_pvd = True
         self.hessian_recovery = 'dL2'
+=======
+        self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=output_dir, op=self)
+
+        self.plot_pvd = True
+        self.hessian_recovery = 'L2'
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
         self.grad_depth_viscosity = True
 
@@ -65,35 +87,60 @@ class BeachOptions(CoupledOptions):
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
+<<<<<<< HEAD
+=======
+        self.stabilisation_sediment = 'lax_friedrichs'
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
         self.morphological_acceleration_factor = Constant(1000)
 
         # Boundary conditions
         h_amp = 0.25  # Ocean boundary forcing amplitude
+<<<<<<< HEAD
         v_amp = 0.5 # Ocean boundary foring velocity
         omega = 0.5  # Ocean boundary forcing frequency
         self.ocean_elev_func = lambda t: (h_amp * np.cos(-omega *(t+(100.0))))
         self.ocean_vel_func = lambda t: (v_amp * np.cos(-omega *(t+(100.0))))
+=======
+        v_amp = 0.5   # Ocean boundary foring velocity
+        omega = 0.5   # Ocean boundary forcing frequency
+        self.ocean_elev_func = lambda t: (h_amp*np.cos(-omega*(t + (100.0))))
+        self.ocean_vel_func = lambda t: (v_amp*np.cos(-omega*(t + (100.0))))
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
         self.tracer_init = Constant(0.0)
 
         # Time integration
+<<<<<<< HEAD
 
+=======
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         self.dt = 0.5
         self.end_time = float(self.num_hours*3600.0/self.morphological_acceleration_factor)
         self.dt_per_mesh_movement = 14
         self.dt_per_export = 14
+<<<<<<< HEAD
         self.timestepper = 'CrankNicolson'
+=======
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         self.implicitness_theta = 1.0
 
         # Timeseries
         self.wd_obs = []
         self.trange = np.linspace(0.0, self.end_time, self.num_hours+1)
+<<<<<<< HEAD
         tol = 1e-8  # FIXME: Point evaluation hack
         self.xrange = np.linspace(tol, 16-tol, 20)
         self.qois = []
 
     def set_up_morph_model(self, mesh = None):
+=======
+        tol = 1e-8
+        self.xrange = np.linspace(tol, 16-tol, 20)
+        self.qois = []
+
+    def set_up_morph_model(self, mesh=None):
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
         # Physical
         self.base_viscosity = 0.5
@@ -115,15 +162,20 @@ class BeachOptions(CoupledOptions):
         self.solve_exner = True
 
         self.norm_smoother = Constant(10/25)
+<<<<<<< HEAD
 
         P1 = FunctionSpace(mesh, "CG", 1)
         bath = self.set_bathymetry(P1)
         self.wetting_and_drying_alpha = Constant(0.0) #1/40) #bath.dx(0)
+=======
+        self.wetting_and_drying_alpha = Constant(0.0)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     def create_sediment_model(self, mesh, bathymetry):
         self.P1DG = FunctionSpace(mesh, "DG", 1)
         self.P1_vec_dg = VectorFunctionSpace(mesh, "DG", 1)
 
+<<<<<<< HEAD
         #if uv_init is None:
         self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
         #if elev_init is None:
@@ -135,6 +187,16 @@ class BeachOptions(CoupledOptions):
                             uv_init = self.uv_d, elev_init = self.eta_d, ks=self.ks, average_size=self.average_size,
                             cons_tracer = self.use_tracer_conservative_form, wetting_and_drying = self.wetting_and_drying, wetting_alpha = self.wetting_and_drying_alpha)
 
+=======
+        self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
+        self.eta_d = Function(self.P1DG).project(self.elev_init)
+
+        self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
+                                            bedload=self.bedload, angle_correction=self.angle_correction, slope_eff=self.slope_eff, seccurrent=False,
+                                            mesh2d=mesh, bathymetry_2d=bathymetry,
+                                            uv_init=self.uv_d, elev_init=self.eta_d, ks=self.ks, average_size=self.average_size,
+                                            cons_tracer=self.use_tracer_conservative_form, wetting_and_drying=self.wetting_and_drying, wetting_alpha=self.wetting_and_drying_alpha)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     def set_manning_drag_coefficient(self, fs):
         if self.friction == 'manning':
@@ -147,17 +209,28 @@ class BeachOptions(CoupledOptions):
     def set_bathymetry(self, fs, **kwargs):
         x, y = SpatialCoordinate(fs.mesh())
         self.bathymetry = Function(fs, name="Bathymetry")
+<<<<<<< HEAD
         self.bathymetry.interpolate(Constant(4)) # - x/40)
+=======
+        self.bathymetry.interpolate(Constant(4))
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         return self.bathymetry
 
     def set_viscosity(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
         self.viscosity = Function(fs)
+<<<<<<< HEAD
         sponge_viscosity = Function(fs).interpolate(conditional(x>=100, -399 + 4*x, Constant(1.0)))
         self.viscosity.interpolate(sponge_viscosity*self.base_viscosity)
         return self.viscosity #Constant(self.base_viscosity)
 
     
+=======
+        sponge_viscosity = Function(fs).interpolate(conditional(x >= 100, -399 + 4*x, Constant(1.0)))
+        self.viscosity.interpolate(sponge_viscosity*self.base_viscosity)
+        return self.viscosity
+
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     def set_boundary_conditions(self, prob, i):
         if not hasattr(self, 'elev_in'):
             self.elev_in = Constant(0.0)
@@ -169,18 +242,29 @@ class BeachOptions(CoupledOptions):
 
         inflow_tag = 1
         outflow_tag = 2
+<<<<<<< HEAD
         bottom_wall_tag = 3
         top_wall_tag = 4
+=======
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         boundary_conditions = {
             'shallow_water': {
                 inflow_tag: {'elev': self.elev_in, 'uv': self.vel_in},
                 outflow_tag: {'un': Constant(0.0)},
             },
+<<<<<<< HEAD
 	   'sediment': {
                inflow_tag: {'value':self.sediment_model.equiltracer}
             }
         }
         return boundary_conditions    
+=======
+            'sediment': {
+                inflow_tag: {'value': self.sediment_model.equiltracer}
+            }
+        }
+        return boundary_conditions
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     def update_boundary_conditions(self, solver_obj, t=0.0):
         self.elev_in.assign(self.ocean_elev_func(t))
@@ -226,19 +310,27 @@ class BeachOptions(CoupledOptions):
         prob.fwd_solutions_sediment[0].interpolate(Constant(0.0))
 
     def set_initial_condition_bathymetry(self, prob):
+<<<<<<< HEAD
         prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))    
+=======
+        prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     def get_update_forcings(self, prob, i, adjoint):
 
         def update_forcings(t):
             uv, elev = prob.fwd_solutions[0].split()
+<<<<<<< HEAD
             if np.round(t%2.7, 0) == 3:
                 print(t)
                 print(assemble(elev*dx))
+=======
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
             self.update_boundary_conditions(prob, t=t)
 
         return update_forcings
 
+<<<<<<< HEAD
     def initialise_fields(self, inputdir, outputdir):
         """
         Initialise simulation with results from a previous simulation
@@ -292,6 +384,14 @@ class BeachOptions(CoupledOptions):
                 # Store modified bathymetry timeseries
             #    wd.project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha))
             #    self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
+=======
+    def get_export_func(self, prob, i):
+        eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
+
+        def export_func():
+            eta_tilde.project(self.get_eta_tilde(prob, i))
+            u, eta = prob.fwd_solutions[i].split()
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
         return export_func
 

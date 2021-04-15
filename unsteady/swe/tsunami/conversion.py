@@ -1,14 +1,28 @@
 """
-Top matter courtesy of Tobias Bieniek, 2012.
+Convert between latitude-longitude and UTM coordinates. An extension of the code by Tobias
+Bieniek to account for UFL expressions and NumPy arrays.
+
+**********************************************************************************************
+*  NOTE: This file is based on utm 0.4.0 (https://pypi.org/project/utm/0.4.0/) and contains  *
+*        some copied code.                                                                   *
+**********************************************************************************************
 """
+<<<<<<< HEAD:unsteady/swe/tsunami/conversion.py
 import ufl
 import numpy as np
 from math import pi, sqrt
 from thetis import print_output
 
+=======
+from thetis import print_output
+import ufl
 
-class OutOfRangeError(ValueError):
-    pass
+from math import pi, sqrt
+import numpy as np
+from utm.conversion import latitude_to_zone_letter, latlon_to_zone_number, zone_number_to_central_longitude
+from utm.error import OutOfRangeError
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a:swe/tsunami/conversion.py
+
 
 
 __all__ = ["to_latlon", "from_latlon", "lonlat_to_utm", "utm_to_lonlat", "degrees", "radians"]
@@ -38,19 +52,21 @@ P3 = 21.0/16*_E2-55.0/32*_E4
 P4 = 151.0/96*_E3-417.0/128*_E5
 P5 = 1097.0/512*_E4
 
-R = 6378137
-
-ZONE_LETTERS = "CDEFGHJKLMNPQRSTUVWXX"
+R = 6378137  # Mean radius of the Earth
 
 
 def degrees(rad):
-    rad *= 180.0/pi
-    return rad
+    """
+    Convert from radians to degrees.
+    """
+    return rad*180.0/pi
 
 
 def radians(deg):
-    deg *= pi/180.0
-    return deg
+    """
+    Convert from degrees to radians.
+    """
+    return deg*pi/180.0
 
 
 def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, force_longitude=False, coords=None):
@@ -235,6 +251,7 @@ def from_latlon(latitude, longitude, force_zone_number=None, zone_info=False, co
         return easting, northing
 
 
+<<<<<<< HEAD:unsteady/swe/tsunami/conversion.py
 def latitude_to_zone_letter(latitude):
     """
     Convert latitude UTM letter, courtesy of Tobias Bieniek, 2012.
@@ -279,6 +296,8 @@ def zone_number_to_central_longitude(zone_number):
     return (zone_number - 1)*6 - 180 + 3
 
 
+=======
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a:swe/tsunami/conversion.py
 def lonlat_to_utm(longitude, latitude, force_zone_number, **kwargs):
     """
     Transformation from longitude-latitude coordinates to UTM coordinates.

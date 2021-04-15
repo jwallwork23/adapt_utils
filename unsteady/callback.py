@@ -1,8 +1,21 @@
 from thetis import *
 
+<<<<<<< HEAD
 
 __all__ = ["VelocityNormCallback", "ElevationNormCallback", "TracerNormCallback",
            "SedimentNormCallback", "ExnerNormCallback", "QoICallback", "GaugeCallback"]
+=======
+import numpy as np
+import os
+
+from adapt_utils.io import index_string
+from adapt_utils.swe.utils import L2ProjectorVorticity
+
+
+__all__ = ["VelocityNormCallback", "ElevationNormCallback", "TracerNormCallback",
+           "SedimentNormCallback", "ExnerNormCallback", "VorticityNormCallback",
+           "QoICallback", "GaugeCallback"]
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 
 class TimeseriesCallback(object):
@@ -10,24 +23,48 @@ class TimeseriesCallback(object):
     Generic callback object for storing timseries extracted during a
     simulation and integrating in time.
     """
+<<<<<<< HEAD
     def __init__(self, prob, func, i, name):
+=======
+    def __init__(self, prob, func, i, name, callback_dir=None):
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         """
         :arg prob: :class:`AdaptiveProblem` object.
         :arg func: user-provided function to be evaluated.
         :arg i: mesh index.
         :arg name: name for the callback object.
+<<<<<<< HEAD
         """
         self.prob = prob
         self.name = name
         self.func = func
         self.timeseries = []
         self.msg = "    {:16s}".format(self.name) + " at time {:6.1f} = {:11.4e}"
+=======
+        :kwarg callback_dir: if provided, timeseries is saved to that location every export.
+        """
+        self.prob = prob
+        self.func = func
+        self.name = '_'.join([name, index_string(i)])
+        self.timeseries = []
+        if not hasattr(self, 'label'):
+            self.label = self.name
+        self.msg = "    {:24s}".format(self.label) + " at time {:6.1f} = {:11.4e}"
+        self.callback_dir = callback_dir
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     def evaluate(self, **kwargs):
         t = self.prob.simulation_time
         value = self.func(t)
+<<<<<<< HEAD
         print_output(self.msg.format(t, value))
         self.timeseries.append(value)
+=======
+        self.prob.print(self.msg.format(t, value))
+        self.timeseries.append(value)
+        if self.callback_dir is not None:
+            np.save(os.path.join(self.callback_dir, self.name), self.timeseries)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     def time_integrate(self):
         N = len(self.timeseries)
@@ -44,7 +81,11 @@ class TimeseriesCallback(object):
 class VelocityNormCallback(TimeseriesCallback):
     """Callback for evaluating the L2 norm of the velocity field at each timestep/export."""
     def __init__(self, prob, i):
+<<<<<<< HEAD
         self.name = "velocity norm"
+=======
+        self.label = "velocity norm"
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         u, eta = prob.fwd_solutions[i].split()
         super(VelocityNormCallback, self).__init__(prob, lambda t: norm(u), i, "velocity_norm")
 
@@ -52,7 +93,11 @@ class VelocityNormCallback(TimeseriesCallback):
 class ElevationNormCallback(TimeseriesCallback):
     """Callback for evaluating the L2 norm of the elevation field at each timestep/export."""
     def __init__(self, prob, i):
+<<<<<<< HEAD
         self.name = "elevation norm"
+=======
+        self.label = "elevation norm"
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         u, eta = prob.fwd_solutions[i].split()
         super(ElevationNormCallback, self).__init__(prob, lambda t: norm(eta), i, "elevation_norm")
 
@@ -60,7 +105,11 @@ class ElevationNormCallback(TimeseriesCallback):
 class TracerNormCallback(TimeseriesCallback):
     """Callback for evaluating the L2 norm of the tracer concentration at each timestep/export."""
     def __init__(self, prob, i):
+<<<<<<< HEAD
         self.name = "tracer norm"
+=======
+        self.label = "tracer norm"
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         c = prob.fwd_solutions_tracer[i]
         super(TracerNormCallback, self).__init__(prob, lambda t: norm(c), i, "tracer_norm")
 
@@ -68,7 +117,11 @@ class TracerNormCallback(TimeseriesCallback):
 class SedimentNormCallback(TimeseriesCallback):
     """Callback for evaluating the L2 norm of the sediment at each timestep/export."""
     def __init__(self, prob, i):
+<<<<<<< HEAD
         self.name = "sediment norm"
+=======
+        self.label = "sediment norm"
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         s = prob.fwd_solutions_sediment[i]
         super(SedimentNormCallback, self).__init__(prob, lambda t: norm(s), i, "sediment_norm")
 
@@ -76,11 +129,35 @@ class SedimentNormCallback(TimeseriesCallback):
 class ExnerNormCallback(TimeseriesCallback):
     """Callback for evaluating the L2 norm of the modified bathymetry at each timestep/export."""
     def __init__(self, prob, i):
+<<<<<<< HEAD
         self.name = "bathymetry norm"
+=======
+        self.label = "bathymetry norm"
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         b = prob.fwd_solutions_bathymetry[i]
         super(ExnerNormCallback, self).__init__(prob, lambda t: norm(b), i, "bathymetry_norm")
 
 
+<<<<<<< HEAD
+=======
+class VorticityNormCallback(TimeseriesCallback):
+    """Callback for evaluating the L2 norm of the fluid vorticity at each timestep/export."""
+    def __init__(self, prob, i):
+        self.label = "vorticity norm"
+        rec = L2ProjectorVorticity(prob.V[i], op=prob.op)
+        prob.vorticity[i] = Function(prob.P1[i], name="Vorticity")
+
+        def vorticity(t):
+            prob.vorticity[i].assign(rec.project(prob.fwd_solutions[i]))
+            if prob.op.plot_pvd:
+                prob.vorticity_file._topology = None
+                prob.vorticity_file.write(prob.vorticity[i])
+            return norm(prob.vorticity[i])
+
+        super(VorticityNormCallback, self).__init__(prob, vorticity, i, "vorticity_norm")
+
+
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 class QoICallback(TimeseriesCallback):
     r"""
     Callback for evaluating functional quantities of interest of the form
@@ -97,7 +174,11 @@ class QoICallback(TimeseriesCallback):
         :arg prob: :class:`AdaptiveProblem` object.
         :arg i: mesh index.
         """
+<<<<<<< HEAD
         self.name = "QoI"
+=======
+        self.label = "quantity of interest"
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         ks = prob.kernels[i]  # Kernel in space
         kt = Constant(0.0)    # Kernel in time
         sol = prob.fwd_solutions[i]
@@ -121,7 +202,11 @@ class GaugeCallback(TimeseriesCallback):
         :arg i: mesh index.
         :arg gauge: name of gauge to be evaluated.
         """
+<<<<<<< HEAD
         self.name = gauge
+=======
+        self.label = "gauge {:s}".format(gauge)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         u, eta = prob.fwd_solutions[i].split()
         gauge_location = prob.op.gauges[gauge]["coords"]
 

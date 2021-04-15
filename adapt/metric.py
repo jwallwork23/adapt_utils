@@ -1,36 +1,69 @@
+"""
+**********************************************************************************************
+*  NOTE: Much of the code in this file is based on https://github.com/taupalosaurus/darwin.  *
+**********************************************************************************************
+"""
 from firedrake import *
 
 import numpy as np
 
+<<<<<<< HEAD
 from adapt_utils.options import Options
 from adapt_utils.adapt.recovery import construct_hessian, construct_boundary_hessian
+=======
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 from adapt_utils.adapt.kernels import *
+from adapt_utils.adapt.recovery import recover_hessian
+from adapt_utils.linalg import check_spd
+from adapt_utils.options import Options
 
 
+__all__ = ["metric_complexity", "cell_size_metric", "volume_and_surface_contributions",
+           "steady_metric", "isotropic_metric", "space_normalise", "space_time_normalise",
+           "boundary_steady_metric", "combine_metrics", "metric_intersection", "metric_average"]
+
+<<<<<<< HEAD
 __all__ = ["metric_complexity", "cell_size_metric",
            "steady_metric", "isotropic_metric", "space_normalise", "space_time_normalise",
            "combine_metrics", "metric_intersection", "metric_average"]
 
 
 def metric_complexity(M):
+=======
+
+def metric_complexity(M, boundary=False):
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     """
     Compute the complexity of a metric, which approximates the number of vertices in a mesh adapted
     based thereupon.
     """
+<<<<<<< HEAD
     return assemble(sqrt(det(M))*dx)
 
 
 def steady_metric(f=None, H=None, projector=None, **kwargs):
+=======
+    if boundary:
+        return assemble(sqrt(det(M))*ds)
+    else:
+        return assemble(sqrt(det(M))*dx)
+
+
+def steady_metric(f=None, H=None, projector=None, mesh=None, **kwargs):
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     r"""
-    Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
-    ``computeSteadyMetric``, from ``adapt.py``, 2016.
+    Computes the steady metric for mesh adaptation.
 
     Clearly at least one of `f` and `H` must not be provided.
 
     :kwarg f: Field to compute the Hessian of.
     :kwarg H: Reconstructed Hessian associated with `f` (if already computed).
     :kwarg projector: :class:`DoubleL2Projector` object to compute Hessian.
+<<<<<<< HEAD
     :kwarg normalise: Toggle spatial normalisation.
+=======
+    :kwarg normalise: toggle spatial normalisation.
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     :kwarg enforce_constraints: Toggle enforcement of element size/anisotropy constraints.
     :kwarg op: :class:`Options` parameter class.
     :return: Steady metric associated with Hessian `H`.
@@ -46,9 +79,14 @@ def steady_metric(f=None, H=None, projector=None, **kwargs):
         except AssertionError:
             raise ValueError("Please supply either field for recovery, or Hessian thereof.")
     elif H is None:
+<<<<<<< HEAD
         H = construct_hessian(f, op=op) if projector is None else projector.project(f)
+=======
+        H = recover_hessian(f, mesh=mesh, op=op) if projector is None else projector.project(f)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     V = H.function_space()
-    mesh = V.mesh()
+    if mesh is None:
+        mesh = V.mesh()
     dim = mesh.topological_dimension()
     assert dim in (2, 3)  # TODO: test 3d case works
 
@@ -59,23 +97,88 @@ def steady_metric(f=None, H=None, projector=None, **kwargs):
     op.print_debug("METRIC: Constructing metric from Hessian...")
     kernel = eigen_kernel(metric_from_hessian, dim)
     op2.par_loop(kernel, V.node_set, M.dat(op2.RW), H.dat(op2.READ))
+<<<<<<< HEAD
     op.print_debug("METRIC: Done!")
+=======
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     # Apply Lp normalisation
     if kwargs.get('normalise'):
         op.print_debug("METRIC: Normalising metric in space...")
+<<<<<<< HEAD
         space_normalise(M, noscale=kwargs.get('noscale'), f=f, op=op)
         op.print_debug("METRIC: Done!")
+=======
+        noscale = kwargs.get('noscale')
+        integral = kwargs.get('integral')
+        space_normalise(M, noscale=noscale, f=f, integral=integral, op=op)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     # Enforce maximum/minimum element sizes and anisotropy
     if kwargs.get('enforce_constraints'):
         op.print_debug("METRIC: Enforcing elemental constraints...")
         enforce_element_constraints(M, op=op)
+<<<<<<< HEAD
         op.print_debug("METRIC: Done!")
+=======
+
+    # Check a valid metric
+    if op.debug:
+        check_spd(M)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     return M
 
 
+<<<<<<< HEAD
+=======
+def boundary_steady_metric(H, mesh=None, boundary_tag='on_boundary', **kwargs):
+    """
+    Computes a boundary metric from a boundary Hessian, following the approach of
+    [Loseille et al. 2011].
+
+    :kwarg H: reconstructed boundary Hessian
+    :kwarg normalise: toggle spatial normalisation.
+    :kwarg enforce_constraints: Toggle enforcement of element size/anisotropy constraints.
+    :kwarg op: :class:`Options` parameter class.
+    :return: boundary metric associated with Hessian `H`.
+    """
+    kwargs.setdefault('normalise', True)
+    kwargs.setdefault('enforce_constraints', True)
+    kwargs.setdefault('noscale', False)
+    op = kwargs.get('op', Options())
+    if mesh is None:
+        mesh = H.function_space().mesh()
+    dim = mesh.topological_dimension()
+    if dim not in (2, 3):
+        raise ValueError("Dimensions other than 2D and 3D not considered.")
+    P1_ten = TensorFunctionSpace(mesh, "CG", 1)
+    M = Function(P1_ten, name="Boundary metric")
+
+    # Ensure positive definite
+    op.print_debug("METRIC: Ensuring positivity of boundary metric...")
+    M.interpolate(abs(H))
+
+    # Apply Lp normalisation
+    if kwargs.get('normalise'):
+        op.print_debug("METRIC: Normalising boundary metric in space...")
+        noscale = kwargs.get('noscale')
+        integral = kwargs.get('integral')
+        space_normalise(M, noscale=noscale, integral=integral, boundary=True, op=op)
+
+    # Enforce maximum/minimum element sizes and anisotropy
+    if kwargs.get('enforce_constraints'):
+        op.print_debug("METRIC: Enforcing elemental constraints on boundary metric...")
+        enforce_element_constraints(M, boundary_tag='on_boundary', op=op)
+
+    # Check a valid metric
+    if op.debug:
+        check_spd(M)
+
+    return M
+
+
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 # TODO: Check equivalent to normalising in space and time separately
 def space_time_normalise(hessians, timestep_integrals=None, enforce_constraints=True, op=Options()):
     r"""
@@ -115,7 +218,10 @@ def space_time_normalise(hessians, timestep_integrals=None, enforce_constraints=
             glob_norm *= pow(integral, 1/p)
     else:
         raise ValueError("Normalisation approach {:s} not recognised.".format(op.normalisation))
+<<<<<<< HEAD
     op.print_debug("METRIC: Done!")
+=======
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     op.print_debug("METRIC: Target space-time complexity = {:.4e}".format(N_st))
     op.print_debug("METRIC: Global normalisation factor = {:.4e}".format(glob_norm))
 
@@ -132,6 +238,7 @@ def space_time_normalise(hessians, timestep_integrals=None, enforce_constraints=
         if enforce_constraints:
             op.print_debug("METRIC: Enforcing size and ansisotropy constraints...")
             enforce_element_constraints(H, op=op)
+<<<<<<< HEAD
             op.print_debug("METRIC: Done!")
     op.print_debug("METRIC: Done!")
 
@@ -212,6 +319,91 @@ def enforce_element_constraints(M, op=Options()):
     op2.par_loop(kernel, M.function_space().node_set, M.dat(op2.RW))
 
 
+=======
+
+
+def space_normalise(M, f=None, integral=None, boundary=False, **kwargs):
+    r"""
+    Normalise steady metric `M` based on field `f`.
+
+    Four normalisation approaches are implemented. These include two 'straightforward' approaches:
+
+      * 'norm'       - simply divide by the norm of `f`;
+      * 'abs'        - divide by the maximum of `abs(f)` and some minimum tolerated value (see
+                       equation (18) of [1]);
+
+    and two :math:`\mathcal L_p` normalisation approaches, for :math:`p\geq1` or :math:`p=\infty`:
+
+      * 'complexity' - Lp normalisation with a target metric complexity (see equation (2.10) of [2]);
+      * 'error'      - Lp normalisation with a target interpolation error (see equation (7) of [3]).
+
+    NOTE: In the case of 'error' normalisation, 'target' is the inverse of error.
+
+
+    [1] Pain et al. "Tetrahedral mesh optimisation and adaptivity for steady-state and transient
+        finite element calculations", Comput. Methods Appl. Mech. Engrg. 190 (2001) pp.3771-3796.
+
+    [2] Loseille & Alauzet, "Continuous mesh framework part II: validations and applications",
+        SIAM Numer. Anal. 49 (2011) pp.61-86.
+
+    [3] Alauzet & Olivier, "An L∞-Lp space-time anisotropic mesh adaptation strategy for
+        time-dependent problems", V European Conference on Computational Fluid Dynamics (2010).
+    """
+    kwargs.setdefault('op', Options())
+    kwargs.setdefault('f_min', 1.0e-08)
+    kwargs.setdefault('noscale', False)
+    op = kwargs.get('op')
+
+    # --- Simple normalisation approaches
+
+    if op.normalisation in ('norm', 'abs'):
+        assert f is not None
+        tol = kwargs.get('f_min')
+        denominator = norm(f) if op.normalisation == 'norm' else max_value(abs(f), tol)
+        M.interpolate(M/denominator)
+        return
+
+    # --- Lp normalisation
+
+    if op.normalisation not in ('complexity', 'error'):
+        raise ValueError("Normalisation approach {:s} not recognised.".format(op.normalisation))
+    p = op.norm_order
+    mesh = M.function_space().mesh()
+    d = mesh.topological_dimension()
+    if boundary:
+        d -= 1
+
+    if integral is None:
+        target = 1 if kwargs.get('noscale') else op.target
+        form = pow(det(M), 0.5) if p is None else pow(det(M), p/(2*p + d))
+        integral = assemble(form*ds) if boundary else assemble(form*dx)
+        if op.normalisation == 'complexity':
+            integral = pow(target/integral, 2/d)
+        else:
+            integral = 1 if p is None else pow(integral, 1/p)
+            integral *= d*target
+    assert integral > 1.0e-08
+    determinant = 1 if p is None else pow(det(M), -1/(2*p + d))
+    M.interpolate(integral*determinant*M)
+    return
+
+
+def enforce_element_constraints(M, op=Options(), boundary_tag=None):
+    """
+    Post-process a metric `M` so that it obeys the following constraints specified by
+    :class:`Options` class `op`:
+
+      * `h_min`          - minimum element size;
+      * `h_max`          - maximum element size;
+      * `max_anisotropy` - maximum element anisotropy.
+    """
+    V = M.function_space()
+    kernel = eigen_kernel(postproc_metric, V.mesh().topological_dimension(), op=op)
+    node_set = V.node_set if boundary_tag is None else DirichletBC(V, 0, boundary_tag).node_set
+    op2.par_loop(kernel, node_set, M.dat(op2.RW))
+
+
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 # TODO: Test identities hold
 def get_density_and_quotients(M):
     r"""
@@ -292,7 +484,11 @@ def isotropic_metric(f, **kwargs):
 
     # Project into P1 space
     op.print_debug("METRIC: Constructing isotropic metric...")
+<<<<<<< HEAD
     M_diag = project(max_value(abs(f), 1e-10), V)
+=======
+    M_diag = project(max_value(abs(f), 1e-12), V)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     M_diag.interpolate(abs(M_diag))  # Ensure positivity
     op.print_debug("METRIC: Done!")
 
@@ -310,20 +506,41 @@ def isotropic_metric(f, **kwargs):
             detM.interpolate(pow(detM, p/(2*p + dim)))
         if op.normalisation == 'complexity':
             M_diag *= pow(rescale/assemble(detM*dx), 2/dim)
+<<<<<<< HEAD
         else:
             if p is not None:
                 M_diag *= pow(assemble(detM*dx), 1/p)
             M_diag *= dim/rescale
         op.print_debug("METRIC: Done!")
+=======
+        else:  # FIXME!!!
+            if p is not None:
+                M_diag *= pow(assemble(detM*dx), 1/p)
+            M_diag *= dim/rescale
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     # Enforce maximum/minimum element sizes
     if kwargs.get('enforce_constraints'):
         op.print_debug("METRIC: Enforcing elemental constraints...")
         M_diag = max_value(1/pow(op.h_max, 2), min_value(M_diag, 1/pow(op.h_min, 2)))
+<<<<<<< HEAD
         op.print_debug("METRIC: Done!")
+=======
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
-    return interpolate(M_diag*Identity(dim), V_ten)
+    # Check a valid metric
+    M = interpolate(M_diag*Identity(dim), V_ten)
+    if op.debug:
+        check_spd(M)
+    return M
 
+
+def cell_size_metric(mesh, op=Options()):
+    P1 = FunctionSpace(mesh, "CG", 1)
+    return isotropic_metric(interpolate(pow(CellSize(mesh), -2), P1), normalise=False, op=op)
+
+
+<<<<<<< HEAD
 
 def cell_size_metric(mesh, op=Options()):
     P1 = FunctionSpace(mesh, "CG", 1)
@@ -333,6 +550,10 @@ def cell_size_metric(mesh, op=Options()):
 # --- Metric combination methods
 
 
+=======
+# --- Metric combination methods
+
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 def metric_intersection(*metrics, **kwargs):
     r"""
     Intersect a metric field, i.e. intersect (globally) over all local metrics.
@@ -351,7 +572,10 @@ def metric_intersection(*metrics, **kwargs):
 
 def _metric_intersection_pair(M1, M2, boundary_tag=None):
     V = M1.function_space()
+<<<<<<< HEAD
     # node_set = V.boundary_nodes(bdy, 'topological') if bdy is not None else V.node_set
+=======
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     node_set = V.node_set if boundary_tag is None else DirichletBC(V, 0, boundary_tag).node_set
     dim = V.mesh().topological_dimension()
     assert dim in (2, 3)
@@ -362,7 +586,11 @@ def _metric_intersection_pair(M1, M2, boundary_tag=None):
     return M12
 
 
+<<<<<<< HEAD
 def metric_relaxation(*metrics, weights=None):
+=======
+def metric_relaxation(*metrics, function_space=None, weights=None):
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     r"""
     As an alternative to intersection, pointwise metric information may be combined using a convex
     combination. Whilst this method does not have as clear an interpretation as metric intersection,
@@ -378,14 +606,23 @@ def metric_relaxation(*metrics, weights=None):
         weights = np.ones(n)/n
     else:
         assert len(weights) == n
+<<<<<<< HEAD
     V = metrics[0].function_space()
     M = Function(V)
     for i, Mi in enumerate(metrics):
         assert Mi.function_space() == V
+=======
+    V = function_space or metrics[0].function_space()
+    M = Function(V)
+    for i, Mi in enumerate(metrics):
+        if not isinstance(Mi, Function) or Mi.function_space() != V:
+            Mi = interpolate(Mi, V)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         M += Mi*weights[i]
     return M
 
 
+<<<<<<< HEAD
 def metric_average(*metrics):
     return metric_relaxation(*metrics)
 
@@ -457,42 +694,36 @@ class UnsteadyHessianMetric():
     def __init__(self):
         raise NotImplementedError  # TODO
 
+=======
+def metric_average(*metrics, **kwargs):
+    return metric_relaxation(*metrics, **kwargs)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
-def get_metric_coefficient(a, b, op=Options()):
-    r"""
-    Solve algebraic problem to get scaling coefficient for interior/boundary metric. See
-    [Loseille et al. 2010] for details.
 
-    :arg a: determinant integral associated with interior metric.
-    :arg b: determinant integral associated with boundary metric.
-    :kwarg op: `Options` class object providing min/max cell size values.
-    :return: Scaling coefficient.
-    """
-    from sympy.solvers import solve
-    from sympy import Symbol
+def combine_metrics(*metrics, average=True, **kwargs):
+    return metric_average(*metrics, **kwargs) if average else metric_intersection(*metrics, **kwargs)
 
-    c = Symbol('c')
-    sol = solve(a*pow(c, -0.6) + b*pow(c, -0.5) - op.target, c)
-    assert len(sol) == 1
-    return Constant(sol[0])
 
+<<<<<<< HEAD
 
 # TODO: Update
 # TODO: Test
 def metric_with_boundary(f=None, H=None, h=None, mesh=None, degree=1, op=Options()):
+=======
+def volume_and_surface_contributions(interior_hessian, boundary_hessian, op=Options(), **kwargs):
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     r"""
-    Computes a Hessian-based steady metric for mesh adaptation, intersected with the corresponding
-    boundary metric. The approach used here follows that of [Loseille et al. 2010].
+    Solve algebraic problem to get scaling coefficient for interior and boundary metrics to
+    obtain a given metric complexity. See [Loseille et al. 2011] for details.
 
-    Clearly at least one of `f` and `H` must not be provided.
-
-    :kwarg f: Field to compute the Hessian of.
-    :kwarg H: Reconstructed Hessian associated with `f` (if already computed).
-    :kwarg h: Reconstructed boundary Hessian associated with `f` (if already computed).
-    :kwarg degree: Polynomial degree of Hessian.
-    :kwarg op: `Options` class object providing min/max cell size values.
-    :return: Intersected interior and boundary metric associated with Hessian `H`.
+    :arg interior_hessian: component from domain interior.
+    :arg boundary_hessian: component from domain boundary.
+    :kwarg interior_hessian_scaling: positive scaling function for interior Hessian.
+    :kwarg boundary_hessian_scaling: positive scaling function for boundary Hessian.
+    :kwarg op: :class:`Options` parameters object.
+    :return: Scaling coefficient.
     """
+<<<<<<< HEAD
     if f is None:
         try:
             assert not (H is None or h is None)
@@ -523,36 +754,29 @@ def metric_with_boundary(f=None, H=None, h=None, mesh=None, degree=1, op=Options
     op2.par_loop(kernel, V_ten.node_set, M_int.dat(op2.RW), detM_int.dat(op2.RW), H.dat(op2.READ))
 
     # Normalise
+=======
+    from sympy import Symbol, solve
+
+    # Collect parameters
+    d = interior_hessian.function_space().mesh().topological_dimension()
+    assert d in (2, 3)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     p = op.norm_order
-    if p is not None:
-        assert p >= 1
-        h *= pow(h, -1/(2*p + dim-1))
-        detM_bdy.interpolate(pow(detM_bdy, p/(2*p + dim-1)))
+    g = kwargs.get('interior_hessian_scaling', Constant(1.0))
+    gbar = kwargs.get('boundary_hessian_scaling', Constant(1.0))
+    op.print_debug("METRIC: original target complexity = {:.4e}".format(op.target))
 
-    # Solve algebraic problem for metric scale parameter, as in [Loseille et al. 2010]
-    if op.normalisation == 'complexity':
-        a = pow(op.target/assemble(detM_int*dx), 2/dim)
-        b = pow(op.target/assemble(detM_bdy*ds), 2/(dim-1))
-        # TODO: not sure about exponents here
-        C = get_metric_coefficient(a, b, op=op)
-        h *= C
+    # Compute optimal coefficient for mixed interior-boundary Hessian
+    if p is None:
+        a = metric_complexity(interior_hessian, boundary=False)
+        b = metric_complexity(boundary_hessian, boundary=True)
     else:
-        raise NotImplementedError  # TODO
-
-    # Construct boundary metric
-    h = max_value(1/pow(op.h_max, 2), min_value(h, 1/pow(op.h_min, 2)))
-    # h = max_value(h, h/pow(op.max_anisotropy, 2))
-    if dim == 2:
-        M_bdy.interpolate(as_matrix([[1/pow(op.h_max, 2), 0], [0, h]]))
-    else:
-        raise NotImplementedError  # TODO
-
-    # Scale interior metric
-    if op.normalisation == 'complexity':
-        M_int *= C
-    else:
-        raise NotImplementedError  # TODO
-    kernel = eigen_kernel(scale_metric, dim, op=op)
-    op2.par_loop(kernel, V_ten.node_set, M_int.dat(op2.RW))
-
-    return metric_intersection(M_int, M_bdy, bdy=True)
+        a = assemble(pow(g, d/(2*p + d))*pow(det(interior_hessian), p/(2*p + d))*dx)
+        b = assemble(pow(gbar, d/(2*p + d - 1))*pow(det(boundary_hessian), p/(2*p + d - 1))*ds)
+    op.print_debug("METRIC: a = {:.4e}".format(a))
+    op.print_debug("METRIC: b = {:.4e}".format(b))
+    c = Symbol('c')
+    # C = float(solve(a*pow(c, -d/(2*p + d)) + b*pow(c, -d/(2*p + d - 1)) - op.target, c)[0])
+    C = float(solve(a*pow(c, d/2) + b*pow(c, (d-1)/2) - op.target, c)[0])  # NOTE: Differs from paper
+    op.print_debug("METRIC: C = {:.4e}".format(C))
+    return C

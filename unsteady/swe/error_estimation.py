@@ -1,6 +1,7 @@
+# TODO: doc
 from __future__ import absolute_import
 from thetis.utility import *
-from ..error_estimation import GOErrorEstimatorTerm, GOErrorEstimator
+from .error_estimation import GOErrorEstimatorTerm, GOErrorEstimator
 from thetis.shallowwater_eq import ShallowWaterTerm
 
 
@@ -619,8 +620,8 @@ class ShallowWaterGOErrorEstimator(GOErrorEstimator):
     """
     :class:`GOErrorEstimator` for the shallow water model.
     """
-    def __init__(self, function_space, depth, options):
-        super(ShallowWaterGOErrorEstimator, self).__init__(function_space)
+    def __init__(self, function_space, depth, options, anisotropic=False):
+        super(ShallowWaterGOErrorEstimator, self).__init__(function_space, anisotropic=anisotropic)
         self.depth = depth
         self.options = options
 
@@ -646,7 +647,7 @@ class ShallowWaterGOErrorEstimator(GOErrorEstimator):
         self.add_term(ContinuitySourceGOErrorEstimatorTerm(*args), 'source')
 
     def setup_strong_residual(self, label, solution, solution_old, fields, fields_old):
-        P0P0 = VectorFunctionSpace(self.mesh, "DG", 0)*self.P0_2d
+        P0P0 = VectorFunctionSpace(self.mesh, "DG", 0)*self.P0
         self.strong_residual = Function(P0P0, name="Strong residual for shallow water equations")
         residual_u, residual_eta = self.strong_residual.split()
         residual_u.rename("Strong residual for momentum equation")
@@ -690,10 +691,10 @@ class ShallowWaterGOErrorEstimator(GOErrorEstimator):
     def evaluate_flux_jump(self, sol):
         """Evaluate flux jump as element-wise indicator functions."""
         sol_u, sol_eta = sol.split()
-        flux_jump = Function(VectorFunctionSpace(self.mesh, "DG", 0)*self.P0_2d)
-        flux_jump_1 = Function(self.P0_2d)
-        flux_jump_2 = Function(self.P0_2d)
-        flux_jump_3 = Function(self.P0_2d)
+        flux_jump = Function(VectorFunctionSpace(self.mesh, "DG", 0)*self.P0)
+        flux_jump_1 = Function(self.P0)
+        flux_jump_2 = Function(self.P0)
+        flux_jump_3 = Function(self.P0)
 
         mass_term = self.p0test*self.p0trial*dx
         solve(mass_term == jump(self.p0test*sol_u[0])*dS, flux_jump_1)  # TODO: Solver parameters?

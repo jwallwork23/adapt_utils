@@ -23,7 +23,7 @@ kwargs = {
     'h_max': 500.0,
 
     # Optimisation parameters
-    'num_adapt': 35,  # Maximum iterations
+    'max_adapt': 35,  # Maximum iterations
     # 'element_rtol': 0.002,
     'element_rtol': 0.001,
     'outer_iterations': 7,

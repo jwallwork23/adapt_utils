@@ -29,6 +29,7 @@ kwargs = {
     'plot_pvd': False,
     'aligned': not offset,
     'debug': bool(args.debug or False),
+<<<<<<< HEAD
 }
 op = PointDischarge2dOptions(approach='fixed_mesh', **kwargs)
 op.tracer_family = family
@@ -36,6 +37,16 @@ op.stabilisation_tracer = args.stabilisation or 'supg'
 op.anisotropic_stabilisation = False if args.anisotropic_stabilisation == "0" else True
 alignment = 'offset' if offset else 'aligned'
 op.di = os.path.join(op.di, op.stabilisation_tracer or family, alignment)
+=======
+    'stabilisation': args.stabilisation,
+}
+op = PointDischarge2dOptions(approach='fixed_mesh', **kwargs)
+op.tracer_family = family
+op.stabilisation = args.stabilisation
+op.anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
+alignment = 'offset' if offset else 'aligned'
+op.di = os.path.join(op.di, args.stabilisation or family, alignment)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 # Plot
 Q = FunctionSpace(op.default_mesh, op.tracer_family.upper(), op.degree_tracer)
@@ -57,6 +68,7 @@ for approach in ('continuous', 'discrete'):
     axes.set_xticks(np.linspace(0, 50, 6))
     axes.xaxis.tick_top()
     axes.set_yticks(np.linspace(0, 10, 3))
+<<<<<<< HEAD
     savefig(fname, op.di, extensions=["jpg"])
 
 # Compute L2 error
@@ -83,3 +95,9 @@ axes.set_xticks(np.linspace(0, 50, 6))
 axes.xaxis.tick_top()
 axes.set_yticks(np.linspace(0, 10, 3))
 savefig("difference", op.di, extensions=["jpg"])
+=======
+    savefig(fname, op.di, extensions=["png"])
+
+# Compute L2 error
+print_output("L2 'error': {:.4f}%".format(100*errornorm(*solutions)/norm(solutions[1])))
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a

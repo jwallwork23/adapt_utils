@@ -7,13 +7,24 @@ tidal free surface forcing on the open boundary.
 The later work of [Kramer et al.] compared Fluidity and MIKE21 using the same domain but a modified
 bathymetry. It is this latter bathymetry which is used here.
 
+<<<<<<< HEAD
 Thanks to [1][Nicolas Barral] for contributing the geometry file.
+=======
+Many thanks to [Nicolas Barral][1] and [Stephan Kramer][2] for assisting with implementing this test
+case in Firedrake.
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 ### Parameters:
   * TODO
 
 ### Boundary conditions:
+<<<<<<< HEAD
   * TODO
+=======
+  * The semicircular boundary is forced using the (spatially uniform) tidal forcing given in `resources/forcing/forcing.dat`.
+  * In addition, we use a viscosity sponge to this boundary, increasing from 5 to 100. There are two options for the sponge type: linear and exponential.
+  * On all other boundaries, free-slip conditions are assumed.
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 ### Quantity of interest
 Power output (integral over turbine footprints and time period of cubed fluid speed, scaled by
@@ -30,3 +41,7 @@ the 2nd International Conference on Environmental Interactions of Marine Renewab
 Technologies (2014).
 
 [1]: https://nicolasbarral.fr "Nicolas Barral"
+<<<<<<< HEAD
+=======
+[2]: https://www.imperial.ac.uk/people/s.kramer "Stephan Kramer"
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a

@@ -1,4 +1,5 @@
 from thetis import *
+<<<<<<< HEAD
 from firedrake.petsc import PETSc
 import firedrake as fire
 
@@ -46,11 +47,31 @@ def initialise_fields(mesh2d, inputdir):
 
 nx = 0.5
 ny = 0.5
+=======
+import firedrake as fire
+
+import datetime
+import numpy as np
+import os
+import pandas as pd
+import time
+
+from adapt_utils.adapt import recovery
+from adapt_utils.io import initialise_bathymetry, export_bathymetry
+from adapt_utils.norms import local_norm
+from adapt_utils.unsteady.solver import AdaptiveProblem
+from adapt_utils.unsteady.test_cases.beach_wall.options import BeachOptions
+
+
+nx = 1
+ny = 1
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 alpha = 1
 beta = 1
 gamma = 0
 
+<<<<<<< HEAD
 kappa = 100 #12.5
 
 ts = time.time()
@@ -58,6 +79,21 @@ st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
 inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220))
+=======
+kappa = 100
+
+ts = time.time()
+st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+di = os.path.dirname(__file__)
+outputdir = os.path.join(di, 'outputs' + st)
+
+# to create the input hydrodynamics directiory please run beach_tidal_hydro.py
+# setting nx and ny to be the same values as above
+
+# we have included the hydrodynamics input dir for nx = 1 and ny = 1 as an example
+
+inputdir = os.path.join(di, 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220)))
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 print(inputdir)
 kwargs = {
     'approach': 'monge_ampere',
@@ -71,6 +107,10 @@ kwargs = {
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
+<<<<<<< HEAD
+=======
+    'stabilisation_sediment': None,
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     'use_automatic_sipg_parameter': True,
     'friction': 'manning'
 }
@@ -78,9 +118,14 @@ kwargs = {
 op = BeachOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
+<<<<<<< HEAD
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
 def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
+=======
+
+def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kappa):
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     P1 = FunctionSpace(mesh, "CG", 1)
 
     uv, elev = swp.fwd_solutions[0].split()
@@ -88,7 +133,11 @@ def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
     abs_horizontal_velocity = Function(elev.function_space()).project(abs(uv[0]))
     abs_hor_vel_norm = Function(elev.function_space()).project(conditional(abs(elev) > 10**(-5), abs(abs_horizontal_velocity - np.mean(abs_horizontal_velocity.dat.data[:])), Constant(0.0)))
 
+<<<<<<< HEAD
     uv_gradient = recovery.construct_gradient(horizontal_velocity)
+=======
+    uv_gradient = recovery.recover_gradient(horizontal_velocity)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     frob_uv_hess = Function(elev.function_space()).project(local_norm(uv_gradient))
 
     if max(abs(frob_uv_hess.dat.data[:])) < 1e-4:
@@ -96,7 +145,11 @@ def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
     else:
         div_uv_star = Function(elev.function_space()).project(frob_uv_hess/max(frob_uv_hess.dat.data[:]))
 
+<<<<<<< HEAD
     if max(abs_horizontal_velocity.dat.data[:])<1e-4:
+=======
+    if max(abs_horizontal_velocity.dat.data[:]) < 1e-4:
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         abs_uv_star = Function(elev.function_space()).project(abs_hor_vel_norm)
     else:
         abs_uv_star = Function(elev.function_space()).project(abs_hor_vel_norm/max(abs_hor_vel_norm.dat.data[:]))
@@ -126,8 +179,13 @@ new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
+<<<<<<< HEAD
 export_final_state("adapt_output/hydrodynamics_beach_bath_new_"+str(int(nx*220))+"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma), bath)
 
+=======
+fpath = "hydrodynamics_beach_bath_new_{:d}_{:d}_{:d}_{:d}".format(int(nx*220), alpha, beta, gamma)
+export_bathymetry(bath, os.path.join("adapt_output", fpath), op=op)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 xaxisthetis1 = []
 baththetis1 = []
@@ -135,10 +193,17 @@ baththetis1 = []
 for i in np.linspace(0, 219, 220):
     xaxisthetis1.append(i)
     baththetis1.append(-bath.at([i, 5]))
+<<<<<<< HEAD
 df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
 df.to_csv("final_result_nx" + str(nx) +"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + ".csv", index = False)
 
 bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_440')
+=======
+df = pd.concat([pd.DataFrame(xaxisthetis1, columns=['x']), pd.DataFrame(baththetis1, columns=['bath'])], axis=1)
+df.to_csv("final_result_nx" + str(nx) + "_" + str(alpha) + '_' + str(beta) + '_' + str(gamma) + ".csv", index=False)
+
+bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_beach_bath_new_440')
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 print('L2')
 print(fire.errornorm(bath, bath_real))

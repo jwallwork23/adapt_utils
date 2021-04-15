@@ -1,18 +1,36 @@
+"""
+**********************************************************************************************
+*  NOTE: Much of the code in this file is based on https://github.com/taupalosaurus/darwin.  *
+**********************************************************************************************
+"""
 from firedrake import op2
+<<<<<<< HEAD
 
 import os
 
 from adapt_utils.options import Options
+=======
+import os
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 
 __all__ = ["eigen_kernel", "get_eigendecomposition", "get_reordered_eigendecomposition",
            "set_eigendecomposition", "set_eigendecomposition_transpose", "intersect",
            "anisotropic_refinement", "metric_from_hessian", "postproc_metric",
+<<<<<<< HEAD
            "gemv", "matscale", "singular_value_decomposition", "get_maximum_length_edge"]
+=======
+           "gemv", "matscale", "poldec_unitary", "poldec_spd", "get_maximum_length_edge"]
 
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 # --- Find Eigen include files
 
+<<<<<<< HEAD
+# --- Find Eigen include files
+
+=======
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 try:
     from firedrake.slate.slac.compiler import PETSC_ARCH
 except ImportError:
@@ -82,7 +100,7 @@ void get_reordered_eigendecomposition(double EVecs_[9], double EVals_[3], const 
 
   // Map inputs and outputs onto Eigen objects
   Map<Matrix<double, 3, 3, RowMajor> > EVecs((double *)EVecs_);
-  Map<Vector2d> EVals((double *)EVals_);
+  Map<Vector3d> EVals((double *)EVals_);
   Map<Matrix<double, 3, 3, RowMajor> > M((double *)M_);
 
   // Solve eigenvalue problem
@@ -332,12 +350,12 @@ void matscale(double B_[%d], const double * A_, const double * alpha_) {
 }
 """
 
-svd_str = """
+poldec_spd_str = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
 
-void singular_value_decomposition(double A_[%d], const double * B_) {
+void poldec_spd(double A_[%d], const double * B_) {
 
   // Map inputs and outputs onto Eigen objects
   Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
@@ -346,8 +364,26 @@ void singular_value_decomposition(double A_[%d], const double * B_) {
   // Compute singular value decomposition
   JacobiSVD<Matrix<double, %d, %d, RowMajor> > svd(B, ComputeFullV);
 
-  // Build metric from singular value decomposition
+  // Get SPD part of polar decomposition
   A += svd.matrixV() * svd.singularValues().asDiagonal() * svd.matrixV().transpose();
+}"""
+
+poldec_unitary_str = """
+#include <Eigen/Dense>
+
+using namespace Eigen;
+
+void poldec_unitary(double A_[%d], const double * B_) {
+
+  // Map inputs and outputs onto Eigen objects
+  Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
+  Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
+
+  // Compute singular value decomposition
+  JacobiSVD<Matrix<double, %d, %d, RowMajor> > svd(B, ComputeFullU | ComputeFullV);
+
+  // Get unitary part of polar decomposition
+  A += svd.matrixU() * svd.matrixV().transpose();
 }"""
 
 get_max_length_edge_2d_str = """
@@ -364,48 +400,86 @@ for (int i=0; i<max_vector.dofs; i++) {
 # --- Python interpreters for C++ kernels
 
 def eigen_kernel(kernel, *args, **kwargs):
-    """Helper function to easily pass Eigen kernels to Firedrake via PyOP2."""
+    """
+    Helper function to easily pass Eigen kernels to Firedrake via PyOP2.
+    """
     return op2.Kernel(kernel(*args, **kwargs), kernel.__name__, cpp=True, include_dirs=include_dir)
 
 
 def get_eigendecomposition(d):
-    """Extract eigenvectors/eigenvalues from a metric field."""
+    """
+    Extract eigenvectors/eigenvalues from a metric field.
+
+    If you care about the order, use `get_reordered_eigendecomposition`.
+    """
     return get_eigendecomposition_str % (d*d, d, d, d, d, d, d, d, d)
 
 
 def get_reordered_eigendecomposition(d):
-    """Extract eigenvectors/eigenvalues from a metric field, ordered by eigenvalue magnitude."""
+    """
+    Extract eigenvectors/eigenvalues from a metric field, with eigenvalues
+    **decreasing** in magnitude.
+    """
     assert d in (2, 3)
     return get_reordered_eigendecomp_2d_str if d == 2 else get_reordered_eigendecomp_3d_str
 
 
 def set_eigendecomposition(d):
-    """Compute metric from eigenvectors/eigenvalues."""
+    """
+    Compute a metric from eigenvectors and eigenvalues as an
+    orthogonal eigendecomposition.
+    """
     return set_eigendecomposition_str % (d*d, d, d, d, d, d)
 
 
 def set_eigendecomposition_transpose(d):
-    """Compute metric from transposed eigenvectors/eigenvalues."""
+    """
+    Compute metric from transposed eigenvectors and eigenvalues
+    as an orthogonal eigendecomposition.
+    """
     return set_eigendecomposition_transpose_str % (d*d, d, d, d, d, d)
 
 
 def intersect(d):
-    """Intersect two metric fields."""
+    """
+    Intersect two metric fields.
+    """
     return intersect_str % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d)
 
 
 def anisotropic_refinement(d, direction):
+<<<<<<< HEAD
     """Refine a metric in a single coordinate direction."""
+=======
+    """
+    Refine a metric in a single coordinate direction.
+    """
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     return anisotropic_refinement_str % (d*d, d, d, d, d, d, d, d, d, direction, 4)
 
 
 def metric_from_hessian(d):
+<<<<<<< HEAD
     """Build a metric field from a Hessian"""
     return metric_from_hessian_str % (d*d, d, d, d, d, d, d, d, d, d, d, d, d)
 
 
 def postproc_metric(d, op=Options()):
     """Post-process a metric field in order to enforce max/min element sizes and anisotropy."""
+=======
+    """
+    Build a metric field from a Hessian.
+    """
+    return metric_from_hessian_str % (d*d, d, d, d, d, d, d, d, d, d, d, d, d)
+
+
+def postproc_metric(d, **kwargs):
+    """
+    Post-process a metric field in order to enforce max/min element sizes and anisotropy.
+    """
+    from adapt_utils.options import Options
+    op = kwargs.get('op', Options())
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     return postproc_metric_str % (d*d, d, d, d, d, d, d, d, d, op.h_min, op.h_max, d, op.max_anisotropy)
 
 
@@ -419,16 +493,36 @@ def gemv(d, alpha=1.0, beta=0.0, tol=1e-8):
 
 
 def matscale(d):
-    """Multiply a matrix by a scalar field."""
+    """
+    Multiply a matrix by a scalar field.
+    """
     return matscale_str % (d*d, d, d, d, d)
 
 
+<<<<<<< HEAD
 def singular_value_decomposition(d):
     """Compute the singular value decomposition of a metric."""
     return svd_str % (d*d, d, d, d, d, d, d)
+=======
+def poldec_unitary(d):
+    """
+    Compute the unitary part of the polar decomposition of a matrix.
+    """
+    return poldec_unitary_str % (d*d, d, d, d, d, d, d)
+
+
+def poldec_spd(d):
+    """
+    Compute the SPD part of the polar decomposition of a matrix.
+    """
+    return poldec_spd_str % (d*d, d, d, d, d, d, d)
+
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 
 def get_maximum_length_edge(d):
+    """
+    Find the mesh edge with maximum length.
+    """
     assert d == 2
-    """Find the mesh edge with maximum length."""
     return get_max_length_edge_2d_str

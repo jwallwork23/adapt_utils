@@ -26,7 +26,10 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
     :kwarg centred: Toggle whether receiver is positioned in the centre of the flow or not.
     """
     def __init__(self, level=0, aligned=True, **kwargs):
+<<<<<<< HEAD
         kwargs.setdefault('direct', False)
+=======
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         super(PointDischarge3dOptions, self).__init__(aligned=aligned, **kwargs)
         # self.qoi_quadrature_degree = 12
         self.qoi_quadrature_degree = 3
@@ -41,7 +44,23 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
         self.h_min = 1.0e-30
         self.h_max = 1.0e+06
         # self.hessian_recovery = 'parts'
+<<<<<<< HEAD
         self.hessian_recovery = 'L2'
+=======
+        self.hessian_recovery = 'dL2'
+
+        # Solver parameters
+        self.solver_parameters['tracer'] = {
+            'ksp_type': 'gmres',
+            'pc_type': 'sor',
+        }
+        # self.solver_parameters['tracer'] = {
+        #     'mat_type': 'aij',
+        #     'ksp_type': 'preonly',
+        #     'pc_type': 'lu',
+        #     'pc_factor_mat_solver_type': 'mumps',
+        # }
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     def set_boundary_conditions(self, prob, i):
         zero = Constant(0.0)
@@ -58,6 +77,7 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
         return boundary_conditions
 
     def set_calibrated_radius(self):
+<<<<<<< HEAD
         """
         Set radius for source term using results from `calibrate_radius.py` script.
 
@@ -67,6 +87,9 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
         # r = 9.954470e-02  # (Level 0, anisotropic SUPG)
         # r = 6.97574750e-02  # (Level 1, anisotropic SUPG)
         r = 6.51537538e-02  # (Level 2, anisotropic SUPG)
+=======
+        r = 0.2  # TODO: Rerun for 3D case
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         return [(1.0 + self.shift, 5.0, 5.0, r)]
 
     def analytical_solution(self, fs):

@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+=======
+from firedrake import *
+
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 import numpy as np
 import os
 import pytest
@@ -14,6 +19,7 @@ def get_mesh(dim, n):
         raise ValueError("Dimension {:d} not supported".format(dim))
 
 
+<<<<<<< HEAD
 def check_entity_counts(mesh1, mesh2):
     assert mesh1.num_vertices() == mesh2.num_vertices()
     assert mesh1.num_edges() == mesh2.num_edges()
@@ -23,6 +29,12 @@ def check_entity_counts(mesh1, mesh2):
 
 def check_coordinates(mesh1, mesh2):
     """Verify that the vertices of `mesh1` are all vertices of `mesh2`."""
+=======
+def check_coordinates(mesh1, mesh2):
+    """
+    Verify that the vertices of `mesh1` are all vertices of `mesh2`.
+    """
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     for v1 in mesh1.coordinates.dat.data:
         found = False
         for v2 in mesh2.coordinates.dat.data:
@@ -43,7 +55,13 @@ def dim(request):
 
 
 def test_indentity_metric(dim):
+<<<<<<< HEAD
     """Verify that adapting with respect to the identity metric does not change the mesh."""
+=======
+    """
+    Verify that adapting with respect to the identity metric does not change the mesh.
+    """
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     if os.environ.get('FIREDRAKE_ADAPT') == '0':
         pytest.xfail("Firedrake installation does not include Pragmatic")
 
@@ -54,14 +72,20 @@ def test_indentity_metric(dim):
     identity = Identity(dim)/sqrt(dim)
     P1_ten = TensorFunctionSpace(mesh, "CG", 1)
     M_hardcoded = interpolate(identity, P1_ten)
+<<<<<<< HEAD
     newmesh = pragmatic_adapt(mesh, M_hardcoded)
     check_entity_counts(mesh, newmesh)
+=======
+    newmesh = adapt(mesh, M_hardcoded)
+    assert mesh.num_vertices() == newmesh.num_vertices()
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     check_coordinates(mesh, newmesh)
 
     # Adapt using an identity metric created using the isotropic_metric driver
     P1 = FunctionSpace(mesh, "CG", 1)
     f = Function(P1).assign(1/np.sqrt(dim))
     M = isotropic_metric(f, normalise=False, enforce_constraints=False)
+<<<<<<< HEAD
     newmesh = pragmatic_adapt(mesh, M)
     assert np.allclose(M_hardcoded.dat.data, M.dat.data)
     check_entity_counts(mesh, newmesh)
@@ -102,3 +126,9 @@ def test_anisotropic_stretch(dim):
         amd.adapt_mesh()
         num_vertices_face_i = len(amd.P1.boundary_nodes(2*i+1, method))
         assert num_vertices_face_i == len(amd.P1.boundary_nodes((2*(i+1)+1) % n, method))
+=======
+    newmesh = adapt(mesh, M)
+    assert np.allclose(M_hardcoded.dat.data, M.dat.data)
+    assert mesh.num_vertices() == newmesh.num_vertices()
+    check_coordinates(mesh, newmesh)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a

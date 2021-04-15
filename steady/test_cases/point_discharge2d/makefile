@@ -4,6 +4,7 @@ dir:
 	@echo "Making directories..."
 	@mkdir -p outputs/fixed_mesh/hdf5
 	@mkdir -p outputs/dwr/hdf5
+<<<<<<< HEAD
 	@mkdir -p outputs/dwr_adjoint/hdf5
 	@mkdir -p outputs/dwr_avg/hdf5
 	@mkdir -p outputs/dwr_int/hdf5
@@ -23,6 +24,19 @@ dir:
 	@mkdir -p outputs/weighted_gradient_adjoint/hdf5
 	@mkdir -p outputs/weighted_gradient_avg/hdf5
 	@mkdir -p outputs/weighted_gradient_int/hdf5
+=======
+	@# mkdir -p outputs/dwr_averaged/hdf5
+	@# mkdir -p outputs/dwr_superposed/hdf5
+	@mkdir -p outputs/anisotropic_dwr/hdf5
+	@# mkdir -p outputs/anisotropic_dwr_averaged/hdf5
+	@# mkdir -p outputs/anisotropic_dwr_superposed/hdf5
+	@mkdir -p outputs/weighted_hessian/hdf5
+	@# mkdir -p outputs/weighted_hessian_averaged/hdf5
+	@# mkdir -p outputs/weighted_hessian_superposed/hdf5
+	@mkdir -p outputs/weighted_gradient/hdf5
+	@# mkdir -p outputs/weighted_gradient_averaged/hdf5
+	@# mkdir -p outputs/weighted_gradient_superposed/hdf5
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 	@mkdir -p data
 	@mkdir -p plots
 
@@ -67,6 +81,7 @@ uniform:
 
 table:
 	@echo "Writing to LaTeX formatted table..."
+<<<<<<< HEAD
 	@python3 write_table.py cg -stabilisation supg -anisotropic_stabilisation 1
 
 enrichment:
@@ -250,3 +265,50 @@ plot_enrichment:
 	@python3 plot_convergence.py enrichment
 
 convergence: uniform table forward plot_forward
+=======
+	@python3 write_table.py
+
+adaptive: isotropic anisotropic weighted_hessian weighted_gradient
+
+isotropic:
+	@echo "Running isotropic DWR adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach dwr
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach dwr -offset 1
+
+anisotropic:
+	@echo "Running anisotropic DWR adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-convergence_rate 2 -approach anisotropic_dwr
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-convergence_rate 2 -approach anisotropic_dwr -offset 1
+
+weighted_hessian:
+	@echo "Running 'weighted Hessian' anisotropic adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach weighted_hessian
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach weighted_hessian -offset 1
+
+weighted_gradient:
+	@echo "Running 'weighted gradient' anisotropic adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach weighted_gradient
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach weighted_gradient -offset 1
+
+plot:
+	@echo "Plotting convergence curves..."
+	@python3 plot_convergence.py cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -convergence_rate 2
+
+plot_norms:
+	@echo "Plotting convergence curves across norm orders..."
+	@python3 plot_convergence_norms.py dwr cg -stabilisation supg
+	@python3 plot_convergence_norms.py weighted_hessian cg -stabilisation supg
+	@python3 plot_convergence_norms.py weighted_gradient cg -stabilisation supg
+	@python3 plot_convergence_norms.py anisotropic_dwr cg -stabilisation supg
+
+convergence: uniform table adaptive plot
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a

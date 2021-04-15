@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from matplotlib.transforms import Bbox, TransformedBbox, blended_transform_factory
 from mpl_toolkits.axes_grid1.inset_locator import BboxPatch, BboxConnector, BboxConnectorPatch
 
@@ -77,10 +78,32 @@ def zoom_effect01(ax1, ax2, xmin, xmax, **kwargs):
 
 
 def zoom_effect02(ax1, ax2, **kwargs):
-    """
-    ax1 : the main axes
-    ax2 : the zoomed axes
+=======
+import matplotlib
+import matplotlib.pyplot as plt
+import os
 
+
+__all__ = ["savefig"]
+
+
+# Fonts
+matplotlib.rc('text', usetex=True)
+matplotlib.rcParams['mathtext.fontset'] = 'custom'
+matplotlib.rcParams['mathtext.rm'] = 'Bitstream Vera Sans'
+matplotlib.rcParams['mathtext.it'] = 'Bitstream Vera Sans:italic'
+matplotlib.rcParams['mathtext.bf'] = 'Bitstream Vera Sans:bold'
+matplotlib.rcParams['mathtext.fontset'] = 'stix'
+matplotlib.rcParams['font.family'] = 'STIXGeneral'
+matplotlib.rcParams['font.size'] = 24
+
+
+def savefig(fname, fpath=None, extensions=['pdf', 'png']):
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
+    """
+    Save current matplotlib.pyplot figure to file.
+
+<<<<<<< HEAD
     Similar to zoom_effect01.  The xmin & xmax will be taken from the
     ax1.viewLim.
 
@@ -106,3 +129,16 @@ def zoom_effect02(ax1, ax2, **kwargs):
     ax2.add_patch(p)
 
     return c1, c2, bbox_patch1, bbox_patch2, p
+=======
+    :arg fname: the name to be given to the file.
+    :kwarg path: (optional) path to file.
+    :kwarg extensions: a list of strings corresponding to the file extensions to be used.
+    """
+    plt.tight_layout()
+    if fpath is not None:
+        fname = os.path.join(fpath, fname)
+    for extension in extensions:
+        plt.savefig('.'.join([fname, extension]))
+    if len(extensions) == 0:
+        plt.show()
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a

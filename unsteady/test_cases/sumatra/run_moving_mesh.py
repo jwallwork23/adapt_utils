@@ -9,7 +9,11 @@ from adapt_utils.norms import local_frobenius_norm, local_norm
 import time
 import datetime
 
+<<<<<<< HEAD
 alpha_std = 20
+=======
+alpha_std = 30
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 beta = 1
 gamma = 1
 
@@ -50,7 +54,11 @@ def gradient_interface_monitor(mesh, alpha=alpha_std, beta=beta, gamma=gamma):
     #b = th.Function(b_copy.function_space()).project(th.conditional(x_1 < 3600, b_copy, th.Constant(b_copy.at([3600, 60]))))
     bath_gradient = b.dx(0) #recovery.construct_gradient(b)
     # second order derivative
+<<<<<<< HEAD
     bath_hess = recovery.construct_hessian(b, op=op)
+=======
+    bath_hess = recovery.recover_hessian(b, op=op)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     frob_bath_hess = th.Function(swp.bathymetry[0].function_space()).project(local_frobenius_norm(bath_hess))
 
     if max(abs(frob_bath_hess.dat.data[:]))<1e-10:
@@ -61,7 +69,11 @@ def gradient_interface_monitor(mesh, alpha=alpha_std, beta=beta, gamma=gamma):
     l2_bath_grad = th.Function(swp.bathymetry[0].function_space()).project(abs(bath_gradient))
 
     bath_dx_l2_norm = th.Function(swp.bathymetry[0].function_space()).interpolate(l2_bath_grad/max(l2_bath_grad.dat.data[:]))
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     x1, y1 = th.SpatialCoordinate(b.function_space().mesh())
     alpha = th.conditional(x1 < 3600, th.Constant(alpha_std), (-alpha_std)/(4044 - 3600) *(x1-3600) + alpha_std)
     comp = th.interpolate(th.conditional(alpha*beta*bath_dx_l2_norm > alpha*gamma*frob_bath_norm, alpha*beta*bath_dx_l2_norm, alpha*gamma*frob_bath_norm), b.function_space())
@@ -73,6 +85,7 @@ def gradient_interface_monitor(mesh, alpha=alpha_std, beta=beta, gamma=gamma):
     tau = th.TestFunction(P1)
     n = th.FacetNormal(mesh)
 
+<<<<<<< HEAD
     K = 20*(12**2)/4
 
     a = (th.inner(tau, H)*th.dx)+(K*th.inner(th.grad(tau), th.grad(H))*th.dx) - (K*(tau*th.inner(th.grad(H), n)))*th.ds
@@ -81,6 +94,16 @@ def gradient_interface_monitor(mesh, alpha=alpha_std, beta=beta, gamma=gamma):
 
 
     return H
+=======
+    K = 40*(12**2)/4
+    
+    a = (th.inner(tau, H)*th.dx)+(K*th.inner(th.grad(tau), th.grad(H))*th.dx) - (K*(tau*th.inner(th.grad(H), n)))*th.ds
+    a -= th.inner(tau, mon_init)*th.dx
+    th.solve(a == 0, H)
+    
+    
+    return th.Constant(1) #H
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 swp.set_monitor_functions(gradient_interface_monitor)
 

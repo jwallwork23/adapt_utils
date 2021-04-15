@@ -1,10 +1,13 @@
 from thetis import *
-from thetis.configuration import *
 
 import math
 import os
 
+<<<<<<< HEAD:unsteady/test_cases/solid_body_rotation/options.py
 from adapt_utils.unsteady.options import CoupledOptions
+=======
+from adapt_utils.options import CoupledOptions
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a:test_cases/slotted_cylinder/options.py
 
 
 __all__ = ["LeVequeOptions"]
@@ -28,9 +31,16 @@ class LeVequeOptions(CoupledOptions):
     The QoI considered in this test case may be viewed as an extension of the QoI considered in the
     [Power et al. 2006] and TELEMAC-2D test cases to time-dependent problems.
     """
+<<<<<<< HEAD:unsteady/test_cases/solid_body_rotation/options.py
     def __init__(self, shape=0, geometry='circle', n=0, background_concentration=0.0, **kwargs):
         self.solve_swe = False
         self.solve_tracer = True
+=======
+    def __init__(self, shape=0, geometry='circle', level=0, background_concentration=0.0, **kwargs):
+        self.solve_swe = False
+        self.solve_tracer = True
+        self.adapt_field = 'tracer'
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a:test_cases/slotted_cylinder/options.py
         self.shape = shape
 
         # Temporal discretisation
@@ -49,10 +59,17 @@ class LeVequeOptions(CoupledOptions):
                 self.default_mesh = Mesh(mesh_file)
             else:
                 raise IOError("Mesh file {:s} does not exist.".format(mesh_file))
+<<<<<<< HEAD:unsteady/test_cases/solid_body_rotation/options.py
             if n > 0:
                 self.default_mesh = MeshHierarchy(self.default_mesh, n)[-1]
         elif geometry == 'square':
             self.default_mesh = UnitSquareMesh(40*2**n, 40*2**n)
+=======
+            if level > 0:
+                self.default_mesh = MeshHierarchy(self.default_mesh, level)[-1]
+        elif geometry == 'square':
+            self.default_mesh = UnitSquareMesh(40*2**level, 40*2**level)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a:test_cases/slotted_cylinder/options.py
         else:
             raise ValueError("Geometry {:s} not recognised.".format(geometry))
         self.default_mesh.coordinates.dat.data[:] -= 0.5
@@ -66,6 +83,7 @@ class LeVequeOptions(CoupledOptions):
 
         # Physics
         self.base_diffusivity = 0.0
+<<<<<<< HEAD:unsteady/test_cases/solid_body_rotation/options.py
 
         # Spatial discretisation
         if self.tracer_family == 'cg':
@@ -89,6 +107,16 @@ class LeVequeOptions(CoupledOptions):
                 # 'ksp_converged_reason': None,
             }
         }
+=======
+        self.characteristic_speed = Constant(1.0)  # TODO: check
+
+        # Spatial discretisation
+        if self.tracer_family == 'cg':
+            self.stabilisation_tracer = 'supg'
+        elif self.tracer_family == 'dg':
+            self.stabilisation_tracer = 'lax_friedrichs'
+            self.lax_friedrichs_tracer_scaling_factor = Constant(1.0)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a:test_cases/slotted_cylinder/options.py
 
     def set_region_of_interest(self, shape=0):
         assert shape in (0, 1, 2)

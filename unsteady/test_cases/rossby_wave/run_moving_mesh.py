@@ -1,6 +1,7 @@
 from thetis import *
 
 import argparse
+<<<<<<< HEAD
 
 from adapt_utils.adapt.metric import metric_intersection
 from adapt_utils.adapt.r import MeshMover
@@ -11,20 +12,46 @@ from adapt_utils.unsteady.test_cases.rossby_wave.monitors import *
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 
+=======
+import os
+
+from adapt_utils.adapt.metric import metric_intersection
+from adapt_utils.adapt.r import MeshMover
+from adapt_utils.adapt.recovery import recover_hessian
+from adapt_utils.norms import *
+from adapt_utils.unsteady.solver import AdaptiveProblem
+from adapt_utils.unsteady.test_cases.rossby_wave.monitors import *
+from adapt_utils.unsteady.test_cases.rossby_wave.options import BoydOptions
+
+
+# --- Parse arguments
+
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 parser = argparse.ArgumentParser()
 parser.add_argument("-n_coarse", help="Resolution of coarse mesh.")
 parser.add_argument("-n_fine", help="Resolution of fine mesh.")
 parser.add_argument("-end_time", help="Simulation end time.")
 parser.add_argument("-refine_equator", help="""
+<<<<<<< HEAD
 Apply Monge-Ampere based r-adaptation to refine equatorial region.""")
 parser.add_argument("-refine_soliton", help="""
 Apply Monge-Ampere based r-adaptation to refine around initial soliton.""")
+=======
+    Apply Monge-Ampere based r-adaptation to refine equatorial region.""")
+parser.add_argument("-refine_soliton", help="""
+    Apply Monge-Ampere based r-adaptation to refine around initial soliton.""")
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 parser.add_argument("-monitor", help="Choose monitor from 'uv', 'elev', 'both'.")
 parser.add_argument("-calculate_metrics", help="Compute metrics using the fine mesh.")
 parser.add_argument("-debug", help="Toggle debugging mode.")
 args = parser.parse_args()
 
 
+<<<<<<< HEAD
+=======
+# --- Set parameters
+
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 n_coarse = int(args.n_coarse or 1)  # NOTE: [Huang et al 2008] considers n = 4, 8, 20
 n_fine = int(args.n_fine or 50)
 
@@ -67,16 +94,32 @@ kwargs = {
     'r_adapt_rtol': 1.0e-3,
     'nonlinear_method': 'relaxation',
     # 'nonlinear_method': 'quasi_newton',
+<<<<<<< HEAD
+=======
+    'dt_per_mesh_movement': 1,  # TODO: Could probably get away with many more
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     # Misc
     'debug': bool(args.debug or False),
 }
+<<<<<<< HEAD
+=======
+if os.getenv('REGRESSION_TEST') is not None:
+    kwargs['end_time'] = kwargs['dt']*kwargs['dt_per_export']
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 fpath = 'resolution_{:d}'.format(n_coarse)
 if initial_monitor_type is not None:
     fpath = os.path.join(fpath, initial_monitor_type)
 fpath = os.path.join(fpath, monitor_type)
 op = BoydOptions(approach='monge_ampere', n=n_coarse, fpath=fpath, order=kwargs['order'])
 op.update(kwargs)
+<<<<<<< HEAD
+=======
+
+
+# --- Initialise mesh
+
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 swp = AdaptiveProblem(op)
 
 # Refine around equator and/or soliton
@@ -85,9 +128,17 @@ if initial_monitor is not None:
     mesh_mover.adapt()
     mesh = Mesh(mesh_mover.x)
     op.__init__(mesh=mesh, **kwargs)
+<<<<<<< HEAD
     swp.__init__(op, meshes=[mesh, ])
 
 
+=======
+    swp.__init__(op, meshes=[mesh])
+
+
+# --- Monitor function definitions
+
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 def elevation_norm_monitor(mesh, alpha=40.0, norm_type='H1'):
     """
     Monitor function derived from the elevation `norm_type` norm.
@@ -97,7 +148,11 @@ def elevation_norm_monitor(mesh, alpha=40.0, norm_type='H1'):
     P1DG = FunctionSpace(mesh, "DG", 1)
     eta = project(swp.fwd_solutions[0].split()[1], P1DG)
     if norm_type == 'hessian_frobenius':
+<<<<<<< HEAD
         H = construct_hessian(eta, op=op)
+=======
+        H = recover_hessian(eta, op=op)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         return 1.0 + alpha*local_frobenius_norm(H)
     else:
         return 1.0 + alpha*local_norm(eta, norm_type=norm_type)
@@ -112,8 +167,13 @@ def velocity_norm_monitor(mesh, alpha=40.0, norm_type='HDiv'):
     P1DG_vec = VectorFunctionSpace(mesh, "DG", 1)
     u = project(swp.fwd_solutions[0].split()[0], P1DG_vec)
     if norm_type == 'hessian_frobenius':
+<<<<<<< HEAD
         H1 = construct_hessian(u[0], op=op)
         H2 = construct_hessian(u[1], op=op)
+=======
+        H1 = recover_hessian(u[0], op=op)
+        H2 = recover_hessian(u[1], op=op)
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         return 1.0 + alpha*local_frobenius_norm(metric_intersection(H1, H2))
     else:
         return 1.0 + alpha*local_norm(u, norm_type=norm_type)
@@ -131,8 +191,16 @@ elif monitor_type == 'uv':
 else:
     monitor = mixed_monitor
 swp.set_monitor_functions(monitor)
+<<<<<<< HEAD
 swp.solve_forward()
 
+=======
+
+
+# --- Solve forward problem and print diagnostics
+
+swp.solve_forward()
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 if bool(args.calculate_metrics or False):
     print_output("\nCalculating error metrics...")
     metrics = op.get_peaks(swp.fwd_solutions[-1].split()[1], reference_mesh_resolution=n_fine)
