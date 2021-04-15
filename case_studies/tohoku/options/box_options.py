@@ -1,12 +1,14 @@
-import thetis
+from thetis import *
+
 import numpy as np
-from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+
+from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
 
 
 __all__ = ["TohokuBoxBasisOptions"]
 
 
-class TohokuBoxBasisOptions(TohokuOptions):
+class TohokuBoxBasisOptions(TohokuInversionOptions):
     """
     Initialise the free surface with an initial condition consisting of an array of rectangular
     indicator functions, each scaled by a control parameter. Setups of this type have been used by
@@ -35,26 +37,38 @@ class TohokuBoxBasisOptions(TohokuOptions):
         self.nx = kwargs.get('nx', 13)
         self.ny = kwargs.get('ny', 10)
         N_b = self.nx*self.ny
-        control_parameters = kwargs.get('control_parameters', 10.0*np.random.rand(N_b))  # arbitrary
-        N_c = len(control_parameters)
-        if N_c != N_b:
-            raise ValueError("{:d} controls inconsistent with {:d} basis functions".format(N_c, N_b))
 
         # Parametrisation of source region
-        self.centre_x = kwargs.get('centre_x', 0.7e+06)
-        self.centre_y = kwargs.get('centre_y', 4.2e+06)
-        self.radius_x = kwargs.get('radius_x', 0.5*560.0e+03/self.nx)
-        self.radius_y = kwargs.get('radius_y', 0.5*240.0e+03/self.ny)
+        # ================================
+        #  These parameters define the geometry of the basis array. Note that if any of the values
+        #  vary from the defaults then the cache is marked as dirty and the projection mass matrix
+        #  will be re-assembled.
+        self.centre_x = self.extract(kwargs, 'centre_x', 0.7e+06)
+        self.centre_y = self.extract(kwargs, 'centre_y', 4.2e+06)
+        self.radius_x = self.extract(kwargs, 'radius_x', 0.5*560.0e+03/self.nx)
+        self.radius_y = self.extract(kwargs, 'radius_y', 0.5*240.0e+03/self.ny)
+        self.strike_angle = self.extract(kwargs, 'strike_angle', 7*np.pi/12)
 
-        # Parametrisation of source basis
+        # Set control parameters (if provided)
+        control_parameters = kwargs.get('control_parameters')
+        if control_parameters is not None:
+            if len(control_parameters) != N_b:
+                msg = "{:d} controls inconsistent with {:d} basis functions"
+                raise ValueError(msg.format(len(control_parameters), N_b))
+            self.assign_control_parameters(control_parameters)
+
+    def assign_control_parameters(self, control_values, mesh=None):
+        """
+        Create a list of control parameters defined in the R space and assign values from the list
+        of floats, `control_values`.
+        """
         self.print_debug("INIT: Assigning control parameter values...")
-        R = thetis.FunctionSpace(self.default_mesh, "R", 0)
+        R = FunctionSpace(mesh or self.default_mesh, "R", 0)
         self.control_parameters = []
-        for i in range(N_c):
-            control = thetis.Function(R, name="Control parameter {:d}".format(i))
-            control.assign(control_parameters[i])
+        for i, control_value in enumerate(control_values):
+            control = Function(R, name="Control parameter {:d}".format(i))
+            control.assign(control_value)
             self.control_parameters.append(control)
-        self.strike_angle = kwargs.get('strike_angle', 7*np.pi/12)
 
     def get_basis_functions(self, fs):
         """
@@ -74,33 +88,35 @@ class TohokuBoxBasisOptions(TohokuOptions):
         X = np.linspace((1 - nx)*rx, (nx - 1)*rx, nx)
         Y = np.linspace((1 - ny)*ry, (ny - 1)*ry, ny)
         self.print_debug("INIT: Assembling rotated array of indicator functions...")
-        self.basis_functions = [thetis.Function(fs) for i in range(N)]
+        self.basis_functions = [Function(fs) for i in range(N)]
         R = rotation_matrix(-angle)
         self._array = []
         for j, y in enumerate(Y):
             for i, x in enumerate(X):
-                psi, phi = self.basis_functions[i + j*nx].split()
+                phi = self.basis_functions[i + j*nx]
                 x_rot, y_rot = tuple(np.array([x0, y0]) + np.dot(R, np.array([x, y])))
                 self._array.append([x_rot, y_rot])
-                phi.interpolate(box([(x_rot, y_rot, rx, ry), ], fs.mesh(), rotation=angle))
+                phi.interpolate(box([(x_rot, y_rot, rx, ry)], fs.mesh(), rotation=angle))
 
-    def set_initial_condition(self, prob, sum_pad=100):
+    def set_initial_condition(self, prob):
         """
+        Project from the piecewise constant basis into the prognostic space used within the tsunami
+        propagation model.
+
         :arg prob: the :class:`AdaptiveProblem` object to which the initial condition is assigned.
-        :kwarg sum_pad: when summing terms to assemble the initial surface, the calculation is split
-            up for large arrays in order to avoid the UFL recursion limit. That is, every `sum_pad`
-            terms are summed separately.
         """
+        fs = prob.V[0].sub(1)
         if not hasattr(self, 'basis_functions'):
-            self.get_basis_functions(prob.V[0])
+            self.get_basis_functions(fs)
+
+        # Assume zero initial velocity
+        u, eta = prob.fwd_solutions[0].split()
+        u.assign(0.0)
 
         # Assemble initial surface
         self.print_debug("INIT: Assembling initial surface...")
-        prob.fwd_solutions[0].assign(0.0)
-        controls = self.control_parameters
-        for n in range(0, self.nx*self.ny, sum_pad):
-            expr = sum(m*g for m, g in zip(controls[n:n+sum_pad], self.basis_functions[n:n+sum_pad]))
-            prob.fwd_solutions[0].assign(prob.fwd_solutions[0] + thetis.project(expr, prob.V[0]))
+        for coeff, bf in zip(self.control_parameters, self.basis_functions):
+            eta.assign(eta + project(coeff*bf, fs))
 
         # Subtract initial surface from the bathymetry field
         self.subtract_surface_from_bathymetry(prob)
@@ -112,12 +128,34 @@ class TohokuBoxBasisOptions(TohokuOptions):
         Note that the approach relies on the fact that the supports of the basis functions do not
         overlap.
         """
+        cache_dir = create_directory(os.path.join(os.path.dirname(__file__), '.cache'))
+        fname = os.path.join(cache_dir, 'mass_matrix_box_{:d}_{:d}x{:d}.npy')
+        fname = fname.format(self.level, self.nx, self.ny)
+
+        # Get basis functions
         if not hasattr(self, 'basis_functions'):
-            self.get_basis_functions(prob.V[0])
-        for i, bf in enumerate(self.basis_functions):
-            psi, phi = bf.split()
-            mass = thetis.assemble(phi*source*thetis.dx)
-            self.control_parameters[i].assign(mass/thetis.assemble(phi*thetis.dx))
+            self.get_basis_functions(prob.V[0].sub(1))
+
+        # Assemble mass matrix
+        if os.path.isfile(fname) and not self.dirty_cache:
+            self.print_debug("PROJECTION: Loading mass matrix from cache...")
+            A = np.load(fname)
+        else:
+            self.print_debug("PROJECTION: Assembling mass matrix...")
+            A = np.array([assemble(phi*phi*dx) for phi in self.basis_functions])
+            self.print_debug("PROJECTION: Cacheing mass matrix...")
+            np.save(fname, A)
+
+        # Assemble RHS
+        self.print_debug("PROJECTION: Assembling RHS...")
+        b = np.array([assemble(phi*source*dx) for phi in self.basis_functions])
+
+        # Project
+        self.print_debug("PROJECTION: Solving linear system...")
+        m = b/A
+
+        # Assign values
+        self.assign_control_parameters(m, prob.meshes[0])
 
     def interpolate(self, prob, source):
         """
@@ -127,6 +165,5 @@ class TohokuBoxBasisOptions(TohokuOptions):
         overlap.
         """
         if not hasattr(self, 'basis_functions'):
-            self.get_basis_functions(prob.V[0])
-        for i, xy in enumerate(self._array):
-            self.control_parameters[i].assign(source.at(xy))
+            self.get_basis_functions(prob.V[0].sub(1))
+        self.assign_control_parameters([source.at(xy) for xy in self._array], prob.meshes[0])

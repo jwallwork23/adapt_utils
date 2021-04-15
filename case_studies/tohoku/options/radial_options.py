@@ -1,16 +1,16 @@
-import thetis
+from thetis import *
 
 import numpy as np
 import scipy
 
-from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
 from adapt_utils.norms import vecnorm
 
 
 __all__ = ["TohokuRadialBasisOptions"]
 
 
-class TohokuRadialBasisOptions(TohokuOptions):
+class TohokuRadialBasisOptions(TohokuInversionOptions):
     """
     Initialise the free surface with an initial condition consisting of an array of radial basis
     functions, each scaled by a control parameter. The setup with a 13 x 10 array was presented in
@@ -46,28 +46,40 @@ class TohokuRadialBasisOptions(TohokuOptions):
         self.nx = kwargs.get('nx', 13)
         self.ny = kwargs.get('ny', 10)
         N_b = self.nx*self.ny
-        control_parameters = kwargs.get('control_parameters', 10.0*np.random.rand(N_b))
-        N_c = len(control_parameters)
-        if N_c != N_b:
-            raise ValueError("{:d} controls inconsistent with {:d} basis functions".format(N_c, N_b))
 
         # Parametrisation of source region
-        self.centre_x = kwargs.get('centre_x', 0.7e+06)
-        self.centre_y = kwargs.get('centre_y', 4.2e+06)
-        self.extent_x = kwargs.get('extent_x', 560.0e+03)
-        self.extent_y = kwargs.get('extent_y', 240.0e+03)
+        # ================================
+        #  These parameters define the geometry of the basis array. Note that if any of the values
+        #  vary from the defaults then the cache is marked as dirty and the projection mass matrix
+        #  will be re-assembled.
+        self.centre_x = self.extract(kwargs, 'centre_x', 0.7e+06)
+        self.centre_y = self.extract(kwargs, 'centre_y', 4.2e+06)
+        self.extent_x = self.extract(kwargs, 'extent_x', 560.0e+03)
+        self.extent_y = self.extract(kwargs, 'extent_y', 240.0e+03)
+        self.radius_x = self.extract(kwargs, 'radius_x', 96e+03 if self.nx == 1 else 48.0e+03)
+        self.radius_y = self.extract(kwargs, 'radius_y', 48e+03 if self.ny == 1 else 24.0e+03)
+        self.strike_angle = self.extract(kwargs, 'strike_angle', 7*np.pi/12)
 
-        # Parametrisation of source basis
-        self.radius_x = kwargs.get('radius_x', 96e+03 if self.nx == 1 else 48.0e+03)
-        self.radius_y = kwargs.get('radius_y', 48e+03 if self.ny == 1 else 24.0e+03)
+        # Set control parameters (if provided)
+        control_parameters = kwargs.get('control_parameters', 10.0*np.random.rand(N_b))
+        if control_parameters is not None:
+            if len(control_parameters) != N_b:
+                msg = "{:d} controls inconsistent with {:d} basis functions"
+                raise ValueError(msg.format(len(control_parameters), N_b))
+            self.assign_control_parameters(control_parameters)
+
+    def assign_control_parameters(self, control_values, mesh=None):
+        """
+        Create a list of control parameters defined in the R space and assign values from the list
+        of floats, `control_values`.
+        """
         self.print_debug("INIT: Assigning control parameter values...")
-        R = thetis.FunctionSpace(self.default_mesh, "R", 0)
+        R = FunctionSpace(mesh or self.default_mesh, "R", 0)
         self.control_parameters = []
-        for i in range(N_c):
-            control = thetis.Function(R, name="Control parameter {:d}".format(i))
-            control.assign(control_parameters[i])
+        for i, control_value in enumerate(control_values):
+            control = Function(R, name="Control parameter {:d}".format(i))
+            control.assign(control_value)
             self.control_parameters.append(control)
-        self.strike_angle = kwargs.get('strike_angle', 7*np.pi/12)
 
     def get_basis_functions(self, fs):  # TODO: Implement radial basis functions other than Gaussians
         """
@@ -85,45 +97,55 @@ class TohokuRadialBasisOptions(TohokuOptions):
         angle = self.strike_angle              # Angle by which to rotate axis / basis array
 
         # Setup array coordinates
-        X = np.array([0.0, ]) if nx == 1 else np.linspace(-0.5*dx, 0.5*dx, nx)
-        Y = np.array([0.0, ]) if ny == 1 else np.linspace(-0.5*dy, 0.5*dy, ny)
+        X = np.array([0.0]) if nx == 1 else np.linspace(-0.5*dx, 0.5*dx, nx)
+        Y = np.array([0.0]) if ny == 1 else np.linspace(-0.5*dy, 0.5*dy, ny)
 
         # Assemble array
         self.print_debug("INIT: Assembling rotated radial basis function array...")
-        self.basis_functions = [thetis.Function(fs) for i in range(N)]
+        self.basis_functions = [Function(fs) for i in range(N)]
         R = rotation_matrix(-angle)
         self._array = []
         for j, y in enumerate(Y):
             for i, x in enumerate(X):
-                psi, phi = self.basis_functions[i + j*nx].split()
+                phi = self.basis_functions[i + j*nx]
                 x_rot, y_rot = tuple(np.array([x0, y0]) + np.dot(R, np.array([x, y])))
                 self._array.append([x_rot, y_rot])
-                phi.interpolate(gaussian([(x_rot, y_rot, rx, ry), ], fs.mesh(), rotation=angle))
+                phi.interpolate(gaussian([(x_rot, y_rot, rx, ry)], fs.mesh(), rotation=angle))
 
-    def set_initial_condition(self, prob, sum_pad=100):
+    @property
+    def basis_function(self):
+        return self.basis_functions[0]
+
+    @property
+    def control_parameter(self):
+        return self.control_parameters[0]
+
+    def set_initial_condition(self, prob):
         """
+        Project from the radial basis into the prognostic space used within the tsunami propagation
+        model.
+
         :arg prob: the :class:`AdaptiveProblem` object to which the initial condition is assigned.
-        :kwarg sum_pad: when summing terms to assemble the initial surface, the calculation is split
-            up for large arrays in order to avoid the UFL recursion limit. That is, every `sum_pad`
-            terms are summed separately.
         """
+        fs = prob.V[0].sub(1)
         if not hasattr(self, 'basis_functions'):
-            self.get_basis_functions(prob.V[0])
+            self.get_basis_functions(fs)
+
+        # Assume zero initial velocity
+        u, eta = prob.fwd_solutions[0].split()
+        u.assign(0.0)
 
         # Assemble initial surface
         self.print_debug("INIT: Assembling initial surface...")
-        prob.fwd_solutions[0].assign(0.0)
-        controls = self.control_parameters
-        for n in range(0, self.nx*self.ny, sum_pad):
-            expr = sum(m*g for m, g in zip(controls[n:n+sum_pad], self.basis_functions[n:n+sum_pad]))
-            prob.fwd_solutions[0].assign(prob.fwd_solutions[0] + thetis.project(expr, prob.V[0]))
+        for coeff, bf in zip(self.control_parameters, self.basis_functions):
+            eta.assign(eta + project(coeff*bf, fs))
 
         # Subtract initial surface from the bathymetry field
         self.subtract_surface_from_bathymetry(prob)
 
     def project(self, prob, source):
         r"""
-        Project a source field into the box basis. This involves solving an auxiliary linear system.
+        Project a source field into the radial basis. This involves solving an auxiliary linear system.
         We seek a vector of control parameters :math:`\mathbf m` satisfying
 
       ..math::
@@ -139,36 +161,42 @@ class TohokuRadialBasisOptions(TohokuOptions):
 
         For ease, we simply assemble the mass matrix and RHS vector and solve using NumPy's `solve`.
         """
-        from thetis import assemble, dx
+        cache_dir = create_directory(os.path.join(os.path.dirname(__file__), '.cache'))
+        fname = os.path.join(cache_dir, 'mass_matrix_radial_{:d}_{:d}x{:d}.npy')
+        fname = fname.format(self.level, self.nx, self.ny)
 
         # Get basis functions
         if not hasattr(self, 'basis_functions'):
-            self.get_basis_functions(prob.V[0])
-        phi = [bf.split()[1] for bf in self.basis_functions]
+            self.get_basis_functions(prob.V[0].sub(1))
+        phi = self.basis_functions
         N = self.nx*self.ny
 
         # Assemble mass matrix
-        self.print_debug("INTERPOLATION: Assembling mass matrix...")
-        A = np.zeros((N, N))
-        for i in range(N):
-            for j in range(i+1):
-                A[i, j] = assemble(phi[i]*phi[j]*dx)
-        for i in range(N):
-            for j in range(i+1, N):
-                A[i, j] = A[j, i]
+        if os.path.isfile(fname) and not self.dirty_cache:
+            self.print_debug("PROJECTION: Loading mass matrix from cache...")
+            A = np.load(fname)
+        else:
+            self.print_debug("PROJECTION: Assembling mass matrix...")
+            A = np.zeros((N, N))
+            for i in range(N):
+                for j in range(i+1):
+                    A[i, j] = assemble(phi[i]*phi[j]*dx)
+            for i in range(N):
+                for j in range(i+1, N):
+                    A[i, j] = A[j, i]
+            self.print_debug("PROJECTION: Cacheing mass matrix...")
+            np.save(fname, A)
 
         # Assemble RHS
-        self.print_debug("INTERPOLATION: Assembling RHS...")
+        self.print_debug("PROJECTION: Assembling RHS...")
         b = np.array([assemble(phi[i]*source*dx) for i in range(N)])
 
-        # Create solution vector and solve
-        self.print_debug("INTERPOLATION: Solving linear system...")
+        # Project
+        self.print_debug("PROJECTION: Solving linear system...")
         m = np.linalg.solve(A, b)
 
         # Assign values
-        self.print_debug("INTERPOLATION: Assigning values...")
-        for i, mi in enumerate(m):
-            self.control_parameters[i].assign(mi)
+        self.assign_control_parameters(m, prob.meshes[0])
 
     def interpolate(self, prob, source):
         r"""
@@ -195,14 +223,14 @@ class TohokuRadialBasisOptions(TohokuOptions):
         quantities can be pre-computed, meaning we just have a linear algebraic optimisation problem.
         """
         if not hasattr(self, 'basis_functions'):
-            self.get_basis_functions(prob.V[0])
+            self.get_basis_functions(prob.V[0].sub(1))
         N = self.nx*self.ny
 
         # Get RHS
         f = np.array([source.at(xy) for xy in self._array])
 
         # Get vector of pointwise basis function values
-        g = np.array([[bf.split()[1].at(xy) for bf in self.basis_functions] for xy in self._array])
+        g = np.array([[bf.at(xy) for bf in self.basis_functions] for xy in self._array])
 
         # Get initial guess by point evaluation (which will probably be an overestimate)
         m_init = f.copy()
@@ -231,6 +259,4 @@ class TohokuRadialBasisOptions(TohokuOptions):
         m_opt = scipy.optimize.fmin_bfgs(J, m_init, **opt_kwargs)
 
         # Assign values
-        self.print_debug("INTERPOLATION: Assigning values...")
-        for i, mi in enumerate(m_opt):
-            self.control_parameters[i].assign(mi)
+        self.assign_control_parameters(m_opt, prob.meshes[0])

@@ -30,7 +30,7 @@ kwargs = {
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Optimisation
-    'control_parameters': [float(args.initial_guess or 3.2760), ],
+    'control_parameters': [float(args.initial_guess or 3.2760)],
     'synthetic': True,
     'qoi_scaling': 1.0,
     'nx': 1,
@@ -58,19 +58,13 @@ with stop_annotating():
         op.gauges[gauge]["data"] = op.gauges[gauge][timeseries_type]
 
 
-class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
-    """The subclass exists to pass the QoI as required."""
-    def quantity_of_interest(self):
-        return self.op.J
-
-
 # Run with 'suboptimal' control
 kwargs['plot_pvd'] = True
 op_opt = TohokuRadialBasisOptions(fpath='discrete/' + kwargs['family'], **kwargs)
 gauges = list(op_opt.gauges.keys())
 for gauge in gauges:
     op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
-swp = DiscreteAdjointTsunamiProblem(op_opt, nonlinear=nonlinear)
+swp = AdaptiveDiscreteAdjointProblem(op_opt, nonlinear=nonlinear)
 swp.solve_forward()
 print_output("QoI: {:.4e}".format(op_opt.J))
 

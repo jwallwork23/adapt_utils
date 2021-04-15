@@ -27,37 +27,38 @@ fixed_mesh:
 	@echo "Solving Tohoku tsunami problem on a fixed mesh..."
 	@python3 run_fixed_mesh.py -plot_pvd 1
 
-#  NOTE: We specify different gradation parameters for different boundary segments:
-#    * Artificial open ocean (tag 100): 20 km;
-#    * Coast outside of Fukushima (tag 200): 10 km;
-#    * Coast around Fukushima (tag 300): 5 km.
-
-#  NOTE: The -dm_plex_remesh_bd option can deform the domain boundary, which is why we specify a
-#    gradation for the open ocean boundary. Instead of applying it here, we use it in the mesh
-#    postprocessing (see `mesh` above).
+#  NOTE: There are three boundary segments, on which we can specify gradation parameters (in km):
+#    * Artificial open ocean (tag 100);
+#    * Coast outside of Fukushima (tag 200);
+#    * Coast around Fukushima (tag 300).
+#   The -dm_plex_remesh_bd option can also be used, but note that it deforms the domain boundary.
 
 hessian:
-	@echo "Solving Tohoku tsunami problem using anisotropic 'hessian' adaptation..."
-	@python3 run_hessian_based.py -plot_pvd 1 \
-		-dm_plex_prescribed_boundary_labels 100,200,300 \
-		-dm_plex_prescribed_boundary_sizes 20e3,10e3,5e3
+	@echo "Solving Tohoku tsunami problem using anisotropic 'Hessian based' adaptation..."
+	@python3 run_adapt.py -approach hessian -plot_pvd 1 \
+		-dm_plex_prescribed_boundary_labels 200,300 \
+		-dm_plex_prescribed_boundary_sizes 10e3,5e3
 
 dwp:
 	@echo "Solving Tohoku tsunami problem using isotropic 'dual weighted primal' adaptation..."
-	@python3 run_dwp.py -plot_pvd 1 \
-		-dm_plex_prescribed_boundary_labels 100,200,300 \
-		-dm_plex_prescribed_boundary_sizes 20e3,10e3,5e3
-# @python3 run_dwp.py -plot_pvd 1 \
-#	  -dm_plex_prescribed_boundary_labels 100,200,300 \
-#	  -dm_plex_prescribed_boundary_sizes 100e3,10e3,5e3
+	@python3 run_adapt.py -approach dwp -plot_pvd 1 \
+		-dm_plex_prescribed_boundary_labels 200,300 \
+		-dm_plex_prescribed_boundary_sizes 10e3,5e3
 
 dwr:
 	@echo "Solving Tohoku tsunami problem using isotropic 'dual weighted residual' adaptation..."
-	@python3 run_dwr.py -plot_pvd 1 \
-		-dm_plex_prescribed_boundary_labels 100,200,300 \
-		-dm_plex_prescribed_boundary_sizes 20e3,10e3,5e3
+	@python3 run_adapt.py -approach dwr -plot_pvd 1 \
+		-dm_plex_prescribed_boundary_labels 200,300 \
+		-dm_plex_prescribed_boundary_sizes 10e3,5e3
 
-# Cleanup
+weighted_hessian:
+	@echo "Solving Tohoku tsunami problem using anisotropic 'weighted Hessian' adaptation..."
+	@python3 run_adapt.py -approach weighted_hessian -plot_pvd 1 \
+		-dm_plex_prescribed_boundary_labels 200,300 \
+		-dm_plex_prescribed_boundary_sizes 10e3,5e3
+
+
+# --- Cleanup
 
 clean:
 	@echo "Cleaning directory..."
@@ -70,4 +71,6 @@ clean:
 	@rm -rf outputs/dwp/*.pvd
 	@rm -rf outputs/dwp/*.vtu
 	@rm -rf outputs/dwr/*.pvd
+	@rm -rf outputs/weighted_hessian/*.vtu
+	@rm -rf outputs/weighted_hessian/*.pvd
 	@rm -rf outputs/dwr/*.vtu

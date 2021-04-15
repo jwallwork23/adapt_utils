@@ -1,11 +1,10 @@
-from thetis import create_directory
-
 import argparse
 import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 
+from adapt_utils.io import create_directory
 from adapt_utils.plotting import *  # NOQA
 
 

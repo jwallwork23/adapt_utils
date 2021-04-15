@@ -3,7 +3,7 @@ from thetis import print_output, create_directory
 import argparse
 import os
 
-from adapt_utils.case_studies.tohoku.options.hazard_options import TohokuHazardOptions
+from adapt_utils.case_studies.tohoku.hazard.options import TohokuHazardOptions
 from adapt_utils.io import OuterLoopLogger
 from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
 
@@ -43,7 +43,7 @@ args = parser.parse_args()
 # --- Set parameters
 
 if args.locations is None:  # TODO: Parse as list
-    locations = ['Fukushima Daiichi', ]
+    locations = ['Fukushima Daiichi']
 else:
     locations = args.locations.split(',')
 radius = float(args.radius or 100.0e+03)
@@ -76,7 +76,7 @@ kwargs = {
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
-levels = int(args.levels or 4)
+levels = int(args.levels or 5)
 di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs', 'qmesh'))
 
 
@@ -90,12 +90,13 @@ for level in range(levels):
     # Set parameters
     kwargs['level'] = level
     op = TohokuHazardOptions(**kwargs)
+    kwargs.pop('level')
 
     # Solve
     swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear, print_progress=False)
     swp.solve_forward()
     qoi = swp.quantity_of_interest()
-    print_output("Quantity of interest: {:.4e}".format(qoi))
+    print_output("Quantity of interest: {:.8e}".format(qoi))
 
     # Diagnostics
     qois.append(qoi)
