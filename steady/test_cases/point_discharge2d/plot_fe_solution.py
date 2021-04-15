@@ -28,7 +28,11 @@ kwargs = {
 }
 op = PointDischarge2dOptions(**kwargs)
 op.tracer_family = args.family
+<<<<<<< HEAD
+op.stabilisation_tracer = args.stabilisation
+=======
 op.stabilisation = args.stabilisation
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 op.anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
 op.di = os.path.join(op.di, args.stabilisation or args.family)
 
@@ -46,4 +50,8 @@ cbar.set_ticks(np.linspace(0, 3, 7))
 axes.set_xticks(np.linspace(0, 50, 6))
 axes.xaxis.tick_top()
 axes.set_yticks(np.linspace(0, 10, 3))
+<<<<<<< HEAD
+savefig("finite_element_solution", op.di, extensions=["jpg"])
+=======
 savefig("finite_element_solution", op.di, extensions=["png"])
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a

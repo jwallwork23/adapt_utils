@@ -27,7 +27,11 @@ assert error_to_calibrate in ('l2', 'qoi')
 level = int(args.level)
 op = PointDischarge3dOptions(level=level)
 op.tracer_family = 'cg'
+<<<<<<< HEAD
+op.stabilisation_tracer = 'supg'
+=======
 op.stabilisation = 'supg'
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 op.anisotropic_stabilisation = True
 mesh = op.default_mesh
 x, y, z = SpatialCoordinate(mesh)
@@ -182,8 +186,13 @@ r_calibrated = minimize(Jhat, method='L-BFGS-B', bounds=(0.001, 1), callback=cal
 print_output("Logging...")
 logstr = "level: {:d}\n".format(level)
 logstr += "family: {:s}\n".format(op.tracer_family.upper())
+<<<<<<< HEAD
+if op.stabilisation_tracer is not None:
+    logstr += "stabilisation: {:}\n".format(op.stabilisation_tracer.upper())
+=======
 if op.stabilisation is not None:
     logstr += "stabilisation: {:}\n".format(op.stabilisation.upper())
+>>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 logstr += "calibrated radius: {:.8f}\n".format(r_calibrated.dat.data[0])
 print_output(logstr)
 with open(os.path.join(op.di, "log"), "a") as log:
