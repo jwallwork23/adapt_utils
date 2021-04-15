@@ -1,33 +1,16 @@
-<<<<<<< HEAD
 from thetis import *
 
 import os
 
-=======
-"""
-***************************************************************************************************
-*   NOTE: Much of the code presented here is copied directly from the code associated with [1].   *
-***************************************************************************************************
-
-[1] A.T.T. McRae, C.J. Cotter, and C.J. Budd, "Optimal-transport--based mesh adaptivity on the
-    plane and sphere using finite elements." SIAM Journal on Scientific Computing 40.2 (2018):
-    A1121-A1148.
-"""
-from thetis import *
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 from adapt_utils.options import Options
 
 
 __all__ = ["MeshMover"]
 
 
-<<<<<<< HEAD
 # TODO: Test Laplacian smoothing
 # TODO: Other options, e.g. MMPDE
 class MeshMover():
-=======
-class MeshMover(object):
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     r"""
     A class dedicated to performing mesh r-adaptation. Given a source mesh and a monitor function
     :math: `m`, the new mesh is established by relocating the vertices of the original mesh. That is,
@@ -42,13 +25,14 @@ class MeshMover(object):
     normalising constant and :math:`H(\phi)` denotes the Hessian of :math:`\phi` with respect to
     coordinates on the computational mesh.
 
-    The implementation is an object-oriented version of that given in [1].
+    The implementation is an objective-oriented version of that given in [1]. Most of the code
+    presented here is copied directly from that associated with [1].
+
+    [1] A.T.T. McRae, C.J. Cotter, and C.J. Budd, "Optimal-transport--based mesh adaptivity on the
+        plane and sphere using finite elements." SIAM Journal on Scientific Computing 40.2 (2018):
+        A1121-A1148.
     """
-<<<<<<< HEAD
     def __init__(self, mesh, monitor_function, method='monge_ampere', bc=None, bbc=None, op=Options()):
-=======
-    def __init__(self, mesh, monitor_function, **kwargs):
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         self.mesh = mesh
         self.dim = self.mesh.topological_dimension()
         try:
@@ -56,18 +40,12 @@ class MeshMover(object):
         except AssertionError:
             raise NotImplementedError("r-adaptation only currently considered in 2D.")
         self.monitor_function = monitor_function
-<<<<<<< HEAD
         assert method in ('monge_ampere', 'laplacian_smoothing')
         self.method = method
-=======
-        self.method = kwargs.get('method', 'monge_ampere')
-        if self.method != 'monge_ampere':
-            raise NotImplementedError  # TODO: Other options, e.g. MMPDE
-        self.op = kwargs.get('op', Options())
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         assert op.nonlinear_method in ('quasi_newton', 'relaxation')
-        self.bc = kwargs.get('bc')
-        self.bbc = kwargs.get('bbc')
+        self.bc = bc
+        self.bbc = bbc
+        self.op = op
         self.ξ = Function(self.mesh.coordinates)  # Computational coordinates
         self.x = Function(self.mesh.coordinates)  # Physical coordinates
         self.I = Identity(self.dim)
@@ -85,10 +63,6 @@ class MeshMover(object):
 
         # Outputs
         if self.op.debug and self.op.debug_mode == 'full':
-<<<<<<< HEAD
-=======
-            import os
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
             self.monitor_file = File(os.path.join(op.di, 'monitor_debug.pvd'))
             self.monitor_file.write(self.monitor)
             self.volume_file = File(os.path.join(op.di, 'volume_debug.pvd'))
@@ -128,13 +102,7 @@ class MeshMover(object):
         self.grad_φ_dg = Function(self.mesh.coordinates, name="Discontinuous gradient")
 
     def update_monitor_function(self):
-<<<<<<< HEAD
         """Update the monitor function based on the current mesh."""
-=======
-        """
-        Update the monitor function based on the current mesh.
-        """
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         if self.monitor_function is not None:
             self.monitor.interpolate(self.monitor_function(self.mesh))
 
@@ -298,13 +266,7 @@ class MeshMover(object):
         self._setup_residuals()
 
     def _initialise_sigma(self):
-<<<<<<< HEAD
         """Set an initial guess for Monge-Ampere type mesh movement."""
-=======
-        """
-        Set an initial guess for Monge-Ampere type mesh movement.
-        """
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         σ, τ = TrialFunction(self.V_ten), TestFunction(self.V_ten)
         n = FacetNormal(self.mesh)
         a = inner(τ, σ)*dx
@@ -363,7 +325,6 @@ class MeshMover(object):
         self.l2_projector = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
 
     def adapt(self):
-<<<<<<< HEAD
         """Run the desired mesh movement algorithm."""
         if self.method == 'laplacian_smoothing':
             self.laplacian_smoothing()
@@ -384,18 +345,6 @@ class MeshMover(object):
 
     def adapt_monge_ampere(self):
         # TODO: doc
-=======
-        """
-        Run the desired mesh movement algorithm.
-        """
-        if self.method == 'monge_ampere':
-            self.adapt_monge_ampere()
-
-    def adapt_monge_ampere(self):
-        """
-        Apply mesh movement of Monge-Ampere type.
-        """
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         if self.op.nonlinear_method == 'quasi_newton':
             self.equidistribution.snes.setMonitor(self.fakemonitor)
             self.equidistribution.solve()

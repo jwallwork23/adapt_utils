@@ -4,22 +4,13 @@ from firedrake.petsc import PETSc
 import datetime
 import os
 
-<<<<<<< HEAD
 from adapt_utils.unsteady.options import CoupledOptions
-=======
-from adapt_utils.options import CoupledOptions
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 
 __all__ = ["save_mesh", "load_mesh", "initialise_field", "export_field",
            "initialise_bathymetry", "export_bathymetry",
            "initialise_hydrodynamics", "export_hydrodynamics",
-<<<<<<< HEAD
            "OuterLoopLogger", "TimeDependentAdaptationLogger", "readfile", "index_string"]
-=======
-           "OuterLoopLogger", "TimeDependentAdaptationLogger",
-           "readfile", "index_string", "get_date"]
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 
 def get_filename(fname, index_str):
@@ -315,12 +306,8 @@ class OuterLoopLogger(object):
         """
         :arg fpath: directory to save log file in.
         """
-<<<<<<< HEAD
         today = datetime.date.today()
         date = '{:d}-{:d}-{:d}'.format(today.year, today.month, today.day)
-=======
-        date = get_date()
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         j = 0
         while True:
             self.di = os.path.join(fpath, '{:s}-run-{:d}'.format(date, j))
@@ -428,12 +415,3 @@ def index_string(index, n=5):
     :return: n-digit string form of index.
     """
     return (n - len(str(index)))*'0' + str(index)
-<<<<<<< HEAD
-=======
-
-
-def get_date():
-    """Get the date in year-month-day format."""
-    today = datetime.date.today()
-    return '{:d}-{:d}-{:d}'.format(today.year, today.month, today.day)
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
