@@ -1,5 +1,4 @@
 from thetis import *
-from thetis.configuration import *
 
 import math
 import os
@@ -31,6 +30,7 @@ class LeVequeOptions(CoupledOptions):
     def __init__(self, shape=0, geometry='circle', level=0, background_concentration=0.0, **kwargs):
         self.solve_swe = False
         self.solve_tracer = True
+        self.adapt_field = 'tracer'
         self.shape = shape
 
         # Temporal discretisation
@@ -66,29 +66,14 @@ class LeVequeOptions(CoupledOptions):
 
         # Physics
         self.base_diffusivity = 0.0
+        self.characteristic_speed = Constant(1.0)  # TODO: check
 
         # Spatial discretisation
         if self.tracer_family == 'cg':
-            self.stabilisation = 'SUPG'
+            self.stabilisation_tracer = 'supg'
         elif self.tracer_family == 'dg':
-            self.stabilisation = 'lax_friedrichs'
+            self.stabilisation_tracer = 'lax_friedrichs'
             self.lax_friedrichs_tracer_scaling_factor = Constant(1.0)
-
-        # Solver
-        self.solver_parameters = {
-            'tracer': {
-                'ksp_type': 'gmres',
-                'pc_type': 'sor',
-                # 'ksp_converged_reason': None,
-            }
-        }
-        self.adjoint_solver_parameters = {
-            'tracer': {
-                'ksp_type': 'gmres',
-                'pc_type': 'sor',
-                # 'ksp_converged_reason': None,
-            }
-        }
 
     def set_region_of_interest(self, shape=0):
         assert shape in (0, 1, 2)

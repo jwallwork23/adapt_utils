@@ -45,6 +45,7 @@ kwargs = {
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
+    'stabilisation_sediment': None,
     'use_automatic_sipg_parameter': True,
     'friction': 'manning'
 }
@@ -66,6 +67,7 @@ print(t2-t1)
 new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
+
 
 fpath = "hydrodynamics_beach_bath_fixed_{:d}_{:d}".format(int(fac_x*220), int(fac_y*10))
 export_bathymetry(bath, os.path.join("fixed_output", fpath), op=op)

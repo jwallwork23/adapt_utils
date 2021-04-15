@@ -11,7 +11,6 @@ import time
 import datetime
 import numpy as np
 
-
 def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
                        elev_init, average_size, dt, t_end, wetting_and_drying=False,
                        wetting_alpha=0.1, friction='nikuradse', friction_coef=0,
@@ -20,7 +19,6 @@ def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
     Sets up a simulation with only hydrodynamics until a quasi-steady state when it can be used as an initial
     condition for the full morphological model. We update the bed friction at each time step.
     The actual run of the model are done outside the function
-
     Inputs:
     boundary_consditions_fn - function defining boundary conditions for problem
     mesh2d - define mesh working on
@@ -53,7 +51,6 @@ def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
         # update bed friction
         if friction == 'nikuradse':
             uv1, elev1 = solver_obj.fields.solution_2d.split()
-
             if wetting_and_drying:
                 wd_bath_displacement = solver_obj.depth.wd_bathymetry_displacement
                 depth.project(elev1 + wd_bath_displacement(elev1) + bathymetry_2d)
@@ -92,7 +89,6 @@ def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
 
     # define bed friction
     cfactor = th.Function(P1_2d).interpolate(2*(0.4**2)/((th.ln(11.036*depth/(ksp)))**2))
-
     # set up solver
     solver_obj = th.solver2d.FlowSolver2d(mesh2d, bathymetry_2d)
     options = solver_obj.options

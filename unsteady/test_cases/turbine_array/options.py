@@ -61,7 +61,7 @@ class TurbineArrayOptions(TurbineOptions):
         self.dt = 2.232
         self.T_tide = 0.1*self.M2_tide_period
         self.T_ramp = 3.855*self.T_tide
-        self.end_time = self.T_tide
+        self.end_time = self.T_tide if spun else self.T_ramp
         self.dt_per_export = 10
 
         # Tidal farm
@@ -83,7 +83,7 @@ class TurbineArrayOptions(TurbineOptions):
         self.elev_out = [None for i in range(self.num_meshes)]
         self.spun = spun
 
-        # Solver parameters and discretisation
+        # Discretisation
         self.stabilisation = 'lax_friedrichs'
         self.use_automatic_sipg_parameter = True
         self.grad_div_viscosity = False
@@ -157,6 +157,12 @@ class TurbineArrayOptions(TurbineOptions):
         return boundary_conditions
 
     def get_update_forcings(self, prob, i, **kwargs):
+        """
+        Simple tidal forcing with frequency :attr:`omega` and amplitude :attr:`max_amplitude`.
+
+        :arg prob: :class:`AdaptiveTurbineProblem` object.
+        :arg i: mesh index.
+        """
         tc = Constant(0.0)
         hmax = Constant(self.max_amplitude)
         offset = self.T_ramp if self.spun else 0.0
@@ -169,6 +175,12 @@ class TurbineArrayOptions(TurbineOptions):
         return update_forcings
 
     def set_initial_condition(self, prob):
+        """
+        Specify elevation at the start of the spin-up period so that it satisfies the boundary
+        forcing and set an arbitrary small velocity.
+
+        :arg prob: :class:`AdaptiveTurbineProblem` object.
+        """
         assert not self.spun
         u, eta = prob.fwd_solutions[0].split()
         x, y = SpatialCoordinate(prob.meshes[0])

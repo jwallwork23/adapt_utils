@@ -11,7 +11,6 @@ from adapt_utils.io import initialise_bathymetry, export_bathymetry
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.beach_wall.options import BeachOptions
 
-
 nx = 1
 ny = 1
 
@@ -45,6 +44,7 @@ kwargs = {
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
+    'stabilisation_sediment': None,
     'use_automatic_sipg_parameter': True,
     'friction': 'manning'
 }
@@ -52,8 +52,6 @@ kwargs = {
 op = BeachOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
-swp.shallow_water_options[0]['mesh_velocity'] = None
-
 
 def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kappa):
     P1 = FunctionSpace(mesh, "CG", 1)
@@ -66,7 +64,6 @@ def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kappa):
     comp_new = project(abs_hor_vel_norm, P1)
     mon_init = project(1.0 + alpha * comp_new, P1)
     return mon_init
-
 
 swp.set_monitor_functions(velocity_monitor)
 

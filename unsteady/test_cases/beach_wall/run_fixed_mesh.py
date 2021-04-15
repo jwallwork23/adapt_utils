@@ -35,6 +35,7 @@ kwargs = {
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
+    'stabilisation_sediment': None,
     'use_automatic_sipg_parameter': True,
     'friction': 'manning',
 
@@ -57,9 +58,6 @@ if os.getenv('REGRESSION_TEST') is not None:
     sys.exit(0)
 
 print(t2-t1)
-
-# fpath = "hydrodynamics_beach_bath_new_{:d}".format(int(nx*220))
-# export_bathymetry(bath, fpath, op=op)
 
 new_mesh = RectangleMesh(880, 20, 220, 10)
 

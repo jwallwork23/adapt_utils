@@ -41,6 +41,7 @@ kwargs = {
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
+    'stabilisation_sediment': None,
     'use_automatic_sipg_parameter': True,
     'friction': 'manning'
 }
@@ -48,8 +49,6 @@ kwargs = {
 op = BeachOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
-# swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
-swp.shallow_water_options[0]['mesh_velocity'] = None
 
 
 def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kappa):

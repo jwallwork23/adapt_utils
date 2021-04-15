@@ -12,8 +12,16 @@ __all__ = ["BeachOptions"]
 
 
 class BeachOptions(CoupledOptions):
+    """
+    Parameters for test case adapted from [1].
+
+    [1] Roberts, W. et al. "Investigation using simple mathematical models of
+    the effect of tidal currents and waves on the profile shape of intertidal
+    mudflats." Continental Shelf Research 20.10-11 (2000): 1079-1097.
+    """
 
     def __init__(self, friction='manning', nx=1, ny=1, mesh=None, input_dir=None, output_dir=None, **kwargs):
+        self.timestepper = 'CrankNicolson'
         super(BeachOptions, self).__init__(**kwargs)
 
         try:
@@ -38,7 +46,7 @@ class BeachOptions(CoupledOptions):
         self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=output_dir, op=self)
 
         self.plot_pvd = True
-        self.hessian_recovery = 'dL2'
+        self.hessian_recovery = 'L2'
 
         self.grad_depth_viscosity = True
 
@@ -46,6 +54,7 @@ class BeachOptions(CoupledOptions):
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
+        self.stabilisation_sediment = 'lax_friedrichs'
 
         self.morphological_acceleration_factor = Constant(10000)
 
@@ -64,7 +73,6 @@ class BeachOptions(CoupledOptions):
         self.end_time = float(self.num_hours*3600.0/self.morphological_acceleration_factor)
         self.dt_per_mesh_movement = 72
         self.dt_per_export = 72
-        self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 
     def set_up_morph_model(self, mesh=None):

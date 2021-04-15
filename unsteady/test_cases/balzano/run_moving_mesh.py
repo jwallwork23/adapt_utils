@@ -52,8 +52,6 @@ if os.getenv('REGRESSION_TEST') is not None:
 op = BalzanoOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
-# swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
-swp.shallow_water_options[0]['mesh_velocity'] = None
 
 alpha = 1.0  # size of the dense region surrounding the coast
 beta = 10.0  # level of refinement at coast

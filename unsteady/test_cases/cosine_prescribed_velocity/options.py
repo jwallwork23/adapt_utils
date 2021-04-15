@@ -12,9 +12,9 @@ class CosinePrescribedVelocityOptions(CoupledOptions):
         self.solve_swe = False
         self.solve_tracer = True
         if self.tracer_family == 'cg':
-            self.stabilisation = 'supg'
+            self.stabilisation_tracer = 'supg'
         elif self.tracer_family == 'dg':
-            self.stabilisation = 'lax_friedrichs'
+            self.stabilisation_tracer = 'lax_friedrichs'
 
         lx, ly = 10, 10
         self.default_mesh = PeriodicRectangleMesh(n, n, lx, ly, direction='x')
@@ -26,6 +26,7 @@ class CosinePrescribedVelocityOptions(CoupledOptions):
         # self.base_diffusivity = 1.0e-8
         self.base_diffusivity = 0.0
         self.base_velocity = [1.0, 0.0]
+        self.characteristic_speed = Constant(1.0)
 
     def set_boundary_conditions(self, prob, i):
         boundary_conditions = {

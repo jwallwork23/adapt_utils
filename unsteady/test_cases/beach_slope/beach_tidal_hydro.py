@@ -10,6 +10,9 @@ import thetis as th
 import hydro_fns as hydro
 
 import numpy as np
+import os
+
+plot = True
 
 from adapt_utils.io import export_hydrodynamics
 
@@ -56,7 +59,6 @@ def boundary_conditions_fn_balzano(bathymetry_2d, flag=None, morfac=1, t_new=0, 
 
         return inflow_constant, outflow_constant
 
-
 fac_x = 0.5
 fac_y = 1
 
@@ -87,6 +89,7 @@ uv_init = th.Constant((10**(-7), 0.))
 
 value = 1/40
 
+
 sponge_fn = th.Function(V).interpolate(th.conditional(x >= 100, -399 + 4*x, th.Constant(1.0)))
 
 solver_obj, update_forcings_hydrodynamics, outputdir = hydro.hydrodynamics_only(boundary_conditions_fn_balzano, mesh2d, bathymetry_2d, uv_init, elev_init, wetting_and_drying=True, wetting_alpha=value, fluc_bcs=True, average_size=200*(10**(-6)), dt=0.05, t_end=100, friction='manning', sponge_viscosity=sponge_fn, viscosity=0.5)
@@ -98,4 +101,32 @@ solver_obj.iterate(update_forcings=update_forcings_hydrodynamics)
 uv, elev = solver_obj.fields.solution_2d.split()
 
 fpath = "hydrodynamics_beach_l_sep_nx_{:d}_{:d}".format(nx, ny)
-export_hydrodynamics(uv, elev, fpath)
+
+if plot == False:
+    export_hydrodynamics(uv, elev, fpath)
+else:
+    import pylab as plt
+
+    x = np.linspace(0, 220, 221)
+
+    bath = [-(4.5 - i/40) for i in x]
+
+    # change t_end = 30
+    wd_bath_displacement = solver_obj.depth.wd_bathymetry_displacement
+    eta = solver_obj.fields.elev_2d
+    eta_tilde = th.Function(P1_2d).project(eta+wd_bath_displacement(eta))
+
+    xaxisthetis1 = []
+    elevthetis1 = []
+
+    for i in np.linspace(0, 219, 220):
+        xaxisthetis1.append(i)
+        elevthetis1.append(eta_tilde.at([i, 5]))
+
+
+
+    plt.plot(xaxisthetis1, elevthetis1, label = 'water surface')
+    plt.plot(x, bath, label = 'bed height')
+    plt.xlabel(r'$x$ (m)')
+    plt.ylabel(r'height (m)')
+    plt.legend(loc = 3)

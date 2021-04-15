@@ -14,6 +14,7 @@ __all__ = ["TrenchSlantOptions"]
 class TrenchSlantOptions(CoupledOptions):
 
     def __init__(self, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir=None, output_dir=None, **kwargs):
+        self.timestepper = 'CrankNicolson'
         super(TrenchSlantOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), np.int(np.ceil(5*ny)), 16, 1.1)
@@ -41,6 +42,7 @@ class TrenchSlantOptions(CoupledOptions):
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
+        self.stabilisation_sediment = 'lax_friedrichs'
 
         # Initial
         self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=output_dir, op=self)
@@ -54,7 +56,6 @@ class TrenchSlantOptions(CoupledOptions):
         self.end_time = self.num_hours*3600.0/float(self.morphological_acceleration_factor)
         self.dt_per_mesh_movement = 40
         self.dt_per_export = 40
-        self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
         self.family = 'dg-dg'
 

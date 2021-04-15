@@ -57,7 +57,6 @@ def boundary_conditions_fn_balzano(bathymetry_2d, flag=None, morfac=1, t_new=0, 
 
         return inflow_constant, outflow_constant
 
-
 # define mesh
 lx = 220
 ly = 10

@@ -8,6 +8,7 @@ from time import perf_counter
 
 from adapt_utils.plotting import *  # NOQA
 from adapt_utils.swe.turbine.solver import AdaptiveTurbineProblem
+from adapt_utils.swe.utils import speed
 from adapt_utils.unsteady.test_cases.spaceship.options import SpaceshipOptions
 
 
@@ -52,13 +53,14 @@ else:
 plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
 
 # Get fluid speed and elevation in P1 space
-u, eta = swp.fwd_solutions[0].split()
-speed = interpolate(sqrt(dot(u, u)), swp.P1[0])
+q = swp.fwd_solutions[0]
+u, eta = q.split()
+speed_proj = interpolate(speed(q), swp.P1[0])
 eta_proj = project(eta, swp.P1[0])
 
 # Plot fluid speed
 fig, axes = plt.subplots(figsize=(14, 6))
-cbar = fig.colorbar(tricontourf(speed, axes=axes, levels=50, cmap='coolwarm'), ax=axes)
+cbar = fig.colorbar(tricontourf(speed_proj, axes=axes, levels=50, cmap='coolwarm'), ax=axes)
 cbar.set_label(r"Fluid speed [$\mathrm{m\,s}^{-1}$]")
 axes.set_xlim([-L/2, L/2])
 axes.set_ylim([-W/2, W/2])

@@ -1,12 +1,12 @@
 import argparse
 import os
 
-from adapt_utils.unsteady.test_cases.desalination.options import DesalinationOutfallOptions
+from adapt_utils.unsteady.test_cases.idealised_desalination.options import *
 
 
 # Parse for refinement level
 parser = argparse.ArgumentParser()
-parser.add_argument("refinement_level", help="Number of refinements of farm region")
+parser.add_argument("refinement_level", help="Number of refinements in central box")
 level = int(parser.parse_args().refinement_level)
 
 # Boiler plate
@@ -16,8 +16,8 @@ code = "//" + 80*"*" + """
 """.format(level) + "//" + 80*"*" + "\n\n"
 
 # Domain and turbine specification
-op = DesalinationOutfallOptions(1.0)
-code += "// Domain and turbine specification\n"
+op = IdealisedDesalinationOutfallOptions()
+code += "// Domain specification\n"
 code += "L = {:.0f};\n".format(op.domain_length)
 code += "W = {:.0f};\n".format(op.domain_width)
 code += "deltax = 1000;\ndeltay = 250;\n"

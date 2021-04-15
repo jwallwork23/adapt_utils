@@ -18,7 +18,6 @@ from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.unsteady.test_cases.trench_slant.options import TrenchSlantOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
-
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
@@ -51,14 +50,13 @@ kwargs = {
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': 'lax_friedrichs',
+    'stabilisation_sediment': 'lax_friedrichs',
     'use_automatic_sipg_parameter': True,
 }
 
 op = TrenchSlantOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
-# swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
-swp.shallow_water_options[0]['mesh_velocity'] = None
 
 
 def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
@@ -83,7 +81,6 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
     mon_init = project(Constant(1.0) + comp_new2, P1)
 
     return mon_init
-
 
 swp.set_monitor_functions(gradient_interface_monitor)
 

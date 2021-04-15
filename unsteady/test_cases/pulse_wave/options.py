@@ -20,6 +20,7 @@ class BeachOptions(CoupledOptions):
     mudflats." Continental Shelf Research 20.10-11 (2000): 1079-1097.
     """
     def __init__(self, plot_timeseries=False, nx=1, ny=1, input_dir=None, output_dir=None, **kwargs):
+        self.timestepper = 'CrankNicolson'
         super(BeachOptions, self).__init__(**kwargs)
         friction = kwargs.get('friction', 'manning')
         try:
@@ -47,9 +48,10 @@ class BeachOptions(CoupledOptions):
 
         # Models
         self.set_up_morph_model(self.default_mesh)
-        self.hessian_recovery = 'dL2'
+        self.hessian_recovery = 'L2'
         self.grad_depth_viscosity = True
         self.stabilisation = 'lax_friedrichs'
+        self.stabilisation_sediment = 'lax_friedrichs'
 
         # Boundary conditions
         h_amp = 0.25  # Ocean boundary forcing amplitude
@@ -65,7 +67,6 @@ class BeachOptions(CoupledOptions):
         self.end_time = float(self.num_hours*3600.0/self.morphological_acceleration_factor)
         self.dt_per_mesh_movement = kwargs.get('dt_per_mesh_movement', 54)
         self.dt_per_export = kwargs.get('dt_per_export', 54)
-        self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 
         # # Timeseries  # TODO: Remove?

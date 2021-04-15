@@ -47,6 +47,7 @@ kwargs = {
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
+    'stabilisation_sediment': None,
     'use_automatic_sipg_parameter': True,
 }
 
@@ -73,7 +74,6 @@ print("total time: ")
 print(t2-t1)
 print(fac_x)
 bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
-
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
