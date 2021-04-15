@@ -1,10 +1,7 @@
 from thetis import *
 from firedrake_adjoint import *
 from firedrake.adjoint.blocks import GenericSolveBlock
-<<<<<<< HEAD
-=======
 import pyadjoint
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
@@ -23,12 +20,6 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
         if self.num_meshes > 1:
             raise NotImplementedError  # TODO: Allow multiple meshes
 
-<<<<<<< HEAD
-    def clear_tape(self):
-        self.tape.clear_tape()
-
-    # TODO: just call `solve_adjoint` (once merged)
-=======
         # Check that only one set of equations has been solved  # TODO
         op = self.op
         equations = []
@@ -47,7 +38,6 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
         """Solve the discrete adjoint problem for some quantity of interest."""
         J = self.quantity_of_interest()
         return pyadjoint.solve_adjoint(J, adj_value=scaling)
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     def compute_gradient(self, controls, scaling=1.0):
         """Compute the gradient of the quantity of interest with respect to a list of controls."""
@@ -67,24 +57,6 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
 
         NOTE: Only currently supported for either shallow water *or* tracer, *not* coupled mode.
         """
-<<<<<<< HEAD
-        i = 0  # TODO: Allow multiple meshes
-        if solve_step % self.op.dt_per_export == 0:
-            msg = "{:2d} {:s}  ADJOINT EXTRACT mesh {:2d}/{:2d}  time {:8.2f}"
-            print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.op.dt*solve_step))
-        if not hasattr(self, 'solve_blocks'):
-            self.get_solve_blocks()
-        adj_sol = self.solve_blocks[solve_step].adj_sol
-        if self.op.solve_swe:
-            if self.op.solve_tracer:
-                raise NotImplementedError("Haven't accounted for coupled model yet.")  # TODO
-            else:
-                self.adj_solutions[i].assign(adj_sol)
-        elif self.op.solve_tracer:
-            self.adj_solutions_tracer[i].assign(adj_sol)
-        else:
-            raise ValueError
-=======
         op = self.op
         i = 0  # TODO: Allow multiple meshes
         if solve_step % op.dt_per_export == 0:
@@ -107,24 +79,18 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
             self.adj_solutions_sediment[i].assign(adj_sol)
         else:
             self.adj_solutions_bathymetry[i].assign(adj_sol)
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     def save_adjoint_trajectory(self):
         """Save the entire adjoint solution trajectory to .vtu, backwards in time."""
         self.get_solve_blocks()
         if self.op.solve_swe:
             self._save_adjoint_trajectory_shallow_water()
-<<<<<<< HEAD
-        if self.op.solve_tracer:
-            self._save_adjoint_trajectory_tracer()
-=======
         elif self.op.solve_tracer:
             self._save_adjoint_trajectory_tracer()
         elif self.op.solve_sediment:
             self._save_adjoint_trajectory_sediment()
         else:
             self._save_adjoint_trajectory_bathymetry()
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     def _save_adjoint_trajectory_shallow_water(self):
         i = 0  # TODO: Allow multiple meshes
@@ -152,12 +118,9 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
             if self.op.plot_pvd:
                 proj.project(self.adj_solutions_tracer[i])
                 self.adjoint_tracer_file.write(proj)
-<<<<<<< HEAD
-=======
 
     def _save_adjoint_trajectory_sediment(self):
         raise NotImplementedError
 
     def _save_adjoint_trajectory_bathymetry(self):
         raise NotImplementedError
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
