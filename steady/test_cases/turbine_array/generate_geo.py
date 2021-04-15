@@ -1,10 +1,3 @@
-<<<<<<< HEAD
-from adapt_utils.swe.turbine.meshgen import *
-from adapt_utils.test_cases.steady_turbine.options import *
-
-import argparse
-
-=======
 import argparse
 import os
 
@@ -12,20 +5,10 @@ from adapt_utils.steady.test_cases.turbine_array.options import TurbineArrayOpti
 
 
 # --- Parse arguments
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-level', help='Mesh resolution')
 args = parser.parse_args()
-<<<<<<< HEAD
-
-levels = ('xcoarse', 'coarse', 'medium', 'fine', 'xfine')
-
-
-def make_geo(level, offset):
-    assert level in levels
-    generate_geo_file(Steady2TurbineOptions(offset=offset), level=level)
-=======
 levels = ('xcoarse', 'coarse', 'medium', 'fine', 'xfine')
 
 
@@ -122,19 +105,11 @@ def generate_geo_file(offset, level):
         f.write('// id inside turbine{:d}\n'.format(i+1))
         f.write('Physical Surface({:d}) = {{{:d}}};\n'.format(i+2, i+2))
     f.close()
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 
 for offset in (0, 1, 2):
     if args.level is not None:
-<<<<<<< HEAD
-        make_geo(args.level, offset)
-    else:
-        for l in levels:
-            make_geo(l, offset)
-=======
         generate_geo_file(offset, args.level)
     else:
         for level in levels:
             generate_geo_file(offset, level)
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a

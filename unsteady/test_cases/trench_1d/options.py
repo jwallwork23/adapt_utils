@@ -1,22 +1,5 @@
 from thetis import *
 from thetis.configuration import *
-<<<<<<< HEAD
-
-from adapt_utils.unsteady.options import CoupledOptions
-from adapt_utils.unsteady.swe.utils import heaviside_approx
-from thetis.options import ModelOptions2d
-from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
-
-import os
-import numpy as np
-import matplotlib
-# import matplotlib.pyplot as plt
-
-
-matplotlib.rc('text', usetex=True)
-matplotlib.rc('font', family='serif')
-
-=======
 import matplotlib
 
 matplotlib.rc('text', usetex=True)
@@ -28,22 +11,11 @@ import numpy as np
 from adapt_utils.io import initialise_hydrodynamics
 from adapt_utils.options import CoupledOptions
 from adapt_utils.sediment.sediments_model import SedimentModel
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 __all__ = ["TrenchSedimentOptions"]
 
 
 class TrenchSedimentOptions(CoupledOptions):
-<<<<<<< HEAD
-
-    def __init__(self, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir = None, output_dir = None, **kwargs):
-        super(TrenchSedimentOptions, self).__init__(**kwargs)
-        self.plot_timeseries = plot_timeseries
-        self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
-        self.plot_pvd = True
-        self.num_hours = 15
-
-=======
     """
     Parameters for the (effectively) 1D migrating trench test case introduced in [Van Rijn 1980].
 
@@ -57,7 +29,6 @@ class TrenchSedimentOptions(CoupledOptions):
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
         self.plot_pvd = True
         self.num_hours = 15
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         if output_dir is not None:
             self.di = output_dir
 
@@ -66,10 +37,7 @@ class TrenchSedimentOptions(CoupledOptions):
         self.wetting_and_drying = False
         self.solve_sediment = True
         self.solve_exner = True
-<<<<<<< HEAD
 
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         try:
             assert friction in ('nikuradse', 'manning', 'nik_solver')
         except AssertionError:
@@ -82,35 +50,6 @@ class TrenchSedimentOptions(CoupledOptions):
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
-<<<<<<< HEAD
-
-        # Initial
-        self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
-
-        self.set_up_morph_model(input_dir, self.default_mesh)
-
-        self.morphological_acceleration_factor = Constant(100)
-
-        # Time integration
-        self.dt = 0.25
-        self.end_time = self.num_hours*3600.0/float(self.morphological_acceleration_factor)
-        self.dt_per_mesh_movement = 40
-        self.dt_per_export = 40
-        self.timestepper = 'CrankNicolson'
-        self.implicitness_theta = 1.0
-        self.family = 'dg-dg'
-
-
-    def set_up_morph_model(self, input_dir, mesh = None):
-
-        # Physical
-        self.base_diffusivity = 0.18011042551606954
-
-        self.porosity = Constant(0.4)
-        self.ks = Constant(0.025)
-        self.average_size = 160*(10**(-6))  # Average sediment size        
-
-=======
         self.stabilisation_sediment = 'lax_friedrichs'
 
         # Initialisation
@@ -132,7 +71,6 @@ class TrenchSedimentOptions(CoupledOptions):
         self.base_diffusivity = 0.18011042551606954
         self.porosity = Constant(0.4)
         self.ks = Constant(0.025)
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         self.wetting_and_drying = False
         self.conservative = False
         self.slope_eff = True
@@ -141,14 +79,6 @@ class TrenchSedimentOptions(CoupledOptions):
         self.convective_vel_flag = True
         self.bedload = True
 
-<<<<<<< HEAD
-        #if not hasattr(self, 'bathymetry') or self.bathymetry is None:
-        #    self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
-        #    self.bathymetry = self.set_bathymetry(self.P1)
-
-
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     def create_sediment_model(self, mesh, bathymetry):
         self.P1DG = FunctionSpace(mesh, "DG", 1)
         self.P1_vec_dg = VectorFunctionSpace(mesh, "DG", 1)
@@ -156,13 +86,6 @@ class TrenchSedimentOptions(CoupledOptions):
         self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
 
         self.eta_d = Function(self.P1DG).project(self.elev_init)
-<<<<<<< HEAD
-        self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
-            bedload=self.bedload, angle_correction=self.angle_correction, slope_eff=self.slope_eff, seccurrent=False,
-            mesh2d=mesh, bathymetry_2d=bathymetry,
-                            uv_init = self.uv_d, elev_init = self.eta_d, ks=self.ks, average_size=self.average_size,
-                            cons_tracer = self.conservative, wetting_and_drying = self.wetting_and_drying)
-=======
         self.sediment_model = SedimentModel(
             ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
             bedload=self.bedload, angle_correction=self.angle_correction,
@@ -170,7 +93,6 @@ class TrenchSedimentOptions(CoupledOptions):
             uv_init=self.uv_d, elev_init=self.eta_d, ks=self.ks, average_size=self.average_size,
             cons_tracer=self.conservative, wetting_and_drying=self.wetting_and_drying
         )
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     def set_quadratic_drag_coefficient(self, fs):
         self.depth = Function(fs).interpolate(self.set_bathymetry(fs) + Constant(0.397))
@@ -188,25 +110,16 @@ class TrenchSedimentOptions(CoupledOptions):
         return 2*(0.4**2)/(ln(aux)**2)
 
     def set_bathymetry(self, fs):
-<<<<<<< HEAD
-
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         initial_depth = Constant(0.397)
         depth_riv = Constant(initial_depth - 0.397)
         depth_trench = Constant(depth_riv - 0.15)
         depth_diff = depth_trench - depth_riv
         x, y = SpatialCoordinate(fs.mesh())
-<<<<<<< HEAD
-        trench = conditional(le(x, 5), depth_riv, conditional(le(x, 6.5), (1/1.5)*depth_diff*(x-6.5) + depth_trench,
-                             conditional(le(x, 9.5), depth_trench, conditional(le(x, 11), -(1/1.5)*depth_diff*(x-11) + depth_riv, depth_riv))))
-=======
         trench = conditional(
             le(x, 5), depth_riv, conditional(
                 le(x, 6.5), (1/1.5)*depth_diff*(x-6.5) + depth_trench, conditional(
                     le(x, 9.5), depth_trench, conditional(
                         le(x, 11), -(1/1.5)*depth_diff*(x-11) + depth_riv, depth_riv))))
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         return interpolate(-trench, fs)
 
     def set_viscosity(self, fs):
@@ -217,21 +130,12 @@ class TrenchSedimentOptions(CoupledOptions):
     def set_boundary_conditions(self, prob, i):
         inflow_tag = 1
         outflow_tag = 2
-<<<<<<< HEAD
-        bottom_wall_tag = 3
-        top_wall_tag = 4
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         boundary_conditions = {
             'shallow_water': {
                 inflow_tag: {'flux': Constant(-0.22)},
                 outflow_tag: {'elev': Constant(0.397)},
             },
-<<<<<<< HEAD
-	   'sediment': {
-=======
             'sediment': {
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
                 inflow_tag: {'value': self.sediment_model.equiltracer}
             }
         }
@@ -261,7 +165,6 @@ class TrenchSedimentOptions(CoupledOptions):
             return Constant(1.0)
 
     def set_initial_condition_sediment(self, prob):
-<<<<<<< HEAD
         prob.fwd_solutions_sediment[0].interpolate(Constant(0.0)) #self.sediment_model.equiltracer)
 
     def set_initial_condition_bathymetry(self, prob):
@@ -323,21 +226,3 @@ class TrenchSedimentOptions(CoupledOptions):
             File(outputdir + "/velocity_imported.pvd").write(uv_init)
             chk.close()
         return elev_init, uv_init,
-
-=======
-        prob.fwd_solutions_sediment[0].interpolate(Constant(0.0))
-
-    def set_initial_condition_bathymetry(self, prob):
-        prob.fwd_solutions_bathymetry[0].interpolate(
-            self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space())
-        )
-
-    def get_export_func(self, prob, i):
-        eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
-
-        def export_func():
-            eta_tilde.project(self.get_eta_tilde(prob, i))
-            u, eta = prob.fwd_solutions[i].split()
-
-        return export_func
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a

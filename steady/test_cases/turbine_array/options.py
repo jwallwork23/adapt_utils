@@ -4,11 +4,7 @@ from thetis.configuration import *
 import numpy as np
 import os
 
-<<<<<<< HEAD
-from adapt_utils.swe.turbine.options import SteadyTurbineOptions
-=======
 from adapt_utils.steady.swe.turbine.options import SteadyTurbineOptions
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 
 __all__ = ["TurbineArrayOptions"]
@@ -25,19 +21,11 @@ class TurbineArrayOptions(SteadyTurbineOptions):
     num_turbines = PositiveInteger(2).tag(config=False)
 
     # Domain specification
-<<<<<<< HEAD
-    mesh_dir = os.path.join(os.path.dirname(__file__), 'resources', 'meshes')
-    domain_length = PositiveFloat(1200.0).tag(config=False)
-    domain_width = PositiveFloat(500.0).tag(config=False)
-
-    def __init__(self, level=0, offset=0, separation=8, meshgen=False, box=False, **kwargs):
-=======
     mesh_file = os.path.join(os.path.dirname(__file__), 'resources', 'meshes', 'xcoarse_{:d}.msh')
     domain_length = PositiveFloat(1200.0).tag(config=False)
     domain_width = PositiveFloat(500.0).tag(config=False)
 
     def __init__(self, level=0, offset=0, separation=8, generate_geo=False, **kwargs):
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         """
         :kwarg level: number of iso-P2 refinements to apply to the base mesh.
         :kwarg offset: offset of the turbines to the south and north in terms of turbine diameters.
@@ -52,10 +40,6 @@ class TurbineArrayOptions(SteadyTurbineOptions):
 
         # Physics
         self.inflow_velocity = [5.0, 0.0]  # Typical fast flow in Pentland Firth
-<<<<<<< HEAD
-        self.base_velocity = self.inflow_velocity
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         self.base_viscosity = 0.5          # Chosen to give a moderately advection-dominated problem
         self.base_bathymetry = 40.0        # Typical depth in Pentland Firth
         self.friction_coeff = 0.0025
@@ -72,28 +56,6 @@ class TurbineArrayOptions(SteadyTurbineOptions):
         assert len(self.region_of_interest) == self.num_turbines
 
         # Gmsh specification
-<<<<<<< HEAD
-        self.base_outer_res = 40.0
-        self.base_inner_res = 8.0
-        if box:
-            assert self.offset == 0
-            self.mesh_file = 'channel_refined_{:d}.msh'.format(level)
-        else:
-            self.mesh_file = 'channel_{:d}_{:d}.msh'.format(level, self.offset)
-        self.mesh_file = os.path.join(self.mesh_dir, self.mesh_file)
-        if meshgen:
-            return
-
-        # Domain and mesh
-        if os.path.isfile(self.mesh_file):
-            self.default_mesh = Mesh(self.mesh_file)
-
-        # Discretisation
-        self.family = 'dg-cg'
-        self.sipg_parameter = None
-        self.use_automatic_sipg_parameter = True
-        self.use_maximal_sipg = True
-=======
         outer_res = 40.0
         inner_res = 8.0
         self.resolution = {'xcoarse': {'outer': outer_res, 'inner': inner_res}}  # TODO: needed?
@@ -116,19 +78,13 @@ class TurbineArrayOptions(SteadyTurbineOptions):
         self.family = 'dg-cg'
         self.sipg_parameter = None
         self.use_automatic_sipg_parameter = True
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         self.stabilisation = 'lax_friedrichs'
         self.grad_div_viscosity = False
         self.grad_depth_viscosity = False
 
         # Mesh adaptation
-<<<<<<< HEAD
-        self.h_min = 1.0e-05
-        self.h_max = 5.0e+02
-=======
         self.h_min = 1e-5
         self.h_max = 500.0
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     def set_inflow(self, fs):
         return interpolate(as_vector(self.inflow_velocity), fs)
@@ -148,9 +104,5 @@ class TurbineArrayOptions(SteadyTurbineOptions):
 
     def set_initial_condition(self, prob):
         u, eta = prob.fwd_solution.split()
-<<<<<<< HEAD
-        u.interpolate(as_vector(self.base_velocity))
-=======
         u.interpolate(as_vector(self.inflow_velocity))
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         eta.assign(0.0)

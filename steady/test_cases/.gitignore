@@ -4,31 +4,18 @@ box_discharge2d/__pycache__/
 point_discharge2d/outputs/
 point_discharge2d/screenshots/
 point_discharge2d/data/
-<<<<<<< HEAD
-point_discharge2d/plots/
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 point_discharge2d/__pycache__/
 point_discharge2d/uniform_convergence_log
 point_discharge3d/outputs/
 point_discharge3d/screenshots/
 point_discharge3d/__pycache__/
-<<<<<<< HEAD
-spacetime_ripple/
-spacetime_ripple/
-=======
 spacetime_ripple/outputs/
 spacetime_ripple/__pycache__/
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 turbine_array/outputs/
 turbine_array/resources/
 turbine_array/screenshots/
 turbine_array/resources/
 turbine_array/data/
-<<<<<<< HEAD
-turbine_array/plots/
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 turbine_array/__pycache__/
 turbine_array/stephan.py
 turbine_array/stephan-noid.py

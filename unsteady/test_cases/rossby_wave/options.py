@@ -6,11 +6,7 @@ import weakref
 import numpy as np
 import matplotlib.pyplot as plt
 
-<<<<<<< HEAD
-from adapt_utils.unsteady.options import CoupledOptions
-=======
 from adapt_utils.options import CoupledOptions
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 
 __all__ = ["BoydOptions"]
@@ -34,10 +30,6 @@ class BoydOptions(CoupledOptions):
         :kwarg periodic: toggle periodic boundary in x-direction
         :kwarg n: mesh resolution
         """
-<<<<<<< HEAD
-=======
-        self.timestepper = 'CrankNicolson'
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         super(BoydOptions, self).__init__(mesh=mesh, **kwargs)
         self.solve_swe = True
         self.solve_tracer = False
@@ -78,10 +70,7 @@ class BoydOptions(CoupledOptions):
         self.end_time = 120.0
         # self.end_time = 30.0
         self.dt_per_export = 50
-<<<<<<< HEAD
         self.timestepper = 'CrankNicolson'
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         self.family = 'dg-dg'
         # self.family = 'dg-cg'
 

@@ -1,17 +1,9 @@
 """
-<<<<<<< HEAD
-Runs the unsteady test case scripts found in `unsteady/test_cases/`. In some cases these examples include
-assertions which verify desired behaviour, but in most cases it is just verified that the solve does not
-crash and reaches the end of the required time period.
-
-The code used in this script was largely copied from `thetis/test/examples.py`.
-=======
 Runs the unsteady test case scripts found in `unsteady/test_cases/`. In some cases these examples
 include assertions which verify desired behaviour, but in most cases it is just verified that the
 solve does not crash and reaches the end of the simulation.
 
 The code used in this script was largely copied from `thetis/test/test_examples.py`.
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 """
 import pytest
 import os
@@ -21,22 +13,6 @@ import subprocess
 import shutil
 
 
-<<<<<<< HEAD
-examples = [
-    'cosine_prescribed_velocity/run.py',
-    'solid_body_rotation/run_fixed_mesh.py',
-    'solid_body_rotation/run_lagrangian.py',
-    # 'bubble_shear/run.py',  # TODO: Currently requires an 'interpretation' input parameter
-    'rossby_wave/run_fixed_mesh.py',
-    # 'rossby_wave/run_moving_mesh.py',  # TODO: Currently takes too long to run
-    'balzano/run_fixed_mesh.py',
-    'balzano/run_moving_mesh.py',
-    # 'trench/run_fixed_mesh.py',  # TODO
-    # 'trench/run_moving_mesh.py',  # TODO
-    # 'turbine_array/run.py',  # TODO
-]
-
-=======
 # Set environment flag so indicate shorter tests
 os.environ['REGRESSION_TEST'] = "1"
 
@@ -71,7 +47,6 @@ examples = [
 
     # Metric-based  # TODO
 ]
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 cwd = os.path.abspath(os.path.dirname(__file__))
 unsteady_dir = os.path.abspath(os.path.join(cwd, '..', 'unsteady', 'test_cases'))
 examples = [os.path.join(unsteady_dir, f) for f in examples]

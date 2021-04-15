@@ -45,11 +45,7 @@ kwargs = {
 }
 op = PointDischarge3dOptions(**kwargs)
 op.tracer_family = 'cg'
-<<<<<<< HEAD
-op.stabilisation_tracer = 'supg'
-=======
 op.stabilisation = 'supg'
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 op.anisotropic_stabilisation = True
 op.normalisation = args.normalisation or 'complexity'  # FIXME: error
 op.print_debug(op)

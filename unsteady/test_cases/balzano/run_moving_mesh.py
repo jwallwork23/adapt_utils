@@ -6,33 +6,19 @@ shallow water flow models." Coastal Engineering 34.1-2 (1998): 83-107.
 """
 from thetis import *
 
-<<<<<<< HEAD
-import numpy as np
-import argparse
-
-from adapt_utils.unsteady.test_cases.balzano.options import BalzanoOptions
-from adapt_utils.unsteady.solver import AdaptiveProblem
-=======
 import argparse
 import numpy as np
 import os
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.balzano.options import BalzanoOptions
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-bathymetry_type", help="""
-<<<<<<< HEAD
-Choose bathymetry type from {1, 2, 3}. Option 1 corresponds to a linear bathymetry, whereas 2 and 3
-have kinks. See [Balzano] for details.
-""")
-=======
     Choose bathymetry type from {1, 2, 3}. Option 1 corresponds to a linear bathymetry, whereas 2
     and 3 have kinks. See [Balzano] for details.
     """)
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 parser.add_argument("-stabilisation", help="Stabilisation method")
 parser.add_argument("-family", help="Choose finite element from 'cg-cg', 'dg-cg' and 'dg-dg'")
 parser.add_argument("-debug", help="Toggle debugging")
@@ -60,20 +46,14 @@ kwargs = {
     'plot_pvd': True,
     'debug': bool(args.debug or False),
 }
-<<<<<<< HEAD
-=======
 if os.getenv('REGRESSION_TEST') is not None:
     kwargs['num_hours'] = 6
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 op = BalzanoOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
-<<<<<<< HEAD
 # swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 alpha = 1.0  # size of the dense region surrounding the coast
 beta = 10.0  # level of refinement at coast

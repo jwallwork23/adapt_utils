@@ -1,9 +1,10 @@
+from thetis import create_directory, print_output
+
 import argparse
 import numpy as np
 import os
 from time import perf_counter
 
-from adapt_utils.io import create_directory, print_output
 from adapt_utils.swe.turbine.solver import AdaptiveTurbineProblem
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
 

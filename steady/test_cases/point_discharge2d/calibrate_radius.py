@@ -11,13 +11,8 @@ from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischar
 
 # Parse arguments
 parser = argparse.ArgumentParser()
-<<<<<<< HEAD
-parser.add_argument('-level', help="Mesh resolution level.")
-parser.add_argument('-family', help="Finite element family, from {'cg', 'dg'}.")
-=======
 parser.add_argument('level', help="Mesh resolution level.")
 parser.add_argument('family', help="Finite element family, from {'cg', 'dg'}.")
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 parser.add_argument('-stabilisation', help="""
     Stabilisation method. No stabilisation by default.
     Otherwise, choose from {'su', 'supg', 'lax_friedrichs'}.
@@ -32,28 +27,12 @@ parser.add_argument('-recompute_parameter_space')
 args = parser.parse_args()
 
 # Collect parsed arguments
-<<<<<<< HEAD
-test_consistency = False if args.test_consistency == '0' else True
-test_gradient = False if args.test_gradient == '0' else True
-=======
 test_consistency = bool(args.test_consistency or False)
 test_gradient = bool(args.test_gradient or False)
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 error_to_calibrate = args.error_to_calibrate or 'l2'
 assert error_to_calibrate in ('l2', 'qoi')
 
 # Parameter object
-<<<<<<< HEAD
-level = int(args.level or 0)
-op = PointDischarge2dOptions(level=level)
-family = args.family or 'cg'
-assert family in ('cg', 'dg')
-op.tracer_family = family
-stabilisation = args.stabilisation or 'supg'
-op.stabilisation_tracer = None if stabilisation == 'none' else stabilisation
-op.anisotropic_stabilisation = False if args.anisotropic_stabilisation == '0' else True
-op.di = os.path.join(op.di, op.stabilisation_tracer or args.family)
-=======
 level = int(args.level)
 op = PointDischarge2dOptions(level=level)
 assert args.family in ('cg', 'dg')
@@ -61,7 +40,6 @@ op.tracer_family = args.family or 'cg'
 op.stabilisation = args.stabilisation
 op.anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
 op.di = os.path.join(op.di, args.stabilisation or args.family)
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 mesh = op.default_mesh
 x, y = SpatialCoordinate(mesh)
 
@@ -200,12 +178,7 @@ if test_gradient:
 
 # Plot parameter space
 fname = os.path.join(op.di, "parameter_space_{:d}.npy".format(level))
-<<<<<<< HEAD
-# if not os.path.isfile(fname) or bool(args.recompute_parameter_space or False):
-if bool(args.recompute_parameter_space or False):
-=======
 if not os.path.isfile(fname) or bool(args.recompute_parameter_space or False):
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     print_output("Exploring parameter space...")
     np.save(fname, np.array([reduced_functional(r) for r in np.linspace(0.01, 0.4, 100)]))
 
@@ -218,13 +191,8 @@ r_calibrated = minimize(Jhat, method='L-BFGS-B', bounds=(0.01, 1), callback=call
 print_output("Logging...")
 logstr = "level: {:d}\n".format(level)
 logstr += "family: {:s}\n".format(op.tracer_family.upper())
-<<<<<<< HEAD
-if op.stabilisation_tracer is not None:
-    logstr += "stabilisation: {:}\n".format(op.stabilisation_tracer.upper())
-=======
 if op.stabilisation is not None:
     logstr += "stabilisation: {:}\n".format(op.stabilisation.upper())
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 logstr += "calibrated radius: {:.8f}\n".format(r_calibrated.dat.data[0])
 print_output(logstr)
 with open(os.path.join(op.di, "log"), "a") as log:
@@ -242,18 +210,6 @@ File(os.path.join(op.di, "error.pvd")).write(error)
 
 # Save optimisation progress
 print_output("Saving optimisation progress...")
-<<<<<<< HEAD
-ext = op.tracer_family
-if ext == 'dg':
-    if op.stabilisation_tracer in ('lf', 'LF', 'lax_friedrichs'):
-        ext += '_lf'
-else:
-    if op.stabilisation_tracer in ('su', 'SU'):
-        ext += '_su'
-    if op.stabilisation_tracer in ('supg', 'SUPG'):
-        ext += '_supg'
-    if op.anisotropic_stabilisation and op.stabilisation_tracer is not None:
-=======
 ext = args.family
 if ext == 'dg':
     if args.stabilisation in ('lf', 'LF', 'lax_friedrichs'):
@@ -264,7 +220,6 @@ else:
     if args.stabilisation in ('supg', 'SUPG'):
         ext += '_supg'
     if op.anisotropic_stabilisation:
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         ext += '_anisotropic'
 fname = "_".join(["{:s}", ext, str(level)])
 fname += ".npy"

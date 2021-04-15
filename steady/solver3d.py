@@ -1,11 +1,8 @@
 from thetis import *
 
-<<<<<<< HEAD
-=======
 # import numpy as np
 # import os
 
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 from adapt_utils.steady.solver import AdaptiveSteadyProblem
 
 
@@ -13,14 +10,7 @@ __all__ = ["AdaptiveSteadyProblem3d"]
 
 
 class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
-<<<<<<< HEAD
-    """
-    Problem class for time-independent three dimensional tracer transport problems on unstructured
-    meshes. (Extruded meshes are not supported.)
-    """
-=======
     # TODO: doc
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     def __init__(self, op, **kwargs):
         super(AdaptiveSteadyProblem3d, self).__init__(op, **kwargs)
         if self.mesh.topological_dimension() != 3:
@@ -75,11 +65,6 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
             self.Q[i],
             self.depth[i],
             anisotropic=op.anisotropic_stabilisation,
-<<<<<<< HEAD
-            su_stabilisation=op.su_stabilisation,
-            supg_stabilisation=op.supg_stabilisation,
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -96,11 +81,6 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
             self.Q[i],
             self.depth[i],
             anisotropic=op.anisotropic_stabilisation,
-<<<<<<< HEAD
-            su_stabilisation=op.su_stabilisation,
-            supg_stabilisation=op.supg_stabilisation,
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -120,11 +100,6 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
             use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
             sipg_parameter=self.tracer_options[i].sipg_parameter,
             anisotropic=self.tracer_options[i].anisotropic_stabilisation,
-<<<<<<< HEAD
-            su_stabilisation=op.su_stabilisation,
-            supg_stabilisation=op.supg_stabilisation,
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         )
 
     def _get_fields_for_tracer_timestepper(self, i):

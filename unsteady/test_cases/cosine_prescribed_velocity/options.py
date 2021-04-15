@@ -1,10 +1,6 @@
 from firedrake import *
 
-<<<<<<< HEAD
-from adapt_utils.unsteady.options import CoupledOptions
-=======
 from adapt_utils.options import CoupledOptions
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 
 __all__ = ["CosinePrescribedVelocityOptions"]
@@ -16,15 +12,9 @@ class CosinePrescribedVelocityOptions(CoupledOptions):
         self.solve_swe = False
         self.solve_tracer = True
         if self.tracer_family == 'cg':
-<<<<<<< HEAD
             self.stabilisation = 'supg'
         elif self.tracer_family == 'dg':
             self.stabilisation = 'lax_friedrichs'
-=======
-            self.stabilisation_tracer = 'supg'
-        elif self.tracer_family == 'dg':
-            self.stabilisation_tracer = 'lax_friedrichs'
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
         lx, ly = 10, 10
         self.default_mesh = PeriodicRectangleMesh(n, n, lx, ly, direction='x')
@@ -36,10 +26,6 @@ class CosinePrescribedVelocityOptions(CoupledOptions):
         # self.base_diffusivity = 1.0e-8
         self.base_diffusivity = 0.0
         self.base_velocity = [1.0, 0.0]
-<<<<<<< HEAD
-=======
-        self.characteristic_speed = Constant(1.0)
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     def set_boundary_conditions(self, prob, i):
         boundary_conditions = {

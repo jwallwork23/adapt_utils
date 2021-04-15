@@ -35,15 +35,9 @@ kwargs = {
     'geometry': geometry,
 
     # Spatial discretisation
-<<<<<<< HEAD
-    'refinement_level': i,
-    'tracer_family': args.family or 'dg',
-    'stabilisation': args.stabilisation,
-=======
     'level': i,
     'tracer_family': args.family or 'dg',
-    'stabilisation_tracer': args.stabilisation,
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
+    'stabilisation': args.stabilisation,
     'use_automatic_sipg_parameter': False,  # We have an inviscid problem
     'use_limiter_for_tracers': bool(args.limiters or True),
     'use_tracer_conservative_form': bool(args.conservative or False),
@@ -71,18 +65,6 @@ tp.solve_forward()
 
 # Print outputs
 f = open(os.path.join(tp.di, "{:s}_{:d}.log".format(geometry, n)), 'w+')
-<<<<<<< HEAD
-head = "\n  Shape            Analytic QoI    Quadrature QoI  Calculated QoI  Error"
-rule = 74*'='
-write(head, f)
-write(rule, f)
-for shape, name in zip(range(3), ('Gaussian', 'Cone', 'Slotted cylinder')):
-    op.shape = shape
-    exact = op.exact_qoi()
-    qoi = tp.quantity_of_interest()
-    qois = (exact, op.quadrature_qoi(tp, -1), qoi, 100.0*abs(1.0 - qoi/exact))
-    line = "{:1d} {:16s} {:14.8e}  {:14.8e}  {:14.8e}  {:6.4f}%".format(shape, name, *qois)
-=======
 head = "\n  Shape            Analytic QoI    Quadrature QoI  Calculated QoI  Error    Disc. error"
 rule = 90*'='
 write(head, f)
@@ -95,7 +77,6 @@ for shape, name in zip(range(3), ('Gaussian', 'Cone', 'Slotted cylinder')):
     quadrature = op.quadrature_qoi(tp, -1)
     qois = (exact, quadrature, qoi, 100*abs(1.0 - qoi/exact), 100*abs(1.0 - qoi/quadrature))
     line = "{:1d} {:16s} {:14.8e}  {:14.8e}  {:14.8e}  {:6.4f}%  {:6.4f}%".format(shape, name, *qois)
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     write(line, f)
 write(rule, f)
 approach = "'" + tp.approach.replace('_', ' ').capitalize() + "'"

@@ -1,27 +1,14 @@
-<<<<<<< HEAD
-from thetis import *
-
-import argparse
-import matplotlib.pyplot as plt
-import matplotlib.patches as ptch
-import numpy as np
-=======
 from firedrake import *
 
 import argparse
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as ptch
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 import os
 import sys
 
 from adapt_utils.steady.test_cases.turbine_array.options import TurbineArrayOptions
-<<<<<<< HEAD
-from adapt_utils.swe.turbine.solver import AdaptiveSteadyTurbineProblem
-=======
 from adapt_utils.steady.swe.turbine.solver import AdaptiveSteadyTurbineProblem
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 from adapt_utils.plotting import *
 
 
@@ -39,21 +26,14 @@ parser.add_argument('-offset', help="""
     (Default 0)""")
 
 # Mesh adaptation
-<<<<<<< HEAD
-parser.add_argument('-enrichment_method', help="Choose from {'GE_hp', 'GE_h', 'GE_p', 'PR'}.")
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 parser.add_argument('-target', help="Target complexity for adaptive approaches (default 3200)")
 parser.add_argument('-adapt_field', help="Field(s) for adaptation (default all_int)")
 
 # I/O and debugging
-<<<<<<< HEAD
-=======
 parser.add_argument('-plot_pdf', help="Save plots to .pdf (default False).")
 parser.add_argument('-plot_png', help="Save plots to .png (default False).")
 parser.add_argument('-plot_pvd', help="Save plots to .pvd (default False).")
 parser.add_argument('-plot_all', help="Plot to .pdf, .png and .pvd (default False).")
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 parser.add_argument('-save_plex', help="Save DMPlex to HDF5 (default False)")
 parser.add_argument('-debug', help="Toggle debugging mode (default False).")
 parser.add_argument('-debug_mode', help="""
@@ -64,8 +44,6 @@ args = parser.parse_args()
 
 # --- Set parameters
 
-<<<<<<< HEAD
-=======
 plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
 if bool(args.plot_all or False):
@@ -76,7 +54,6 @@ if plot_pdf:
 if plot_png:
     extensions.append('png')
 plot_any = len(extensions) > 0
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 save_plex = bool(args.save_plex or False)
 kwargs = {
     'approach': args.approach,
@@ -92,10 +69,6 @@ kwargs = {
     'convergence_rate': 1,
     'norm_order': None,  # i.e. infinity norm
     'h_max': 500.0,
-<<<<<<< HEAD
-    'enrichment_method': args.enrichment_method or 'GE_h',
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     # Optimisation parameters
     'element_rtol': 0.001,
@@ -106,18 +79,10 @@ kwargs = {
     'debug': bool(args.debug or 0),
     'debug_mode': args.debug_mode or 'basic',
 }
-<<<<<<< HEAD
-discrete_turbines = True
-# discrete_turbines = False
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 op = TurbineArrayOptions(**kwargs)
 op.set_all_rtols(op.element_rtol)
 if op.approach == 'fixed_mesh':
     raise ValueError("This script is for mesh adaptive methods.")
-<<<<<<< HEAD
-plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
-=======
 
 # Plotting
 patch_kwargs = {
@@ -151,24 +116,16 @@ fontsizes = {
     'cbar': 20,
 }
 plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'screenshots'))
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 
 # --- Solve forward problem within a mesh adaptation loop
 
-<<<<<<< HEAD
-tp = AdaptiveSteadyTurbineProblem(op, discrete_adjoint=True, discrete_turbines=discrete_turbines)
-tp.run()
-if save_plex:
-    tp.store_plexes('{:s}_{:d}.h5'.format(op.approach, op.offset))
-=======
 tp = AdaptiveSteadyTurbineProblem(op, discrete_adjoint=True)
 tp.adaptation_loop()
 if save_plex:
     tp.store_plexes('{:s}_{:d}.h5'.format(op.approach, op.offset))
 if not plot_any:
     sys.exit(0)
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 
 # --- Plot mesh, with a zoom of the turbine array region
@@ -176,28 +133,11 @@ if not plot_any:
 # Get turbine array
 loc = op.region_of_interest
 D = op.turbine_diameter
-<<<<<<< HEAD
-patch_kwargs = {'facecolor': 'none', 'edgecolor': 'b', 'linewidth': 2}
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 turbine1 = ptch.Rectangle((loc[0][0]-D/2, loc[0][1]-D/2), D, D, **patch_kwargs)
 turbine2 = ptch.Rectangle((loc[1][0]-D/2, loc[1][1]-D/2), D, D, **patch_kwargs)
 
 # Plot mesh and annotate with turbine footprint
 fig, axes = plt.subplots(figsize=(12, 5))
-<<<<<<< HEAD
-interior_kw = {"linewidth": 0.3}
-boundary_kw = {"linewidth": 3.0, "colors": ["k", "k", "k"]}
-triplot(tp.mesh, axes=axes, interior_kw=interior_kw, boundary_kw=boundary_kw)
-axes.set_xlim([-1, op.domain_length+1])
-axes.set_ylim([-1, op.domain_width+1])
-axes.add_patch(turbine1)
-axes.add_patch(turbine2)
-axes.set_xticks([])
-axes.set_yticks([])
-fname = '{:s}__offset{:d}__target{:d}__elem{:d}'
-savefig(fname.format(op.approach, op.offset, int(op.target), tp.num_cells[-1][0]), plot_dir, extensions=["jpg"])
-=======
 triplot(tp.mesh, axes=axes, **triplot_kwargs)
 axes.set_xlim([0.0, op.domain_length])
 axes.set_ylim([0.0, op.domain_width])
@@ -207,71 +147,17 @@ plt.tight_layout()
 fname = os.path.join(plot_dir, '{:s}__offset{:d}__target{:d}__elem{:d}.{:3s}')
 for ext in extensions:
     plt.savefig(fname.format(op.approach, op.offset, int(op.target), tp.num_cells[-1], ext))
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 # Magnify turbine region
 axes.set_xlim(loc[0][0] - 2*D, loc[1][0] + 2*D)
 axes.set_ylim(op.domain_width/2 - 3.5*D, op.domain_width/2 + 3.5*D)
-<<<<<<< HEAD
-fname = '{:s}__offset{:d}__target{:d}__elem{:d}__zoom'
-savefig(fname.format(op.approach, op.offset, int(op.target), tp.num_cells[-1][0]), plot_dir, extensions=["jpg"])
-=======
 fname = os.path.join(plot_dir, '{:s}__offset{:d}__target{:d}__elem{:d}__zoom.{:3s}')
 for ext in extensions:
     plt.savefig(fname.format(op.approach, op.offset, int(op.target), tp.num_cells[-1], ext))
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 
 # --- Plot goal-oriented error indicators
 
-<<<<<<< HEAD
-if op.approach not in ('dwr', 'isotropic_dwr', 'anisotropic_dwr'):
-    sys.exit(0)
-
-# Plot dwr cell residual
-residual = interpolate(abs(tp.indicator['cell']), tp.indicator['cell'].function_space())
-minpower = -3
-maxpower = 3
-minvalue = 10**minpower
-maxvalue = 10**maxpower
-residual.interpolate(min_value(max_value(residual, 1.001*minvalue), 0.999*maxvalue))
-residual.dat.data[:] = np.log10(residual.dat.data)
-powers = np.linspace(minpower, maxpower, 50)
-fig, axes = plt.subplots(figsize=(12, 6))
-tc = tricontourf(residual, axes=axes, levels=powers, cmap='coolwarm')
-cbar = fig.colorbar(tc, ax=axes, orientation='horizontal', pad=0.1, fraction=0.2)
-powers = np.linspace(minpower, maxpower, int(np.floor(maxpower-minpower/2))+1)
-cbar.set_ticks(powers)
-cbar.set_ticklabels([r"$10^{{{:d}}}$".format(int(i)) for i in powers])
-axes.xaxis.tick_top()
-axes.set_yticks([0, 100, 200, 300, 400, 500])
-axes.set_xlim([-1, op.domain_length+1])
-axes.set_ylim([-1, op.domain_width+1])
-fname = 'cell_residual__offset{:d}__elem{:d}'
-savefig(fname.format(op.offset, tp.num_cells[-1][0]), plot_dir, extensions=["jpg"])
-
-# Plot dwr flux
-flux = interpolate(abs(tp.indicator['flux']), tp.indicator['flux'].function_space())
-minpower = -2
-maxpower = 7
-minvalue = 10**minpower
-maxvalue = 10**maxpower
-flux.interpolate(min_value(max_value(flux, 1.001*minvalue), 0.999*maxvalue))
-flux.dat.data[:] = np.log10(flux.dat.data)
-powers = np.linspace(minpower, maxpower, 50)
-fig, axes = plt.subplots(figsize=(12, 6))
-tc = tricontourf(flux, axes=axes, levels=powers, cmap='coolwarm')
-cbar = fig.colorbar(tc, ax=axes, orientation='horizontal', pad=0.1, fraction=0.2)
-powers = np.linspace(minpower, maxpower, int(np.floor(maxpower-minpower/2))+1)
-cbar.set_ticks(powers)
-cbar.set_ticklabels([r"$10^{{{:d}}}$".format(int(i)) for i in powers])
-axes.xaxis.tick_top()
-axes.set_yticks([0, 100, 200, 300, 400, 500])
-axes.set_xlim([-1, op.domain_length+1])
-axes.set_ylim([-1, op.domain_width+1])
-fname = 'flux__offset{:d}__elem{:d}'
-savefig(fname.format(op.offset, tp.num_cells[-1][0]), plot_dir, extensions=["jpg"])
-=======
 # Plot dwr cell residual
 fs = tp.indicators['dwr_cell'].function_space()
 residual = interpolate(abs(tp.indicators['dwr_cell']), fs)
@@ -295,4 +181,3 @@ plt.tight_layout()
 fname = os.path.join(plot_dir, 'flux__offset{:d}__elem{:d}.{:3s}')
 for ext in extensions:
     plt.savefig(fname.format(op.offset, tp.mesh.num_cells(), ext))
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a

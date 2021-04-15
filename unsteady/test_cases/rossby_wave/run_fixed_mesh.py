@@ -1,15 +1,6 @@
 from thetis import *
 
 import argparse
-<<<<<<< HEAD
-
-from adapt_utils.adapt.r import MeshMover
-from adapt_utils.unsteady.test_cases.rossby_wave.options import BoydOptions
-from adapt_utils.unsteady.test_cases.rossby_wave.monitors import *
-from adapt_utils.unsteady.solver import AdaptiveProblem
-
-
-=======
 import os
 
 from adapt_utils.adapt.r import MeshMover
@@ -20,32 +11,22 @@ from adapt_utils.unsteady.test_cases.rossby_wave.options import BoydOptions
 
 # --- Parse arguments
 
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 parser = argparse.ArgumentParser()
 parser.add_argument("-n_coarse", help="Resolution of coarse mesh.")
 parser.add_argument("-n_fine", help="Resolution of fine mesh.")
 parser.add_argument("-end_time", help="Simulation end time.")
 parser.add_argument("-refine_equator", help="""
-<<<<<<< HEAD
-Apply Monge-Ampere based r-adaptation to refine equatorial region.""")
-parser.add_argument("-refine_soliton", help="""
-Apply Monge-Ampere based r-adaptation to refine around initial soliton.""")
-=======
     Apply Monge-Ampere based r-adaptation to refine equatorial region.""")
 parser.add_argument("-refine_soliton", help="""
     Apply Monge-Ampere based r-adaptation to refine around initial soliton.""")
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 parser.add_argument("-calculate_metrics", help="Compute metrics using the fine mesh.")
 parser.add_argument("-ale", help="Use ALE mesh movement to track soliton.")
 parser.add_argument("-debug", help="Toggle debugging mode.")
 args = parser.parse_args()
 
-<<<<<<< HEAD
-=======
 
 # --- Set parameters
 
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 n_coarse = int(args.n_coarse or 1)  # NOTE: [Huang et al 2008] considers n = 4, 8, 20
 n_fine = int(args.n_fine or 50)
 ale = bool(args.ale or False)
@@ -89,23 +70,17 @@ kwargs = {
     # Misc
     'debug': bool(args.debug or False),
 }
-<<<<<<< HEAD
-=======
 if os.getenv('REGRESSION_TEST') is not None:
     kwargs['end_time'] = 30.0
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 fpath = 'resolution_{:d}'.format(n_coarse)
 if monitor is not None:
     fpath = os.path.join(fpath, monitor_type)
 op = BoydOptions(approach='ale' if ale else 'fixed_mesh', fpath=fpath, n=n_coarse, order=kwargs['order'])
 op.update(kwargs)
-<<<<<<< HEAD
-=======
 
 
 # --- Initialise mesh
 
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 swp = AdaptiveProblem(op)
 
 # Refine around equator and/or soliton
@@ -114,26 +89,16 @@ if monitor is not None:
     mesh_mover.adapt()
     mesh = Mesh(mesh_mover.x)
     op.__init__(mesh=mesh, **kwargs)
-<<<<<<< HEAD
     swp.__init__(op, meshes=[mesh, ])
 
 # Apply constant mesh velocity  # FIXME
 if ale:
     swp.mesh_velocities[0] = Constant(as_vector([-op.lx/op.end_time, 0.0]))
-swp.solve_forward()
-
-=======
-    swp.__init__(op, meshes=[mesh])
-
-# Apply constant mesh velocity
-if ale:
-    raise NotImplementedError  # FIXME
 
 
 # --- Solve forward problem and print diagnostics
 
 swp.solve_forward()
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 if bool(args.calculate_metrics or False):
     print_output("\nCalculating error metrics...")
     metrics = op.get_peaks(swp.fwd_solutions[-1].split()[1], reference_mesh_resolution=n_fine)

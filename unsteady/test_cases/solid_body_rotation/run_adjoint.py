@@ -38,15 +38,9 @@ kwargs = {
     'geometry': geometry,
 
     # Spatial discretisation
-<<<<<<< HEAD
-    'refinement_level': i,
-    'tracer_family': args.family or 'dg',
-    'stabilisation': args.stabilisation,
-=======
     'level': i,
     'tracer_family': args.family or 'dg',
-    'stabilisation_tracer': args.stabilisation,
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
+    'stabilisation': args.stabilisation,
     'use_automatic_sipg_parameter': False,  # We have an inviscid problem
     'use_limiter_for_tracers': bool(args.limiters or True),
     'use_tracer_conservative_form': bool(args.conservative or False),
@@ -72,18 +66,6 @@ class AnnotatedTracerProblem(AdaptiveDiscreteAdjointProblem):
         return assemble(kernel*sol*dx)
 
 
-<<<<<<< HEAD
-# # Run model
-# op.di = create_directory(os.path.join(di, 'discrete'))
-# tp_discrete = AnnotatedTracerProblem(op)
-# print_output("Running forward model...")
-# tp_discrete.solve_forward()
-#
-# # Compute gradient w.r.t. fluid speed and extract adjoint solution
-# print_output("Running discrete adjoint model...")
-# q = tp_discrete.fwd_solutions[0]  # An arbitrary control
-# tp_discrete.compute_gradient(Control(q))  # TODO: just use solve_adjoint once merged
-=======
 # Solve forward
 op.di = create_directory(os.path.join(di, 'discrete'))
 tp_discrete = AnnotatedTracerProblem(op)
@@ -93,7 +75,6 @@ tp_discrete.solve_forward()
 # # Solve discrete adjoint  # FIXME
 # print_output("Running discrete adjoint model...")
 # tp_discrete.solve_adjoint()
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 # tp_discrete.save_adjoint_trajectory()
 stop_annotating()
 
@@ -106,17 +87,9 @@ class UnannotatedTracerProblem(AdaptiveProblem):
         return assemble(kernel*sol*dx)
 
 
-<<<<<<< HEAD
-# Solve
-=======
 # Solve continuous adjoint
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 op.di = create_directory(os.path.join(di, 'continuous'))
 tp_continuous = UnannotatedTracerProblem(op)
 tp_continuous.set_initial_condition()  # Adjoint propagation is driven by reverse flow
 print_output("Running continuous adjoint model...")
 tp_continuous.solve_adjoint()
-<<<<<<< HEAD
-print_output("Done!")
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a

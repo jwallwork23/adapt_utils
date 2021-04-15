@@ -1,17 +1,10 @@
 from thetis import *
 from thetis.configuration import *
 
-<<<<<<< HEAD
 from adapt_utils.unsteady.options import CoupledOptions
 from adapt_utils.unsteady.swe.utils import heaviside_approx
 from thetis.options import ModelOptions2d
 from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
-=======
-from adapt_utils.options import CoupledOptions
-from adapt_utils.swe.utils import heaviside_approx
-from thetis.options import ModelOptions2d
-from adapt_utils.sediment.sediments_model import SedimentModel
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 import scipy.interpolate as ip
 import os
@@ -65,11 +58,7 @@ class SumatraOptions(CoupledOptions):
         self.dt = 0.5
         self.end_time = 1000 #float(7140/self.morphological_acceleration_factor)
         self.dt_per_mesh_movement = 7140
-<<<<<<< HEAD
         self.dt_per_export = 40
-=======
-        self.dt_per_export = 2 #40
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 
@@ -145,13 +134,8 @@ class SumatraOptions(CoupledOptions):
 
     def set_viscosity(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
-<<<<<<< HEAD
         self.viscosity = Constant(1) #Function(fs)
         #self.viscosity.interpolate(conditional(x> 2000, conditional(x < 2860, ((100-1e-6)/(860)*(x-2000))+1e-6, Constant(100)), Constant(1e-6)))
-=======
-        self.viscosity = Function(fs)
-        self.viscosity.interpolate(conditional(x> 2000, conditional(x < 2860, ((100-1e-6)/(860)*(x-2000))+1e-6, Constant(100)), Constant(1e-6)))
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         return self.viscosity
 
     
@@ -209,14 +193,8 @@ class SumatraOptions(CoupledOptions):
     
     def set_wetting_and_drying_alpha(self, bathymetry, fs):
 
-<<<<<<< HEAD
         #mesh = fs.mesh()
         #wetting_fn = Function(fs).interpolate(abs(bathymetry.dx(0)))
-=======
-        mesh = fs.mesh()
-        #wetting_fn = Function(fs)
-        wetting_fn = Function(fs).interpolate(abs(bathymetry.dx(0)))
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
         #tau = TestFunction(fs)
         #n = FacetNormal(mesh)
 
@@ -225,15 +203,9 @@ class SumatraOptions(CoupledOptions):
         #a -= inner(tau, bathymetry_dx)*dx
         #solve(a == 0, wetting_fn)
 
-<<<<<<< HEAD
         #self.wetting_and_drying_alpha = Function(fs).interpolate(conditional(wetting_fn > 0, dot(get_cell_widths_2d(mesh)[0], wetting_fn)+Constant(1), Constant(1)))
         print('wetting fn')
         return Function(self.P1).interpolate(Constant(2)) #self.wetting_and_drying_alpha
-=======
-        self.wetting_and_drying_alpha = Function(fs).interpolate(conditional(wetting_fn > 0, dot(get_cell_widths_2d(mesh)[0], wetting_fn)+Constant(1), Constant(1)))
-
-        return Constant(2) #self.wetting_and_drying_alpha
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
     #def set_advective_velocity_factor(self, fs):
     #    if self.convective_vel_flag:
@@ -251,31 +223,22 @@ class SumatraOptions(CoupledOptions):
 
         def update_forcings(t):
             self.update_boundary_conditions(prob, t=t)
-<<<<<<< HEAD
             if t < 2:
                 if t> 1:
                     u, eta = prob.fwd_solutions[i].split()
                     chk = DumbCheckpoint("mesh_new", mode=FILE_CREATE)
                     chk.store(eta.function_space().mesh().coordinates, name="mesh")
                     chk.close()
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
-
         return update_forcings
 
 
     def get_export_func(self, prob, i):
 
         def export_func():
-<<<<<<< HEAD
-=======
-            u, eta = prob.fwd_solutions[i].split()
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
             if not hasattr(self, 'eta_tilde_file'):
                 self.eta_tilde_file = File(self.di + "/eta_tilde.pvd")
                 eta_tilde_file = File(self.di + "/eta_tilde_orig.pvd")
-<<<<<<< HEAD
                 bath = prob.depth[i].bathymetry_2d
                 uv, eta = prob.fwd_solutions[0].split()
                 H = bath + eta
@@ -290,14 +253,6 @@ class SumatraOptions(CoupledOptions):
                 H = bath + eta
                 wd_b = 0.5 * (sqrt(H ** 2 + prob.depth[i].wetting_and_drying_alpha ** 2) - H)
                 self.eta_tilde_new.project(prob.depth[i].get_total_depth(eta)) #eta+wd_b)
-=======
-                tmp_function = Function(eta.function_space()).interpolate(prob.depth[i].get_total_depth(eta))
-                eta_tilde_file.write(tmp_function)
-            else:
-                if not hasattr(self, 'eta_tilde_new'):
-                    self.eta_tilde_new = Function(eta.function_space()).interpolate(prob.depth[i].get_total_depth(eta))
-                self.eta_tilde_new.project(self.get_eta_tilde(prob, i))
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
                 self.eta_tilde_file.write(self.eta_tilde_new)
 
 

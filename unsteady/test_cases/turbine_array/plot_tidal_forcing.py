@@ -1,8 +1,9 @@
+from thetis import create_directory
+
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from adapt_utils.io import create_directory
 from adapt_utils.plotting import *  # NOQA
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
 

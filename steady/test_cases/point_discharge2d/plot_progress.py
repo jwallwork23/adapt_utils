@@ -61,8 +61,4 @@ axes.set_ylabel(r"$J_{\mathrm{calibration}}$")
 axes.set_xlim([0, 0.4])
 axes.set_ylim([1e-2, 1e5])
 axes.grid(True)
-<<<<<<< HEAD
-savefig("progress_{:s}".format(ext), plot_dir, extensions=["pdf", "jpg"])
-=======
 savefig("progress_{:s}".format(ext), plot_dir, extensions=["pdf", "png"])
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a

@@ -4,11 +4,6 @@ from thetis import *
 
 import numpy as np
 
-<<<<<<< HEAD
-
-from adapt_utils.io import initialise_bathymetry, export_bathymetry
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 from adapt_utils.unsteady.test_cases.beach_slope.options import BeachOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.adapt import recovery
@@ -18,16 +13,6 @@ import pandas as pd
 import time
 import datetime
 
-<<<<<<< HEAD
-nx = 0.5
-ny = 1
-
-alpha = 7
-beta = 0
-gamma = 1
-
-kappa = 72
-=======
 def export_final_state(inputdir, bathymetry_2d):
     """
     Export fields to be used in a subsequent simulation
@@ -67,22 +52,14 @@ beta = 0
 gamma = 1
 
 kappa = 200
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-<<<<<<< HEAD
-inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220)) + '_10'
-print(inputdir)
-
-r_tol = 1e-3
-
-=======
 inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220))
 print(inputdir)
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
+
 kwargs = {
     'approach': 'monge_ampere',
     'nx': nx,
@@ -91,11 +68,7 @@ kwargs = {
     'input_dir': inputdir,
     'output_dir': outputdir,
     'nonlinear_method': 'relaxation',
-<<<<<<< HEAD
-    'r_adapt_rtol': r_tol,
-=======
     'r_adapt_rtol': 1.0e-3,
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
@@ -147,15 +120,6 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = ka
     a = (inner(tau, H)*dx)+(K*inner(tau.dx(1), H.dx(1))*dx) - inner(tau, mon_init)*dx
     solve(a == 0, H)
 
-    #H = Function(P1)
-    #tau = TestFunction(P1)
-
-    #n = FacetNormal(mesh)
-
-    #a = (inner(tau, H)*dx)+(K*inner(grad(tau), grad(H))*dx) - (K*(tau*inner(grad(H), n)))*ds
-    #a -= inner(tau, mon_init)*dx
-    #solve(a == 0, H)
-
     return H
 
 swp.set_monitor_functions(gradient_interface_monitor)
@@ -175,17 +139,9 @@ new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-<<<<<<< HEAD
-export_bathymetry(bath, "adapt_output/hydrodynamics_beach_bath_mov_"+ str(op.dt_per_export) + "_" + str(int(nx*220))+"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma))
-
-bath_real = initialise_bathymetry(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_440_1')
-
-
-=======
 export_final_state("adapt_output/hydrodynamics_beach_bath_mov_"+ str(op.dt_per_export) + "_" + str(int(nx*220))+"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma), bath)
 
 bath_real = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_440_1')
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
@@ -201,9 +157,3 @@ bath_real_mod = Function(V).interpolate(conditional(x > 70, bath_real, Constant(
 print('subdomain')
 
 print(fire.errornorm(bath_mod, bath_real_mod))
-<<<<<<< HEAD
-
-print('tolerance')
-print(r_tol)
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a

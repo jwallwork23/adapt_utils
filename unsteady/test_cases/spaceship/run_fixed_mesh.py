@@ -1,3 +1,5 @@
+from thetis import create_directory, print_output, File, COMM_WORLD
+
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
@@ -5,7 +7,6 @@ import os
 import sys
 from time import perf_counter
 
-from adapt_utils.io import create_directory, print_output, File, COMM_WORLD
 from adapt_utils.plotting import *  # NOQA
 from adapt_utils.swe.turbine.solver import AdaptiveTurbineProblem
 from adapt_utils.unsteady.test_cases.spaceship.options import SpaceshipOptions

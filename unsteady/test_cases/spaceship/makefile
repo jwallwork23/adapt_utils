@@ -1,12 +1,3 @@
-<<<<<<< HEAD
-all: mesh
-
-mesh:
-	gmsh -2 spaceship.geo
-
-plot:
-	python3 plot_setup.py
-=======
 all: clean mesh plot
 
 mesh:
@@ -21,4 +12,3 @@ plot:
 clean:
 	@echo "Cleaning directory..."
 	@rm -Rf *.msh
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a

@@ -1,16 +1,4 @@
 r"""
-<<<<<<< HEAD
-Test mesh movement and metric based adaptation in the steady state case for analytically defined sensor
-functions.
-
-Sensors as defined in
-
-Olivier, Géraldine. Anisotropic metric-based mesh adaptation for unsteady CFD simulations involving moving geometries. Diss. 2011.
-"""
-import pytest
-import os
-# import matplotlib.pyplot as plt
-=======
 Test mesh movement and metric based adaptation in the steady state case for analytically defined
 sensor functions.
 
@@ -24,7 +12,6 @@ from firedrake import *
 import pytest
 import os
 import matplotlib.pyplot as plt
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 from adapt_utils import *
 from adapt_utils.test.adapt.sensors import *
@@ -44,11 +31,7 @@ def normalisation(request):
     return request.param
 
 
-<<<<<<< HEAD
-@pytest.fixture(params=[1, 2, 'inf'])
-=======
 @pytest.fixture(params=[1, 2, None])
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 def norm_order(request):
     return request.param
 
@@ -57,16 +40,6 @@ def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False):
     if os.environ.get('FIREDRAKE_ADAPT') == '0':
         pytest.xfail("Firedrake installation does not include Pragmatic")
 
-<<<<<<< HEAD
-    kwargs = {
-        'h_min': 1.0e-06,
-        'h_max': 1.0e-01,
-        'num_adapt': 4,
-        'normalisation': normalisation,
-        'norm_order': norm_order,
-    }
-    op = Options(**kwargs)  # NOQA  TODO
-=======
     # Set parameters
     kwargs = {
         'approach': 'hessian',
@@ -109,7 +82,6 @@ def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False):
             pytest.xfail("Needed to set up the test. Please try again.")
     loaded = np.load(os.path.join(fpath, 'data', fname + '.npy'))
     assert np.allclose(newmesh.coordinates.dat.data, loaded), "Mesh does not match data"
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 
 # ---------------------------
@@ -117,12 +89,7 @@ def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False):
 # ---------------------------
 
 if __name__ == '__main__':
-<<<<<<< HEAD
-    for f in [bowl, hyperbolic, multiscale, interweaved]:
-        test_metric_based(f, 'complexity', 1, plot_mesh=True)
-=======
     for f in (bowl, hyperbolic, multiscale, interweaved):
         for n in ('complexity', 'error'):
             for p in (1, 2, None):
                 test_metric_based(f, n, p, plot_mesh=True)
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
