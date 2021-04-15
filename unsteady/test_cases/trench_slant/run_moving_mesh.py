@@ -18,10 +18,10 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 0.5
-ny = 0.5
+nx = 0.2
+ny = 0.4
 alpha = 7
-beta = 0
+beta = 1
 gamma = 1
 
 inputdir = 'hydrodynamics_trench_slant_'  + str(nx)
@@ -90,7 +90,7 @@ new_mesh = RectangleMesh(16*5*4, 5*4, 16, 1.1)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_bathymetry(bath, "adapt_output/hydrodynamics_trench_slant_bath_"+str(alpha) + "_" + str(beta) + '_' + str(gamma) + '-' + str(nx))
+#export_bathymetry(bath, "adapt_output/hydrodynamics_trench_slant_bath_"+str(alpha) + "_" + str(beta) + '_' + str(gamma) + '-' + str(nx))
 
 bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
 

@@ -15,6 +15,12 @@ Includes:
     Japan: Inversion analysis based on dispersive tsunami simulations" (2011), Geophysical Research
     Letters, 38(7).
 
+## Additional software dependencies
+
+  * `clawpack` (install as described at https://www.clawpack.org/installing.html and set the `$CLAW` environment variable to the root directory)
+  * `pyadolc` (install as described at https://github.com/b45ch1/pyadolc)
+  * `WIN` (install as described at http://wwweic.eri.u-tokyo.ac.jp/WIN/pub/win/)
+
 [GEBCO]: https://www.gebco.net "GEBCO"
 [NOAA]: https://www.ngdc.noaa.gov/mgg/global "NOAA"
 [PARI]: https://www.pari.go.jp/en/ "PARI"

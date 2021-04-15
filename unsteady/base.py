@@ -97,7 +97,7 @@ class AdaptiveProblemBase(object):
         op.print_debug(op.indent + "SETUP: Creating solutions...")
         self.create_solutions()
         op.print_debug(op.indent + "SETUP: Creating fields...")
-        self.set_fields(init=True)
+        self.set_fields(init=1)
         op.print_debug(op.indent + "SETUP: Setting stabilisation parameters...")
         self.set_stabilisation()
         op.print_debug(op.indent + "SETUP: Setting boundary conditions...")
@@ -418,12 +418,12 @@ class AdaptiveProblemBase(object):
             self.mesh_movers[i] = MeshMover(*args, **kwargs)
         self.op.print_debug("MESH MOVEMENT: Done!")
 
-    def move_mesh(self, i):
+    def move_mesh(self, i, init = False):
         # TODO: documentation
         if self.op.approach in ('lagrangian', 'ale'):  # TODO: Make more robust (apply BCs etc.)
             self.move_mesh_ale(i)
         elif self.mesh_movers[i] is not None:
-            self.move_mesh_monge_ampere(i)
+            self.move_mesh_monge_ampere(i, init)
 
     def move_mesh_ale(self, i):
         # TODO: documentation
@@ -466,7 +466,7 @@ class AdaptiveProblemBase(object):
             import warnings
             warnings.warn("WARNING: Mesh has {:d} inverted element(s)!".format(num_inverted))
 
-    def move_mesh_monge_ampere(self, i):  # TODO: Annotation
+    def move_mesh_monge_ampere(self, i, init):  # TODO: Annotation
         """
         Move the physical mesh using a monitor based approach driven by solutions of a Monge-Ampere
         type equation.
@@ -511,5 +511,5 @@ class AdaptiveProblemBase(object):
 
         # Re-interpolate fields
         self.op.print_debug("MESH MOVEMENT: Re-interpolating fields...")
-        self.set_fields()
+        self.set_fields(init)
         self.op.print_debug("MESH MOVEMENT: Done!")
