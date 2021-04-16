@@ -42,8 +42,8 @@ def initialise_fields(mesh2d, inputdir):
 
 t1 = time.time()
 
-nx = 3
-ny = 3
+nx = 4
+ny = 4
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -77,7 +77,7 @@ bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bath
 
 export_final_state("fixed_output/bath_fixed_"+str(int(nx*30)) + '_' + str(int(ny*8)), bath)
 
-bath_real = initialise_fields(new_mesh, 'fixed_output/bath_fixed_300_80')
+bath_real = initialise_fields(new_mesh, 'fixed_output/bath_fixed_600_160')
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
