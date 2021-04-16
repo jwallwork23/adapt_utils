@@ -567,8 +567,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     debug(self.op.sediment_model.salfa.dat.data,
                           self.intermediary_solutions_salfa[i].dat.data,
                           "salfa")
-                    debug(self.op.sediment_model.strss.dat.data,
-                          self.intermediary_solutions_strss[i].dat.data,
+                    debug(self.op.sediment_model.stress.dat.data,
+                          self.intermediary_solutions_stress[i].dat.data,
                           "stress")
                     debug(self.op.sediment_model.cparam.dat.data,
                           self.intermediary_solutions_cparam[i].dat.data,

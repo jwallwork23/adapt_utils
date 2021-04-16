@@ -491,7 +491,7 @@ class AdaptiveProblemBase(object):
 
         # Update intermediary mesh coordinates
         self.op.print_debug("MESH MOVEMENT: Updating intermediary mesh coordinates...")
-        self.intermediary_meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
+        self.intermediary_meshes[i].coordinates.assign(self.mesh_movers[i].x)
         self.op.print_debug("MESH MOVEMENT: Done!")
 
         # Project a copy of the current solution onto mesh defined on new coordinates

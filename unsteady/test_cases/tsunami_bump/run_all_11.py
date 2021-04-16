@@ -1,8 +1,8 @@
 from moving_func import *
 
 alpha = 11
-nx = 3
-ny = 3
+nx = 4
+ny = 4
 
 filename = 'nx_' + str(nx) + '_alpha_' + str(alpha) + '.txt'
 
