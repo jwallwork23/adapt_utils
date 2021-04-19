@@ -45,14 +45,14 @@ def initialise_fields(mesh2d, inputdir):
         chk.close()
     return bath
 
-nx = 3
-ny = 3
+nx = 1
+ny = 1
 
-alpha =3
-mod =0
+alpha =7
+mod =1
 beta = 1
-gamma = 1
-beta_mod = 1
+gamma = 0
+beta_mod = 5
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -141,7 +141,7 @@ new_mesh = RectangleMesh(600, 160, 30, 8)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("adapt_output/bath_fixed_" + str(op.dt_per_export) + "_" +str(int(nx*30)) + "_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + '_' + str(mod), bath)
+#export_final_state("adapt_output/bath_fixed_" + str(op.dt_per_export) + "_" +str(int(nx*30)) + "_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + '_' + str(mod), bath)
 
 bath_real = initialise_fields(new_mesh, 'fixed_output/bath_fixed_600_160')
 

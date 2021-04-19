@@ -78,8 +78,8 @@ class BeachOptions(CoupledOptions):
         else:
             self.dt = 0.025
         self.end_time = 20
-        self.dt_per_mesh_movement = 20
-        self.dt_per_export = 20
+        self.dt_per_mesh_movement = 16 #20
+        self.dt_per_export = 16 #20
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 
