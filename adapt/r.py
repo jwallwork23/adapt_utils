@@ -9,8 +9,8 @@
 """
 from thetis import *
 from adapt_utils.options import Options
-from adapt_utils.params import serial_quasi_newton, parallel_quasi_newton  # noqa
-from pyadjoint import AdjFloat
+from adapt_utils.params import serial_quasi_newton, parallel_quasi_newton
+from pyadjoint import AdjFloat, no_annotations
 
 
 __all__ = ["MeshMover"]
@@ -19,10 +19,10 @@ __all__ = ["MeshMover"]
 class MeshMover(object):
     r"""
     A class dedicated to performing mesh r-adaptation. Given a source mesh and a monitor function
-    :math: `m`, the new mesh is established by relocating the vertices of the original mesh. That is,
-    the topology remains unchanged.
+    :math: `m`, the new mesh is established by relocating the vertices of the original mesh. That
+    is, the topology remains unchanged.
 
-    At present, the mesh movement is determined by solving the Monge-Ampère type equation
+    The mesh movement is determined by solving the Monge-Ampère type equation
 
 ..  math::
         m(x)\det(I + H(\phi)) = \theta,
@@ -31,38 +31,42 @@ class MeshMover(object):
     normalising constant and :math:`H(\phi)` denotes the Hessian of :math:`\phi` with respect to
     coordinates on the computational mesh.
 
-    The implementation is an object-oriented version of that given in [1].
+    The implementation is an object-oriented version of that given in [1], extended to account
+    for boundary conditions:
+        * `bc is None` implies that the mesh is only moved tangential to the boundary, as a
+          post-processing step. This uses the `EquationBC` construct;
+        * `bc == []` implies free-slip conditions with no post-processing. This does not
+          guarantee that the mesh will only move tangential to the boundary, although it is
+          approximately true for simple domains;
+        * setting `bc` to a `DirichletBC` will fix the boundary mesh nodes as a post-processing
+          step.
     """
     def __init__(self, mesh, monitor_function, **kwargs):
         self.mesh = mesh
         self.dim = self.mesh.topological_dimension()
-        try:
-            assert self.dim == 2
-        except AssertionError:
+        if self.dim != 2:
             raise NotImplementedError("r-adaptation only currently considered in 2D.")
         self.monitor_function = monitor_function
         self.method = kwargs.get('method', 'monge_ampere')
         if self.method != 'monge_ampere':
-            raise NotImplementedError  # TODO: Other options, e.g. MMPDE
+            raise NotImplementedError
         self.op = kwargs.get('op', Options())
         self.nonlinear_method = kwargs.get('nonlinear_method', self.op.nonlinear_method)
         assert self.nonlinear_method in ('quasi_newton', 'relaxation')
         self.bc = kwargs.get('bc')
         self.bbc = kwargs.get('bbc')
-        self.ξ = Function(self.mesh.coordinates)  # Computational coordinates
-        self.x = Function(self.mesh.coordinates)  # Physical coordinates
+        self.ξ = Function(self.mesh.coordinates, name="Computational coordinates")
+        self.x = Function(self.mesh.coordinates, name="Physical coordinates")
         self.I = Identity(self.dim)
-        self.dt = Constant(self.op.dt)
         self.pseudo_dt = Constant(self.op.pseudo_dt)
 
         # Create functions and solvers
         self._create_function_spaces()
         self._create_functions()
+        self._initialise_sigma()
         self._setup_equidistribution()
         self._setup_l2_projector()
-        self._initialise_sigma()
-        if self.nonlinear_method != 'quasi_newton':
-            self._setup_pseudotimestepper()
+        self._setup_pseudotimestepper()
 
         # Outputs
         if self.op.debug and self.op.debug_mode == 'full':
@@ -93,13 +97,20 @@ class MeshMover(object):
             self.φ_new, self.σ_new = split(self.φσ)
             self.φσ_temp = Function(self.W)
             self.φ_old, self.σ_old = split(self.φσ_temp)
-        self.θ = Constant(0.0)  # Normalisation parameter
+
+        # Normalisation parameter and monitor function
+        self.θ = Constant(0.0)
         self.monitor = Function(self.P1, name="Monitor function")
         self.update_monitor_function()
-        self.volume = Function(self.P0, name="Mesh volume").assign(assemble(self.p0test*dx))
-        self.original_volume = assemble(self.p0test*dx)
-        self.total_volume = assemble(Constant(1.0)*dx(domain=self.mesh))
         self.L_p0 = self.p0test*self.monitor*dx
+
+        # Volumes
+        self.original_volume = assemble(self.p0test*dx)
+        self.volume = Function(self.P0, name="Mesh volume")
+        self.volume.assign(self.original_volume)
+        self.total_volume = assemble(Constant(1.0)*dx(domain=self.mesh))
+
+        # Gradients
         self.grad_φ_cts = Function(self.P1_vec, name="L2 projected gradient")
         self.grad_φ_dg = Function(self.mesh.coordinates, name="Discontinuous gradient")
 
@@ -112,40 +123,45 @@ class MeshMover(object):
 
     def _setup_pseudotimestepper(self):
         if not self.nonlinear_method == 'relaxation':
-            raise ValueError("Pseudotimestepping is only used when a 'relaxation' approach is used.")
+            return
         φ, ψ = TrialFunction(self.V), TestFunction(self.V)
+        residual = self.total_volume*self.monitor*det(self.I + self.σ_old) - self.θ
+
         a = dot(grad(ψ), grad(φ))*dx
-        L = dot(grad(ψ), grad(self.φ_old))*dx
-        L += self.pseudo_dt*ψ*(self.total_volume*self.monitor*det(self.I + self.σ_old) - self.θ)*dx
+        L = dot(grad(ψ), grad(self.φ_old))*dx \
+            + self.pseudo_dt*ψ*residual*dx
         prob = LinearVariationalProblem(a, L, self.φ_new)
-        kwargs = {
-            'solver_parameters': {
+
+        self.pseudotimestepper = LinearVariationalSolver(
+            prob,
+            solver_parameters={
                 'snes_type': 'ksponly',
                 'ksp_type': 'cg',
                 'pc_type': 'gamg',
             },
-            'nullspace': self.V_nullspace,
-            'transpose_nullspace': self.V_nullspace,
-        }
-        self.pseudotimestepper = LinearVariationalSolver(prob, **kwargs)
+            nullspace=self.V_nullspace,
+            transpose_nullspace=self.V_nullspace,
+        )
 
     def _setup_residuals(self):
         ψ = TestFunction(self.V)
         self.θ_form = self.monitor*det(self.I + self.σ_old)*dx
-        self.residual_l2_form = ψ*(self.monitor*det(self.I + self.σ_old) - self.θ/self.total_volume)*dx
+        residual = self.monitor*det(self.I + self.σ_old) - self.θ/self.total_volume
+        self.residual_l2_form = ψ*residual*dx
         self.norm_l2_form = ψ*self.θ/self.total_volume*dx
 
     def _apply_map(self):
-        """
+        r"""
         Transfer L2 projected gradient from P1 to P1DG space and use it to perform the coordinate
-        transform between computational and physical mesh.
-        """
-        # par_loop(('{[i, j] : 0 <= i < cg.dofs and 0 <= j < 2}', 'dg[i, j] = cg[i, j]'), dx,
-        #          {'cg': (self.grad_φ_cts, READ), 'dg': (self.grad_φ_dg, WRITE)},
-        #          is_loopy_kernel=True)
-        self.grad_φ_dg.interpolate(self.grad_φ_cts)
-        self.x.assign(self.ξ + self.grad_φ_dg)  # x = ξ + grad(φ)
+        transform between computational and physical mesh:
 
+      ..math::
+            \mathbf x = \boldsymbol\xi + \nabla\phi.
+        """
+        self.grad_φ_dg.interpolate(self.grad_φ_cts)
+        self.x.assign(self.ξ + self.grad_φ_dg)
+
+    @no_annotations
     def get_diagnostics(self):
         """
         Compute
@@ -182,19 +198,20 @@ class MeshMover(object):
         if self.nonlinear_method == 'relaxation':
             σ, τ = TrialFunction(self.V_ten), TestFunction(self.V_ten)
             a = inner(τ, σ)*dx
-            L = -dot(div(τ), grad(self.φ_new))*dx
-            # L += (τ[0, 0]*n[0]*self.φ_new.dx(0) + τ[1, 1]*n[1]*self.φ_new.dx(1))*ds
-            L += (τ[0, 1]*n[1]*self.φ_new.dx(0) + τ[1, 0]*n[0]*self.φ_new.dx(1))*ds
+            L = -dot(div(τ), grad(self.φ_new))*dx \
+                + τ[0, 1]*n[1]*self.φ_new.dx(0)*ds \
+                + τ[1, 0]*n[0]*self.φ_new.dx(1)*ds
             prob = LinearVariationalProblem(a, L, self.σ_new)
             params = {'ksp_type': 'cg'}
             self.equidistribution = LinearVariationalSolver(prob, solver_parameters=params)
         else:
             φ, σ = TrialFunctions(self.W)
             ψ, τ = TestFunctions(self.W)
-            F = inner(τ, self.σ_new)*dx + dot(div(τ), grad(self.φ_new))*dx
-            # F -= (τ[0, 0]*n[0]*self.φ_new.dx(0) + τ[1, 1]*n[1]*self.φ_new.dx(1))*ds
-            F -= (τ[0, 1]*n[1]*self.φ_new.dx(0) + τ[1, 0]*n[0]*self.φ_new.dx(1))*ds
-            F -= ψ*(self.monitor*det(self.I + self.σ_new) - self.θ)*dx
+            F = inner(τ, self.σ_new)*dx \
+                + dot(div(τ), grad(self.φ_new))*dx \
+                - τ[0, 1]*n[1]*self.φ_new.dx(0)*ds \
+                - τ[1, 0]*n[0]*self.φ_new.dx(1)*ds \
+                - ψ*(self.monitor*det(self.I + self.σ_new) - self.θ)*dx
 
             def generate_m(cursol):
                 with self.φσ_temp.dat.vec as v:
@@ -218,8 +235,7 @@ class MeshMover(object):
 
             prob = NonlinearVariationalProblem(F, self.φσ, Jp=Jp)
             nullspace = MixedVectorSpaceBasis(self.W, [self.V_nullspace, self.W.sub(1)])
-            params = serial_quasi_newton
-            # params = parallel_quasi_newton
+            params = serial_quasi_newton if COMM_WORLD.size == 1 else parallel_quasi_newton
             params["snes_rtol"] = self.op.r_adapt_rtol
             if self.op.debug:
                 # params["ksp_monitor"] = None
@@ -259,9 +275,9 @@ class MeshMover(object):
         σ, τ = TrialFunction(self.V_ten), TestFunction(self.V_ten)
         n = FacetNormal(self.mesh)
         a = inner(τ, σ)*dx
-        L = -dot(div(τ), grad(self.φ_new))*dx
-        # L += (τ[0, 0]*n[0]*self.φ_new.dx(0) + τ[1, 1]*n[1]*self.φ_new.dx(1))*ds
-        L += (τ[0, 1]*n[1]*self.φ_new.dx(0) + τ[1, 0]*n[0]*self.φ_new.dx(1))*ds
+        L = -dot(div(τ), grad(self.φ_new))*dx \
+            + τ[0, 1]*n[1]*self.φ_new.dx(0)*ds \
+            + τ[1, 0]*n[0]*self.φ_new.dx(1)*ds
         σ_init = Function(self.V_ten)
         solve(a == L, σ_init, solver_parameters={'ksp_type': 'cg'})
         if self.nonlinear_method == 'quasi_newton':
@@ -291,7 +307,7 @@ class MeshMover(object):
         a = dot(v_cts, u_cts)*dx
         L = dot(v_cts, grad(self.φ_old))*dx
 
-        if self.bc != []:
+        if self.bc is None:
 
             # Enforce no mesh movement normal to boundaries
             n = FacetNormal(self.mesh)
@@ -326,14 +342,14 @@ class MeshMover(object):
         """
         Apply mesh movement of Monge-Ampere type.
         """
-        rtol = self.op.r_adapt_rtol
+        rtol = rtol or self.op.r_adapt_rtol
         maxit = maxiter or self.op.r_adapt_maxit
         if self.nonlinear_method == 'quasi_newton':
             self.equidistribution.snes.setTolerances(rtol=rtol, max_it=maxit)
             self.equidistribution.snes.setMonitor(self.fakemonitor)
             self.equidistribution.solve()
             i = self.equidistribution.snes.getIterationNumber()
-            print_output("r-adaptation converged in {:d} iterations".format(i+1))
+            print_output(f"r-adaptation converged in {i+1} iterations")
             return
 
         assert self.nonlinear_method == 'relaxation'
@@ -362,10 +378,10 @@ class MeshMover(object):
                 initial_norm = residual_l2_norm  # Store to check for divergence
             print_output(self.msg.format(i, minmax, residual_l2_norm, equi))
             if residual_l2_norm < rtol:
-                print_output("r-adaptation converged in {:2d} iterations.".format(i+1))
+                print_output(f"r-adaptation converged in {i+1} iterations.")
                 break
             if residual_l2_norm > 2.0*initial_norm:
-                raise ConvergenceError("r-adaptation failed to converge in {:d} iterations.".format(i+1))
+                raise ConvergenceError(f"r-adaptation failed to converge in {i+1} iterations.")
 
             # Solve
             self.pseudotimestepper.solve()
@@ -373,4 +389,4 @@ class MeshMover(object):
             self.φ_old.assign(self.φ_new)
             self.σ_old.assign(self.σ_new)
             if i == maxit-1:
-                raise ConvergenceError("r-adaptation failed to converge in {:d} iterations.".format(i+1))
+                raise ConvergenceError(f"r-adaptation failed to converge in {i+1} iterations.")
