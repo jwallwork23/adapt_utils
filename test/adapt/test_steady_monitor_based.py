@@ -9,8 +9,6 @@ from [Weller et al. 2016].
 """
 from firedrake import *
 
-import matplotlib.pyplot as plt
-import numpy as np
 import os
 import pytest
 
@@ -19,27 +17,25 @@ from adapt_utils.options import Options
 from adapt_utils.plotting import *
 
 
-def ring(mesh):
+def ring(mesh=None, x=None):
     """
     An analytically defined monitor function which concentrates mesh density in
     a narrow ring within the unit square domain.
     """
-    x, y = SpatialCoordinate(mesh)
     alpha = 10.0  # Controls amplitude of the ring
     beta = 200.0  # Controls width of the ring
     gamma = 0.15  # Controls radius of the ring
-    return 1.0 + alpha*pow(cosh(beta*((x-0.5)*(x-0.5) + (y-0.5)*(y-0.5) - gamma)), -2)
+    return 1.0 + alpha*pow(cosh(beta*((x[0]-0.5)*(x[0]-0.5) + (x[1]-0.5)*(x[1]-0.5) - gamma)), -2)
 
 
-def bell(mesh):
+def bell(mesh=None, x=None):
     """
     An analytically defined monitor function which concentrates mesh density in
     a bell region within the unit square domain.
     """
-    x, y = SpatialCoordinate(mesh)
     alpha = 10.0  # Controls amplitude of the bell
     beta = 400.0  # Controls width of the bell
-    return 1.0 + alpha*pow(cosh(beta*((x-0.5)*(x-0.5) + (y-0.5)*(y-0.5))), -2)
+    return 1.0 + alpha*pow(cosh(beta*((x[0]-0.5)*(x[0]-0.5) + (x[1]-0.5)*(x[1]-0.5))), -2)
 
 
 # ---------------------------
@@ -57,6 +53,9 @@ def method(request):
 
 
 def test_analytical(monitor, method, plot_mesh=False):
+    """
+    Check that the moved mesh matches that obtained previously.
+    """
     fname = '_'.join([monitor.__name__, method])
     fpath = os.path.dirname(__file__)
 
@@ -72,6 +71,7 @@ def test_analytical(monitor, method, plot_mesh=False):
     assert np.allclose(orig_vol, vol), "Volume is not conserved!"
 
     if plot_mesh:
+        import matplotlib.pyplot as plt
         fig, axes = plt.subplots(figsize=(5, 5))
         triplot(mesh, axes=axes, interior_kw={'linewidth': 0.1}, boundary_kw={'color': 'k'})
         axes.axis(False)
