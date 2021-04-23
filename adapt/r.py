@@ -10,6 +10,7 @@
 from thetis import *
 from adapt_utils.options import Options
 from adapt_utils.params import serial_quasi_newton, parallel_quasi_newton  # noqa
+from pyadjoint import AdjFloat
 
 
 __all__ = ["MeshMover"]
@@ -44,7 +45,8 @@ class MeshMover(object):
         if self.method != 'monge_ampere':
             raise NotImplementedError  # TODO: Other options, e.g. MMPDE
         self.op = kwargs.get('op', Options())
-        assert self.op.nonlinear_method in ('quasi_newton', 'relaxation')
+        self.nonlinear_method = kwargs.get('nonlinear_method', self.op.nonlinear_method)
+        assert self.nonlinear_method in ('quasi_newton', 'relaxation')
         self.bc = kwargs.get('bc')
         self.bbc = kwargs.get('bbc')
         self.ξ = Function(self.mesh.coordinates)  # Computational coordinates
@@ -59,7 +61,7 @@ class MeshMover(object):
         self._setup_equidistribution()
         self._setup_l2_projector()
         self._initialise_sigma()
-        if self.op.nonlinear_method != 'quasi_newton':
+        if self.nonlinear_method != 'quasi_newton':
             self._setup_pseudotimestepper()
 
         # Outputs
@@ -81,7 +83,7 @@ class MeshMover(object):
         self.p0test = TestFunction(self.P0)
 
     def _create_functions(self):
-        if self.op.nonlinear_method == 'relaxation':
+        if self.nonlinear_method == 'relaxation':
             self.φ_old = Function(self.V)
             self.φ_new = Function(self.V)
             self.σ_old = Function(self.V_ten)
@@ -105,35 +107,43 @@ class MeshMover(object):
         """
         Update the monitor function based on the current mesh.
         """
-        if self.monitor_function is not None:
-            self.monitor.interpolate(self.monitor_function(self.mesh))
+        assert self.monitor_function is not None
+        self.monitor.interpolate(self.monitor_function(mesh=self.mesh, x=self.x))
 
     def _setup_pseudotimestepper(self):
-        if not self.op.nonlinear_method == 'relaxation':
+        if not self.nonlinear_method == 'relaxation':
             raise ValueError("Pseudotimestepping is only used when a 'relaxation' approach is used.")
         φ, ψ = TrialFunction(self.V), TestFunction(self.V)
         a = dot(grad(ψ), grad(φ))*dx
         L = dot(grad(ψ), grad(self.φ_old))*dx
-        L += self.pseudo_dt*ψ*(self.monitor*det(self.I + self.σ_old) - self.θ)*dx
+        L += self.pseudo_dt*ψ*(self.total_volume*self.monitor*det(self.I + self.σ_old) - self.θ)*dx
         prob = LinearVariationalProblem(a, L, self.φ_new)
-        kwargs = {'solver_parameters': {'ksp_type': 'cg', 'pc_type': 'gamg'},
-                  'nullspace': self.V_nullspace, 'transpose_nullspace': self.V_nullspace}
+        kwargs = {
+            'solver_parameters': {
+                'snes_type': 'ksponly',
+                'ksp_type': 'cg',
+                'pc_type': 'gamg',
+            },
+            'nullspace': self.V_nullspace,
+            'transpose_nullspace': self.V_nullspace,
+        }
         self.pseudotimestepper = LinearVariationalSolver(prob, **kwargs)
 
     def _setup_residuals(self):
         ψ = TestFunction(self.V)
         self.θ_form = self.monitor*det(self.I + self.σ_old)*dx
-        self.residual_l2_form = ψ*(self.monitor*det(self.I + self.σ_old) - self.θ)*dx
-        self.norm_l2_form = ψ*self.θ*dx
+        self.residual_l2_form = ψ*(self.monitor*det(self.I + self.σ_old) - self.θ/self.total_volume)*dx
+        self.norm_l2_form = ψ*self.θ/self.total_volume*dx
 
     def _apply_map(self):
         """
         Transfer L2 projected gradient from P1 to P1DG space and use it to perform the coordinate
         transform between computational and physical mesh.
         """
-        par_loop(('{[i, j] : 0 <= i < cg.dofs and 0 <= j < 2}', 'dg[i, j] = cg[i, j]'), dx,
-                 {'cg': (self.grad_φ_cts, READ), 'dg': (self.grad_φ_dg, WRITE)},
-                 is_loopy_kernel=True)
+        # par_loop(('{[i, j] : 0 <= i < cg.dofs and 0 <= j < 2}', 'dg[i, j] = cg[i, j]'), dx,
+        #          {'cg': (self.grad_φ_cts, READ), 'dg': (self.grad_φ_dg, WRITE)},
+        #          is_loopy_kernel=True)
+        self.grad_φ_dg.interpolate(self.grad_φ_cts)
         self.x.assign(self.ξ + self.grad_φ_dg)  # x = ξ + grad(φ)
 
     def get_diagnostics(self):
@@ -169,7 +179,7 @@ class MeshMover(object):
         nonlinear iterations.
         """
         n = FacetNormal(self.mesh)
-        if self.op.nonlinear_method == 'relaxation':
+        if self.nonlinear_method == 'relaxation':
             σ, τ = TrialFunction(self.V_ten), TestFunction(self.V_ten)
             a = inner(τ, σ)*dx
             L = -dot(div(τ), grad(self.φ_new))*dx
@@ -199,7 +209,7 @@ class MeshMover(object):
                 self.mesh.coordinates.assign(self.ξ)
 
                 # Evaluate normalisation coefficient
-                self.θ.assign(assemble(self.θ_form)/self.total_volume)
+                self.θ.assign(AdjFloat(assemble(self.θ_form)))
 
             self.generate_m = generate_m
 
@@ -229,7 +239,7 @@ class MeshMover(object):
 
                 self.mesh.coordinates.assign(self.x)
                 assemble(self.L_p0, tensor=self.volume)  # For equidistribution measure
-                self.volume /= self.original_volume
+                self.volume.assign(self.volume/self.original_volume)
                 if self.op.debug and self.op.debug_mode == 'full':
                     self.monitor_file.write(self.monitor)
                     self.volume_file.write(self.volume)
@@ -254,7 +264,7 @@ class MeshMover(object):
         L += (τ[0, 1]*n[1]*self.φ_new.dx(0) + τ[1, 0]*n[0]*self.φ_new.dx(1))*ds
         σ_init = Function(self.V_ten)
         solve(a == L, σ_init, solver_parameters={'ksp_type': 'cg'})
-        if self.op.nonlinear_method == 'quasi_newton':
+        if self.nonlinear_method == 'quasi_newton':
             self.φσ.sub(1).assign(σ_init)
         else:
             self.σ_new.assign(σ_init)
@@ -281,46 +291,52 @@ class MeshMover(object):
         a = dot(v_cts, u_cts)*dx
         L = dot(v_cts, grad(self.φ_old))*dx
 
-        # Enforce no mesh movement normal to boundaries
-        n = FacetNormal(self.mesh)
-        a_bc = dot(u_cts, n)*dot(v_cts, n)*ds
-        L_bc = Constant(0.0)*dot(v_cts, n)*ds
-        if self.bc is None:
-            self.bc = [EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary')]
+        if self.bc != []:
 
-        # Allow tangential movement, but only up until the end of boundary segments
-        s = as_vector([n[1], -n[0]])
-        a_bc = dot(u_cts, s)*dot(v_cts, s)*ds
-        L_bc = dot(grad(self.φ_old), s)*dot(v_cts, s)*ds
-        if self.bbc is None:
-            edges = set(self.mesh.exterior_facets.unique_markers)
-            if len(edges) > 1:
-                corners = [(i, j) for i in edges for j in edges.difference([i])]
-                self.bbc = DirichletBC(self.P1_vec, 0, corners)
-        self.bc.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary', bcs=self.bbc))
+            # Enforce no mesh movement normal to boundaries
+            n = FacetNormal(self.mesh)
+            a_bc = dot(u_cts, n)*dot(v_cts, n)*ds
+            L_bc = Constant(0.0)*dot(v_cts, n)*ds
+            self.bc = [self.bc or EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary')]
+
+            # Allow tangential movement, but only up until the end of boundary segments
+            s = as_vector([n[1], -n[0]])
+            a_bc = dot(u_cts, s)*dot(v_cts, s)*ds
+            L_bc = dot(grad(self.φ_old), s)*dot(v_cts, s)*ds
+            if self.bbc is None:
+                edges = set(self.mesh.exterior_facets.unique_markers)
+                if len(edges) > 1:
+                    corners = [(i, j) for i in edges for j in edges.difference([i])]
+                    self.bbc = DirichletBC(self.P1_vec, 0, corners)
+            if self.bbc != []:
+                self.bc.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary', bcs=self.bbc))
 
         # Create solver
         prob = LinearVariationalProblem(a, L, self.grad_φ_cts, bcs=self.bc)
         self.l2_projector = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
 
-    def adapt(self):
+    def adapt(self, **kwargs):
         """
         Run the desired mesh movement algorithm.
         """
         if self.method == 'monge_ampere':
-            self.adapt_monge_ampere()
+            self.adapt_monge_ampere(**kwargs)
 
-    def adapt_monge_ampere(self):
+    def adapt_monge_ampere(self, rtol=None, maxiter=None):
         """
         Apply mesh movement of Monge-Ampere type.
         """
-        if self.op.nonlinear_method == 'quasi_newton':
+        rtol = self.op.r_adapt_rtol
+        maxit = maxiter or self.op.r_adapt_maxit
+        if self.nonlinear_method == 'quasi_newton':
+            self.equidistribution.snes.setTolerances(rtol=rtol, max_it=maxit)
             self.equidistribution.snes.setMonitor(self.fakemonitor)
             self.equidistribution.solve()
+            i = self.equidistribution.snes.getIterationNumber()
+            print_output("r-adaptation converged in {:d} iterations".format(i+1))
             return
 
-        assert self.op.nonlinear_method == 'relaxation'
-        maxit = self.op.r_adapt_maxit
+        assert self.nonlinear_method == 'relaxation'
         for i in range(maxit):
 
             # Perform L2 projection and generate coordinates appropriately
@@ -331,26 +347,30 @@ class MeshMover(object):
             self.mesh.coordinates.assign(self.x)
             self.update_monitor_function()
             assemble(self.L_p0, tensor=self.volume)  # For equidistribution measure
-            self.volume /= self.original_volume
+            self.volume.assign(self.volume/self.original_volume)
             if self.op.debug and self.op.debug_mode == 'full':
                 self.monitor_file.write(self.monitor)
                 self.volume_file.write(self.volume)
             self.mesh.coordinates.assign(self.ξ)
 
             # Evaluate normalisation coefficient
-            self.θ.assign(assemble(self.θ_form)/self.total_volume)
+            self.θ.assign(AdjFloat(assemble(self.θ_form)))
 
             # Convergence criteria
             minmax, residual_l2_norm, equi = self.get_diagnostics()
             if i == 0:
                 initial_norm = residual_l2_norm  # Store to check for divergence
             print_output(self.msg.format(i, minmax, residual_l2_norm, equi))
-            if residual_l2_norm < self.op.r_adapt_rtol:
+            if residual_l2_norm < rtol:
                 print_output("r-adaptation converged in {:2d} iterations.".format(i+1))
                 break
             if residual_l2_norm > 2.0*initial_norm:
                 raise ConvergenceError("r-adaptation failed to converge in {:d} iterations.".format(i+1))
+
+            # Solve
             self.pseudotimestepper.solve()
             self.equidistribution.solve()
             self.φ_old.assign(self.φ_new)
             self.σ_old.assign(self.σ_new)
+            if i == maxit-1:
+                raise ConvergenceError("r-adaptation failed to converge in {:d} iterations.".format(i+1))
