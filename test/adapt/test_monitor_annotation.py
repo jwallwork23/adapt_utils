@@ -14,20 +14,40 @@ import pytest
 
 
 def qoi1(x):
-    return x[0]*x[1]*dx
-
-
-def qoi2(x):
+    """
+    Some nonlinear functional.
+    """
     return inner(x, x)*dx
 
 
-# @pytest.fixture(params=['quasi_newton', 'relaxation'])  # FIXME
+def qoi2(x):
+    """
+    Error of coordinates against some
+    other coordinates, `x0`, with the
+    same boundary values.
+    """
+    x0 = Function(x)
+    x0.interpolate(as_vector([
+        x[0]*(1-x[0]),
+        x[1]*(1-x[1]),
+    ]))
+    return inner(x-x0, x-x0)*dx
+
+
+# ---------------------------
+# standard tests for pytest
+# ---------------------------
+
+@pytest.fixture(params=['ring', 'bell'])
+def monitor(request):
+    return request.param
+
+
 @pytest.fixture(params=['relaxation'])
 def nonlinear_method(request):
     return request.param
 
 
-# @pytest.fixture(params=['alpha', 'beta', 'gamma'])  # FIXME
 @pytest.fixture(params=['alpha', 'beta'])
 def ctrl(request):
     return request.param
@@ -44,7 +64,7 @@ def qoi(request):
     return request.param
 
 
-def test_adjoint(nonlinear_method, ctrl, bnd, qoi):
+def test_adjoint(monitor, nonlinear_method, ctrl, bnd, qoi):
     """
     Test replay and gradient for control `ctrl`, boundary condition `bnd` and quantity of
     interest `qoi`.
@@ -60,16 +80,23 @@ def test_adjoint(nonlinear_method, ctrl, bnd, qoi):
     elif ctrl == 'beta':
         init = 200.0
         control = Control(beta)
-    else:
-        init = 0.15
-        control = Control(gamma)
 
     def ring(x=None, **kwargs):
         """
-        Ring shaped monitor function
+        An analytically defined monitor function which concentrates mesh density in
+        a narrow ring within the unit square domain.
         """
         r = dot(x, x)
         return Constant(1.0) + alpha*pow(cosh(beta*(r - gamma)), -2)
+
+
+    def bell(mesh=None, x=None):
+        """
+        An analytically defined monitor function which concentrates mesh density in
+        a bell region within the unit square domain.
+        """
+        r = dot(x, x)
+        return 1.0 + alpha*pow(cosh(0.5*beta*r), -2)
 
     # Setup mesh
     with stop_annotating():
@@ -89,22 +116,29 @@ def test_adjoint(nonlinear_method, ctrl, bnd, qoi):
         bc, bbc = None, None
 
     # Move mesh
-    mm = MeshMover(mesh, ring, bc=bc, bbc=bbc, nonlinear_method=nonlinear_method)
+    mm = MeshMover(
+        mesh, ring if monitor == 'ring' else bell,
+        bc=bc, bbc=bbc, nonlinear_method=nonlinear_method,
+    )
     mm.adapt(rtol=rtol, maxiter=maxiter)
 
-    # Compute some QoI
+    # Evaluate some functional
     J = assemble(qoi(mm.x))
     stop_annotating()
 
-    # Test
+    # Test replay given same input
     Jhat = ReducedFunctional(J, control)
     c = Constant(init)
     JJ = Jhat(c)
     assert np.isclose(J, JJ), f"{J} != {JJ}"
+
+    # Test replay given different input
     c = Constant(1.1*init)
     JJ = Jhat(c)
     JJJ = Jhat(c)
     assert np.isclose(JJ, JJJ), f"{JJ} != {JJJ}"
+
+    # Taylor test
     c = Constant(init)
     dc = Constant(1.0)
     minconv = taylor_test(Jhat, c, dc)
