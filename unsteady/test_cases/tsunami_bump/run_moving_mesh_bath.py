@@ -45,14 +45,14 @@ def initialise_fields(mesh2d, inputdir):
         chk.close()
     return bath
 
-nx = 3
-ny = 3
+nx = 1
+ny = 1
 
-alpha =3
-mod =0
+alpha =7
+mod =1
 beta = 1
-gamma = 1
-beta_mod = 1
+gamma = 0
+beta_mod = 5
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
