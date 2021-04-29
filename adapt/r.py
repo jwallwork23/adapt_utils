@@ -125,7 +125,7 @@ class MeshMover(object):
         if not self.nonlinear_method == 'relaxation':
             return
         φ, ψ = TrialFunction(self.V), TestFunction(self.V)
-        residual = self.total_volume*self.monitor*det(self.I + self.σ_old) - self.θ
+        residual = self.monitor*det(self.I + self.σ_old) - self.θ
 
         a = dot(grad(ψ), grad(φ))*dx
         L = dot(grad(ψ), grad(self.φ_old))*dx \
@@ -146,9 +146,9 @@ class MeshMover(object):
     def _setup_residuals(self):
         ψ = TestFunction(self.V)
         self.θ_form = self.monitor*det(self.I + self.σ_old)*dx
-        residual = self.monitor*det(self.I + self.σ_old) - self.θ/self.total_volume
+        residual = self.monitor*det(self.I + self.σ_old) - self.θ
         self.residual_l2_form = ψ*residual*dx
-        self.norm_l2_form = ψ*self.θ/self.total_volume*dx
+        self.norm_l2_form = ψ*self.θ*dx
 
     def _apply_map(self):
         r"""
@@ -226,7 +226,7 @@ class MeshMover(object):
                 self.mesh.coordinates.assign(self.ξ)
 
                 # Evaluate normalisation coefficient
-                self.θ.assign(AdjFloat(assemble(self.θ_form)))
+                self.θ.assign(assemble(self.θ_form)/self.total_volume)
 
             self.generate_m = generate_m
 
@@ -286,49 +286,40 @@ class MeshMover(object):
             self.σ_new.assign(σ_init)
 
     def _setup_l2_projector(self):
-        """
-        Setup solver which L2 projects the gradient of `φ_old` into P1 space as `grad_φ_cts`.
-
-        It is at this stage where we enforce that the domain boundary should not be changed. This is
-        done by imposing an `EquationBC` constraint on the normal component of `grad_φ_cts` being
-        zero. For solvability of the resulting system, we need to enforce an additional constraint.
-        For this, we say that the tangential component of `grad_φ_cts` should be equal to the
-        tangential component of `grad(φ_old)`. However, on it's own, this condition is insufficient
-        to avoid boundary deformation at the intersection between boundary segments. As such, we
-        need apply a Dirichlet condition at each intersection, stating that the tangential component
-        is zero.
-
-        NOTE: This implementation assumes all boundary segments are straight lines, meaning boundary
-              deformation may occur if this is not the case.
-        """
         u_cts, v_cts = TrialFunction(self.P1_vec), TestFunction(self.P1_vec)
-
-        # FEM problem for L2 projection
         a = dot(v_cts, u_cts)*dx
         L = dot(v_cts, grad(self.φ_old))*dx
+        bcs = []
+        for i in self.mesh.exterior_facets.unique_markers:
+            n = [assemble(FacetNormal(self.mesh)[0]*ds(i)), assemble(FacetNormal(self.mesh)[1]*ds(i))]
+            if np.allclose(n[0], 0.0) and np.allclose(n[1], 0.0):
+                raise ValueError("Invalid normal vector {:}".format(n))
+            elif np.allclose(n[0], 0.0):
+                bcs.append(DirichletBC(self.P1_vec.sub(1), 0.0, i))
+            elif np.allclose(n[1], 0.0):
+                bcs.append(DirichletBC(self.P1_vec.sub(0), 0.0, i))
+            else:
+                 if self.bc is None:
+                    # Enforce no mesh movement normal to boundaries
+                    n = FacetNormal(self.mesh)
+                    a_bc = dot(u_cts, n)*dot(v_cts, n)*ds
+                    L_bc = Constant(0.0)*dot(v_cts, n)*ds
+                    self.bc = [self.bc or EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary')]
 
-        if self.bc is None:
-
-            # Enforce no mesh movement normal to boundaries
-            n = FacetNormal(self.mesh)
-            a_bc = dot(u_cts, n)*dot(v_cts, n)*ds
-            L_bc = Constant(0.0)*dot(v_cts, n)*ds
-            self.bc = [self.bc or EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary')]
-
-            # Allow tangential movement, but only up until the end of boundary segments
-            s = as_vector([n[1], -n[0]])
-            a_bc = dot(u_cts, s)*dot(v_cts, s)*ds
-            L_bc = dot(grad(self.φ_old), s)*dot(v_cts, s)*ds
-            if self.bbc is None:
-                edges = set(self.mesh.exterior_facets.unique_markers)
-                if len(edges) > 1:
-                    corners = [(i, j) for i in edges for j in edges.difference([i])]
-                    self.bbc = DirichletBC(self.P1_vec, 0, corners)
-            if self.bbc != []:
-                self.bc.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary', bcs=self.bbc))
-
+                    # Allow tangential movement, but only up until the end of boundary segments
+                    s = as_vector([n[1], -n[0]])
+                    a_bc = dot(u_cts, s)*dot(v_cts, s)*ds
+                    L_bc = dot(grad(self.φ_old), s)*dot(v_cts, s)*ds
+                    if self.bbc is None:
+                        edges = set(self.mesh.exterior_facets.unique_markers)
+                        if len(edges) > 1:
+                            corners = [(i, j) for i in edges for j in edges.difference([i])]
+                            self.bbc = DirichletBC(self.P1_vec, 0, corners)
+                    if self.bbc != []:
+                        self.bc.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary', bcs=self.bbc))
+                 bcs = self.bc
         # Create solver
-        prob = LinearVariationalProblem(a, L, self.grad_φ_cts, bcs=self.bc)
+        prob = LinearVariationalProblem(a, L, self.grad_φ_cts, bcs=bcs)
         self.l2_projector = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
 
     def adapt(self, **kwargs):
@@ -370,7 +361,7 @@ class MeshMover(object):
             self.mesh.coordinates.assign(self.ξ)
 
             # Evaluate normalisation coefficient
-            self.θ.assign(AdjFloat(assemble(self.θ_form)))
+            self.θ.assign(assemble(self.θ_form)/self.total_volume)
 
             # Convergence criteria
             minmax, residual_l2_norm, equi = self.get_diagnostics()

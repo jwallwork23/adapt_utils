@@ -289,14 +289,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.intermediary_solutions_uv_cg = [Function(space) for space in space_uv_cg]
             spaces = [FunctionSpace(mesh, self.finite_element_bathymetry) for mesh in mesh_copies]
             self.intermediary_solutions_old_bathymetry = [Function(space) for space in spaces]
-            self.intermediary_solutions_TOB = [Function(space) for space in spaces]
+            self.intermediary_solutions_bed_stress = [Function(space) for space in spaces]
             self.intermediary_solutions_depth = [Function(space) for space in spaces]
+            if self.op.bedload:
+                self.intermediary_solutions_calfa = [Function(space) for space in spaces]
+                self.intermediary_solutions_salfa = [Function(space) for space in spaces]
+                self.intermediary_solutions_stress = [Function(space) for space in spaces]
+                self.intermediary_solutions_cparam = [Function(space) for space in spaces]
 
             if self.op.suspended:
                 if self.op.convective_vel_flag:
                     self.intermediary_corr_vel_factor = [Function(space) for space in spaces]
-                space_dg = [FunctionSpace(mesh, self.op.sediment_model.coeff.function_space().ufl_element()) for mesh in mesh_copies]
-                self.intermediary_coeff = [Function(space) for space in space_dg]
+                space_dg = [FunctionSpace(mesh, self.op.sediment_model.ceq.function_space().ufl_element()) for mesh in mesh_copies]
                 self.intermediary_ceq = [Function(space) for space in space_dg]
                 self.intermediary_equiltracer = [Function(space) for space in space_dg]
                 self.intermediary_ero = [Function(space) for space in space_dg]
@@ -344,15 +348,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         # Bathymetry
         if self.op.solve_exner:
-            if init:
+            if init==1:
                 self.fwd_solutions_bathymetry[i].project(self.op.set_bathymetry(self.P1[i]))
                 self.op.create_sediment_model(self.P1[i].mesh(), self.fwd_solutions_bathymetry[i])
+            elif init==2:
+                for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
+                    bathymetry.project(self.op.set_bathymetry(self.P1[i]))
             self.depth[i] = DepthExpression(
                 self.fwd_solutions_bathymetry[i],
                 use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
                 use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
                 wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
-            )
+                )
         else:
             self.bathymetry[i] = self.op.set_bathymetry(self.P1[i])
             if self.op.solve_sediment and init:
@@ -658,13 +665,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if hasattr(self.op, 'sediment_model'):
             self.intermediary_solutions_old_bathymetry[i].project(self.op.sediment_model.old_bathymetry_2d)
             self.intermediary_solutions_uv_cg[i].project(self.op.sediment_model.uv_cg)
-            self.intermediary_solutions_TOB[i].project(self.op.sediment_model.TOB)
+            self.intermediary_solutions_bed_stress[i].project(self.op.sediment_model.bed_stress)
             self.intermediary_solutions_depth[i].project(self.op.sediment_model.depth)
+
+            if self.op.bedload:
+                self.intermediary_solutions_calfa[i].project(self.op.sediment_model.calfa)
+                self.intermediary_solutions_salfa[i].project(self.op.sediment_model.salfa)
+                self.intermediary_solutions_stress[i].project(self.op.sediment_model.stress)
+                self.intermediary_solutions_cparam[i].project(self.op.sediment_model.cparam)
 
             if self.op.suspended:
                 if self.op.convective_vel_flag:
                     self.intermediary_corr_vel_factor[i].project(self.op.sediment_model.corr_factor_model.corr_vel_factor)
-                self.intermediary_coeff[i].project(self.op.sediment_model.coeff)
                 self.intermediary_ceq[i].project(self.op.sediment_model.ceq)
                 self.intermediary_equiltracer[i].project(self.op.sediment_model.equiltracer)
                 self.intermediary_ero[i].project(self.op.sediment_model.ero)
@@ -677,60 +689,71 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if np.allclose(a, b):
                 self.warning("WARNING: Is the intermediary {:s} solution just copied?".format(name))
 
-        debug(self.fwd_solutions[i].dat.data[0],
-              self.intermediary_solutions[i].dat.data[0],
-              "velocity")
-        debug(self.fwd_solutions[i].dat.data[1],
-              self.intermediary_solutions[i].dat.data[1],
-              "elevation")
-        if self.op.solve_tracer:
-            debug(self.fwd_solutions_tracer[i].dat.data,
-                  self.intermediary_solutions_tracer[i].dat.data,
-                  "tracer")
-        if self.op.solve_sediment:
-            debug(self.fwd_solutions_sediment[i].dat.data,
-                  self.intermediary_solutions_sediment[i].dat.data,
-                  "sediment")
-        if self.op.solve_exner:
-            debug(self.fwd_solutions_bathymetry[i].dat.data,
-                  self.intermediary_solutions_bathymetry[i].dat.data,
-                  "bathymetry")
-        if hasattr(self.op, 'sediment_model'):
-            debug(self.op.sediment_model.old_bathymetry_2d.dat.data,
-                  self.intermediary_solutions_old_bathymetry[i].dat.data,
-                  "old_bathymetry")
-            debug(self.op.sediment_model.uv_cg.dat.data,
-                  self.intermediary_solutions_uv_cg[i].dat.data,
-                  "uv_cg")
-            debug(self.op.sediment_model.TOB.dat.data,
-                  self.intermediary_solutions_TOB[i].dat.data,
-                  "TOB")
-            debug(self.op.sediment_model.depth.dat.data,
-                  self.intermediary_solutions_depth[i].dat.data,
-                  "depth")
-            if self.op.suspended:
-                if self.op.convective_vel_flag:
-                    debug(self.op.sediment_model.corr_factor_model.corr_vel_factor.dat.data,
-                          self.intermediary_corr_vel_factor[i].dat.data,
-                          "corr_vel_factor")
-                debug(self.op.sediment_model.coeff.dat.data,
-                      self.intermediary_coeff[i].dat.data,
-                      "coeff")
-                debug(self.op.sediment_model.ceq.dat.data,
-                      self.intermediary_ceq[i].dat.data,
-                      "ceq")
-                debug(self.op.sediment_model.equiltracer.dat.data,
-                      self.intermediary_equiltracer[i].dat.data,
-                      "equiltracer")
-                debug(self.op.sediment_model.ero.dat.data,
-                      self.intermediary_ero[i].dat.data,
-                      "ero")
-                debug(self.op.sediment_model.ero_term.dat.data,
-                      self.intermediary_ero_term[i].dat.data,
-                      "ero_term")
-                debug(self.op.sediment_model.depo_term.dat.data,
-                      self.intermediary_depo_term[i].dat.data,
-                      "depo_term")
+        if self.op.debug:
+            debug(self.fwd_solutions[i].dat.data[0],
+                  self.intermediary_solutions[i].dat.data[0],
+                  "velocity")
+            debug(self.fwd_solutions[i].dat.data[1],
+                  self.intermediary_solutions[i].dat.data[1],
+                  "elevation")
+            if self.op.solve_tracer:
+                debug(self.fwd_solutions_tracer[i].dat.data,
+                      self.intermediary_solutions_tracer[i].dat.data,
+                      "tracer")
+            if self.op.solve_sediment:
+                debug(self.fwd_solutions_sediment[i].dat.data,
+                      self.intermediary_solutions_sediment[i].dat.data,
+                      "sediment")
+            if self.op.solve_exner:
+                debug(self.fwd_solutions_bathymetry[i].dat.data,
+                      self.intermediary_solutions_bathymetry[i].dat.data,
+                      "bathymetry")
+            if hasattr(self.op, 'sediment_model'):
+                debug(self.op.sediment_model.old_bathymetry_2d.dat.data,
+                      self.intermediary_solutions_old_bathymetry[i].dat.data,
+                      "old_bathymetry")
+                debug(self.op.sediment_model.uv_cg.dat.data,
+                      self.intermediary_solutions_uv_cg[i].dat.data,
+                      "uv_cg")
+                debug(self.op.sediment_model.bed_stress.dat.data,
+                      self.intermediary_solutions_bed_stress[i].dat.data,
+                      "bed_stress")
+                debug(self.op.sediment_model.depth.dat.data,
+                      self.intermediary_solutions_depth[i].dat.data,
+                      "depth")
+                if self.op.suspended:
+                    if self.op.convective_vel_flag:
+                        debug(self.op.sediment_model.corr_factor_model.corr_vel_factor.dat.data,
+                              self.intermediary_corr_vel_factor[i].dat.data,
+                              "corr_vel_factor")
+                    debug(self.op.sediment_model.ceq.dat.data,
+                          self.intermediary_ceq[i].dat.data,
+                          "ceq")
+                    debug(self.op.sediment_model.equiltracer.dat.data,
+                          self.intermediary_equiltracer[i].dat.data,
+                          "equiltracer")
+                    debug(self.op.sediment_model.ero.dat.data,
+                          self.intermediary_ero[i].dat.data,
+                          "ero")
+                    debug(self.op.sediment_model.ero_term.dat.data,
+                          self.intermediary_ero_term[i].dat.data,
+                          "ero_term")
+                    debug(self.op.sediment_model.depo_term.dat.data,
+                          self.intermediary_depo_term[i].dat.data,
+                          "depo_term")
+                if self.op.bedload:
+                    debug(self.op.sediment_model.calfa.dat.data,
+                          self.intermediary_solutions_calfa[i].dat.data,
+                          "calfa")
+                    debug(self.op.sediment_model.salfa.dat.data,
+                          self.intermediary_solutions_salfa[i].dat.data,
+                          "salfa")
+                    debug(self.op.sediment_model.stress.dat.data,
+                          self.intermediary_solutions_stress[i].dat.data,
+                          "stress")
+                    debug(self.op.sediment_model.cparam.dat.data,
+                          self.intermediary_solutions_cparam[i].dat.data,
+                          "cparam")
 
     def project_from_intermediary_mesh(self, i):
         if self.op.solve_swe:
@@ -748,26 +771,30 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def copy_data_from_intermediary_mesh(self, i):
         super(AdaptiveProblem, self).copy_data_from_intermediary_mesh(i)
         if self.op.solve_tracer:
-            self.fwd_solutions_tracer[i].dat.data[:] = self.intermediary_solutions_tracer[i].dat.data
+            self.fwd_solutions_tracer[i].project(self.intermediary_solutions_tracer[i])
         if self.op.solve_sediment:
-            self.fwd_solutions_sediment[i].dat.data[:] = self.intermediary_solutions_sediment[i].dat.data
+            self.fwd_solutions_sediment[i].project(self.intermediary_solutions_sediment[i])
         if self.op.solve_exner:
-            self.fwd_solutions_bathymetry[i].dat.data[:] = self.intermediary_solutions_bathymetry[i].dat.data
+            self.fwd_solutions_bathymetry[i].project(self.intermediary_solutions_bathymetry[i])
 
         if hasattr(self.op, 'sediment_model'):
-            self.op.sediment_model.old_bathymetry_2d.dat.data[:] = self.intermediary_solutions_old_bathymetry[i].dat.data
-            self.op.sediment_model.uv_cg.dat.data[:] = self.intermediary_solutions_uv_cg[i].dat.data
-            self.op.sediment_model.TOB.dat.data[:] = self.intermediary_solutions_TOB[i].dat.data
-            self.op.sediment_model.depth.dat.data[:] = self.intermediary_solutions_depth[i].dat.data
+            self.op.sediment_model.old_bathymetry_2d.project(self.intermediary_solutions_old_bathymetry[i])
+            self.op.sediment_model.uv_cg.project(self.intermediary_solutions_uv_cg[i])
+            self.op.sediment_model.bed_stress.project(self.intermediary_solutions_bed_stress[i])
+            self.op.sediment_model.depth.project(self.intermediary_solutions_depth[i])
             if self.op.suspended:
                 if self.op.convective_vel_flag:
-                    self.op.sediment_model.corr_factor_model.corr_vel_factor.dat.data[:] = self.intermediary_corr_vel_factor[i].dat.data
-                self.op.sediment_model.coeff.dat.data[:] = self.intermediary_coeff[i].dat.data
-                self.op.sediment_model.ceq.dat.data[:] = self.intermediary_ceq[i].dat.data
-                self.op.sediment_model.equiltracer.dat.data[:] = self.intermediary_equiltracer[i].dat.data
-                self.op.sediment_model.ero.dat.data[:] = self.intermediary_ero[i].dat.data
-                self.op.sediment_model.ero_term.dat.data[:] = self.intermediary_ero_term[i].dat.data
-                self.op.sediment_model.depo_term.dat.data[:] = self.intermediary_depo_term[i].dat.data
+                    self.op.sediment_model.corr_factor_model.corr_vel_factor.project(self.intermediary_corr_vel_factor[i])
+                self.op.sediment_model.ceq.project(self.intermediary_ceq[i])
+                self.op.sediment_model.equiltracer.project(self.intermediary_equiltracer[i])
+                self.op.sediment_model.ero.project(self.intermediary_ero[i])
+                self.op.sediment_model.ero_term.project(self.intermediary_ero_term[i])
+                self.op.sediment_model.depo_term.project(self.intermediary_depo_term[i])
+            if self.op.bedload:
+                self.op.sediment_model.calfa.project(self.intermediary_solutions_calfa[i])
+                self.op.sediment_model.salfa.project(self.intermediary_solutions_salfa[i])
+                self.op.sediment_model.stress.project(self.intermediary_solutions_stress[i])
+                self.op.sediment_model.cparam.project(self.intermediary_solutions_cparam[i])
 
     # --- I/O
 
@@ -1451,7 +1478,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Mesh movement
             if self.iteration % op.dt_per_mesh_movement == 0:
-                inverted = self.move_mesh(i)
+                if self.iteration == 0:
+                    inverted = self.move_mesh(i, init = 2)
+                else:
+                    inverted = self.move_mesh(i)
                 if inverted and op.approach in ('lagrangian', 'hybrid'):
                     self.simulation_time += op.dt
                     self.iteration += 1
