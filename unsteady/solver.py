@@ -294,8 +294,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if self.op.bedload:
                 self.intermediary_solutions_calfa = [Function(space) for space in spaces]
                 self.intermediary_solutions_salfa = [Function(space) for space in spaces]
-                self.intermediary_solutions_stress = [Function(space) for space in spaces]
-                self.intermediary_solutions_cparam = [Function(space) for space in spaces]
+                if self.op.angle_correction:
+                    self.intermediary_solutions_stress = [Function(space) for space in spaces]
+                    self.intermediary_solutions_cparam = [Function(space) for space in spaces]
 
             if self.op.suspended:
                 if self.op.convective_vel_flag:
@@ -671,8 +672,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if self.op.bedload:
                 self.intermediary_solutions_calfa[i].project(self.op.sediment_model.calfa)
                 self.intermediary_solutions_salfa[i].project(self.op.sediment_model.salfa)
-                self.intermediary_solutions_stress[i].project(self.op.sediment_model.stress)
-                self.intermediary_solutions_cparam[i].project(self.op.sediment_model.cparam)
+                if self.op.angle_correction:
+                    self.intermediary_solutions_stress[i].project(self.op.sediment_model.stress)
+                    self.intermediary_solutions_cparam[i].project(self.op.sediment_model.cparam)
 
             if self.op.suspended:
                 if self.op.convective_vel_flag:
@@ -748,12 +750,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     debug(self.op.sediment_model.salfa.dat.data,
                           self.intermediary_solutions_salfa[i].dat.data,
                           "salfa")
-                    debug(self.op.sediment_model.stress.dat.data,
-                          self.intermediary_solutions_stress[i].dat.data,
-                          "stress")
-                    debug(self.op.sediment_model.cparam.dat.data,
-                          self.intermediary_solutions_cparam[i].dat.data,
-                          "cparam")
+                    if self.op.angle_correction:
+                        debug(self.op.sediment_model.stress.dat.data,
+                              self.intermediary_solutions_stress[i].dat.data,
+                              "stress")
+                        debug(self.op.sediment_model.cparam.dat.data,
+                              self.intermediary_solutions_cparam[i].dat.data,
+                              "cparam")
 
     def project_from_intermediary_mesh(self, i):
         if self.op.solve_swe:
@@ -793,8 +796,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if self.op.bedload:
                 self.op.sediment_model.calfa.project(self.intermediary_solutions_calfa[i])
                 self.op.sediment_model.salfa.project(self.intermediary_solutions_salfa[i])
-                self.op.sediment_model.stress.project(self.intermediary_solutions_stress[i])
-                self.op.sediment_model.cparam.project(self.intermediary_solutions_cparam[i])
+                if self.op.angle_correction:
+                    self.op.sediment_model.stress.project(self.intermediary_solutions_stress[i])
+                    self.op.sediment_model.cparam.project(self.intermediary_solutions_cparam[i])
 
     # --- I/O
 
