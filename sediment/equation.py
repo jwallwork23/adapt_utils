@@ -22,9 +22,8 @@ velocities, and :math:`\mu_h` denotes horizontal diffusivity.
 from __future__ import absolute_import
 from thetis.utility import *
 from thetis.equation import Equation
-from thetis.tracer_eq_2d import HorizontalDiffusionTerm, TracerTerm
-from thetis.conservative_tracer_eq_2d import ConservativeHorizontalDiffusionTerm
-from adapt_utils.tracer.equation import HorizontalAdvectionTerm, ConservativeHorizontalAdvectionTerm
+from thetis.tracer_eq_2d import HorizontalAdvectionTerm, HorizontalDiffusionTerm, TracerTerm
+from thetis.conservative_tracer_eq_2d import ConservativeHorizontalDiffusionTerm, ConservativeHorizontalAdvectionTerm
 
 
 class SedimentTerm(TracerTerm):

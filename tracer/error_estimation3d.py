@@ -30,9 +30,8 @@ class TracerHorizontalAdvectionGOErrorEstimatorTerm3D(TracerGOErrorEstimatorTerm
         uv = self.corr_factor*fields_old['uv_3d']
 
         # Apply SUPG stabilisation
-        if self.stabilisation in ('su', 'supg'):
-            tau = self.su_stabilisation if self.stabilisation == 'su' else self.supg_stabilisation
-            arg = arg + tau*dot(uv, grad(arg))
+        if self.options.use_supg_tracer:
+            arg = arg + self.supg_stabilisation*dot(uv, grad(arg))
 
         return -self.p0test*arg*inner(uv, grad(solution))*self.dx
 
@@ -52,11 +51,10 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm3D(TracerGOErrorEstimatorTerm
 
         # Apply SUPG stabilisation
         uv = fields_old.get('uv_3d')
-        if self.stabilisation == 'supg' and uv is not None:
+        if self.options.use_supg_tracer and uv is not None:
             self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
             uv = self.corr_factor*uv
-            tau = self.supg_stabilisation
-            arg = arg + tau*dot(uv, grad(arg))
+            arg = arg + self.supg_stabilisation*dot(uv, grad(arg))
 
         return self.p0test*arg*div(dot(diff_tensor, grad(solution)))*self.dx
 
@@ -130,11 +128,10 @@ class TracerSourceGOErrorEstimatorTerm3D(TracerGOErrorEstimatorTerm3D):
 
         # Apply SUPG stabilisation
         uv = fields_old.get('uv_3d')
-        if self.stabilisation == 'supg' and uv is not None:
+        if self.options.use_supg_tracer and uv is not None:
             self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
             uv = self.corr_factor*uv
-            tau = self.supg_stabilisation
-            arg = arg + tau*dot(uv, grad(arg))
+            arg = arg + self.supg_stabilisation*dot(uv, grad(arg))
 
         f += self.p0test*inner(source, arg)*self.dx
         return f
@@ -144,13 +141,7 @@ class TracerGOErrorEstimator3D(TracerGOErrorEstimator):
     """
     :class:`GOErrorEstimator` for the 3D tracer model.
     """
-    def __init__(self, function_space,
-                 depth=None,
-                 use_lax_friedrichs=True,
-                 sipg_factor=Constant(1.0),
-                 **kwargs):
-        super(TracerGOErrorEstimator, self).__init__(function_space, **kwargs)
-        args = (function_space, depth, stabilisation == 'lax_friedrichs', sipg_factor)
+    def add_terms(self, *args):
         self.add_term(TracerHorizontalAdvectionGOErrorEstimatorTerm3D(*args), 'explicit')
         self.add_term(TracerHorizontalDiffusionGOErrorEstimatorTerm3D(*args), 'explicit')
         self.add_term(TracerSourceGOErrorEstimatorTerm3D(*args), 'source')
