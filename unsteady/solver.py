@@ -81,7 +81,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         static_options = {
             'use_lax_friedrichs_tracer': op.stabilisation_tracer == 'lax_friedrichs',
             'use_limiter_for_tracers': op.use_limiter_for_tracers and op.tracer_family == 'dg',
-            'use_supg_stabilization_tracer': op.stabilisation_tracer == 'supg',
+            'use_supg_tracer': op.stabilisation_tracer == 'supg',
             'sipg_factor': Constant(1.0),
             'use_tracer_conservative_form': op.use_tracer_conservative_form,
             'horizontal_velocity_scale': op.characteristic_speed,
@@ -699,17 +699,19 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
     def create_forward_tracer_equation_step(self, i):
-        from ..tracer.equation import TracerEquation2D, ConservativeTracerEquation2D
-
-        op = self.tracer_options[i]
-        conservative = op.use_tracer_conservative_form
-        model = ConservativeTracerEquation2D if conservative else TracerEquation2D
+        if self.tracer_options[i].use_tracer_conservative_form:
+            from thetis.conservative_tracer_eq_2d import ConservativeTracerEquation2D
+            model = ConservativeTracerEquation2D
+        else:
+            from thetis.tracer_eq_2d import TracerEquation2D
+            model = TracerEquation2D
         self.equations[i].tracer = model(
             self.Q[i],
             self.depth[i],
             self.tracer_options[i],
+            self.fwd_solutions[i].split()[0],
         )
-        if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
+        if self.tracer_options[i].use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
         self.equations[i].tracer.bnd_functions = self.boundary_conditions[i]['tracer']
 
@@ -766,17 +768,19 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
     def create_adjoint_tracer_equation_step(self, i):
-        from ..tracer.equation import TracerEquation2D, ConservativeTracerEquation2D
-
-        op = self.tracer_options[i]
-        conservative = op.use_tracer_conservative_form
-        model = TracerEquation2D if conservative else ConservativeTracerEquation2D
+        if self.tracer_options[i].use_tracer_conservative_form:
+            from thetis.conservative_tracer_eq_2d import ConservativeTracerEquation2D
+            model = ConservativeTracerEquation2D
+        else:
+            from thetis.tracer_eq_2d import TracerEquation2D
+            model = TracerEquation2D
         self.equations[i].adjoint_tracer = model(
             self.Q[i],
             self.depth[i],
             self.tracer_options[i],
+            self.fwd_solutions[i].split()[0],
         )
-        if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
+        if self.tracer_options[i].use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
         adjoint_boundary_conditions = {}
         zero = Constant(0.0)
