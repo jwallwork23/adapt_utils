@@ -21,9 +21,8 @@ velocities, and :math:`\mu_h` denotes horizontal diffusivity.
 """
 from __future__ import absolute_import
 from thetis.utility import *
-from thetis.equation import Equation
-from thetis.tracer_eq_2d import HorizontalAdvectionTerm, HorizontalDiffusionTerm, TracerTerm
-from thetis.conservative_tracer_eq_2d import ConservativeHorizontalDiffusionTerm, ConservativeHorizontalAdvectionTerm
+from thetis.tracer_eq_2d import *
+from thetis.conservative_tracer_eq_2d import *
 
 
 class SedimentTerm(TracerTerm):
@@ -107,7 +106,7 @@ class SedimentSinkTerm(SedimentTerm):
         return -f
 
 
-class SedimentEquation2D(Equation):
+class SedimentEquation2D(TracerEquation2D):
     """
     2D sediment advection-diffusion equation: eq:`tracer_eq` or `conservative_tracer_eq`
     with sediment source and sink term
@@ -117,9 +116,9 @@ class SedimentEquation2D(Equation):
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
         """
-        super(SedimentEquation2D, self).__init__(function_space)
+        super(SedimentEquation2D, self).__init__(function_space, depth, options, None)
         args = (function_space, depth, options)
-        if conservative:
+        if options.use_tracer_conservative_form:
             self.add_term(ConservativeHorizontalAdvectionTerm(*args), 'explicit')
             self.add_term(ConservativeHorizontalDiffusionTerm(*args), 'explicit')
         else:
