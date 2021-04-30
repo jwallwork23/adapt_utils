@@ -65,6 +65,7 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
             self.Q[i],
             self.depth[i],
             self.tracer_options[i],
+            self.fwd_solutions[i].split()[0],
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -81,6 +82,7 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
             self.Q[i],
             self.depth[i],
             self.tracer_options[i],
+            self.fwd_solutions[i].split()[0],
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -111,8 +113,6 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
             'source': self.fields[i].tracer_source_2d,
             'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,
         })
-        if self.stabilisation == 'su':
-            fields['su_stabilisation'] = True
-        elif self.stabilisation == 'supg':
+        if self.stabilisation == 'supg':
             fields['supg_stabilisation'] = True
         return fields

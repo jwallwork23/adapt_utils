@@ -472,7 +472,7 @@ class CoupledOptions(Options):
         polynomial order of the finite element space by incremented?
         """).tag(config=True)
     stabilisation_tracer = Unicode(None, allow_none=True, help="""
-        Stabilisation approach for tracer model, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if
+        Stabilisation approach for tracer model, chosen from {'SUPG', 'lax_friedrichs'}, if
         not None.
         """).tag(config=True)
     lax_friedrichs_tracer_scaling_factor = FiredrakeScalarExpression(Constant(1.0), help="""
