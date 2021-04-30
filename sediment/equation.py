@@ -31,17 +31,13 @@ class SedimentTerm(TracerTerm):
     """
     Generic sediment term that provides commonly used members.
     """
-    def __init__(self, function_space, depth,
-                 use_lax_friedrichs=True, sipg_factor=Constant(10.0), conservative=False):
+    def __init__(self, function_space, depth, options):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
-        :kwarg bool use_lax_friedrichs: whether to use Lax Friedrichs stabilisation
-        :kwarg sipg_factor: :class: `Constant` or :class: `Function` penalty parameter for SIPG
-        :kwarg bool conservative: whether to use conservative tracer
         """
         super(SedimentTerm, self).__init__(function_space, depth)
-        self.conservative = conservative
+        self.conservative = options.use_tracer_conservative_form
 
 
 class SedimentSourceTerm(SedimentTerm):
@@ -117,25 +113,18 @@ class SedimentEquation2D(Equation):
     2D sediment advection-diffusion equation: eq:`tracer_eq` or `conservative_tracer_eq`
     with sediment source and sink term
     """
-    def __init__(self, function_space, depth,
-                 use_lax_friedrichs=False,
-                 sipg_factor=Constant(10.0),
-                 conservative=False):
+    def __init__(self, function_space, depth, options):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
-        :kwarg bool use_lax_friedrichs: whether to use Lax Friedrichs stabilisation
-        :kwarg sipg_factor: :class: `Constant` or :class: `Function` penalty parameter for SIPG
-        :kwarg bool conservative: whether to use conservative tracer
         """
         super(SedimentEquation2D, self).__init__(function_space)
-        args = (function_space, depth, use_lax_friedrichs, sipg_factor)
-        args_sediment = (function_space, depth, use_lax_friedrichs, sipg_factor, conservative)
+        args = (function_space, depth, options)
         if conservative:
             self.add_term(ConservativeHorizontalAdvectionTerm(*args), 'explicit')
             self.add_term(ConservativeHorizontalDiffusionTerm(*args), 'explicit')
         else:
             self.add_term(HorizontalAdvectionTerm(*args), 'explicit')
             self.add_term(HorizontalDiffusionTerm(*args), 'explicit')
-        self.add_term(SedimentSourceTerm(*args_sediment), 'source')
-        self.add_term(SedimentSinkTerm(*args_sediment), 'implicit')
+        self.add_term(SedimentSourceTerm(*args), 'source')
+        self.add_term(SedimentSinkTerm(*args), 'implicit')

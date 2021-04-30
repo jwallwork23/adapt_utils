@@ -716,27 +716,23 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def create_forward_sediment_equation_step(self, i):
         from ..sediment.equation import SedimentEquation2D
 
-        op = self.sediment_options[i]
-        model = SedimentEquation2D
-        self.equations[i].sediment = model(
+        self.equations[i].sediment = SedimentEquation2D(
             self.Q[i],
-            # self.op.sediment_model.depth_expr,
             self.depth[i],
             self.sediment_options[i],
         )
-        if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
+        if self.sediment_options[i].use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
         self.equations[i].sediment.bnd_functions = self.boundary_conditions[i]['sediment']
 
     def create_forward_exner_equation_step(self, i):
-        from ..sediment.exner_eq import ExnerEquation
+        from thetis.exner_eq import ExnerEquation
 
-        model = ExnerEquation
-        self.equations[i].exner = model(
+        self.equations[i].exner = ExnerEquation(
             self.W[i],
             self.depth[i],
-            conservative=self.op.use_tracer_conservative_form,
-            sed_model=self.op.sediment_model,
+            self.op.sediment_model,
+            depth_integrated_sediment=self.op.use_tracer_conservative_form,
         )
 
     def free_forward_equations_step(self, i):
