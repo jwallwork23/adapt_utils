@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+from firedrake_adjoint import *
 from thetis import *
 from thetis.limiter import VertexBasedP1DGLimiter
 
@@ -306,15 +307,25 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         self.fields = [AttrDict() for P1 in self.P1]
         for i, P1 in enumerate(self.P1):
-            self.fields[i].update({
-                'horizontal_viscosity': self.op.set_viscosity(P1),
-                'horizontal_diffusivity': self.op.set_diffusivity(P1),
-                'coriolis_frequency': self.op.set_coriolis(P1),
-                'nikuradse_bed_roughness': self.op.ksp,
-                'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
-                'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
-                'tracer_advective_velocity_factor': self.op.set_advective_velocity_factor(P1)
-            })
+            if init == 1:
+                self.fields[i].update({
+                    'horizontal_viscosity': self.op.set_viscosity(P1),
+                    'horizontal_diffusivity': self.op.set_diffusivity(P1),
+                    'coriolis_frequency': self.op.set_coriolis(P1),
+                    'nikuradse_bed_roughness': self.op.ksp,
+                    'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
+                    'manning_drag_coefficient': self.op.friction_coeff, #set_manning_drag_coefficient(P1),
+                    'tracer_advective_velocity_factor': self.op.set_advective_velocity_factor(P1)
+                })
+            else:
+                self.fields[i].update({
+                    'horizontal_viscosity': self.op.set_viscosity(P1),
+                    'horizontal_diffusivity': self.op.set_diffusivity(P1),
+                    'coriolis_frequency': self.op.set_coriolis(P1),
+                    'nikuradse_bed_roughness': self.op.ksp,
+                    'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
+                    'tracer_advective_velocity_factor': self.op.set_advective_velocity_factor(P1)
+                })
         if self.op.solve_tracer:
             for i, P1DG in enumerate(self.P1DG):
                 self.fields[i].update({

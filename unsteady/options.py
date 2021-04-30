@@ -17,7 +17,7 @@ class CoupledOptions(Options):
     base_velocity = [0.0, 0.0]
     g = FiredrakeScalarExpression(Constant(9.81)).tag(config=True)
     friction = Unicode(None, allow_none=True).tag(config=True)
-    friction_coeff = NonNegativeFloat(None, allow_none=True).tag(config=True)
+    friction_coeff = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
     ksp = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
 
     # Common model
@@ -203,7 +203,7 @@ class CoupledOptions(Options):
 
     def set_manning_drag_coefficient(self, fs):
         if self.friction == 'manning':
-            return Constant(self.friction_coeff or 0.02)
+            return self.friction_coeff #Constant(self.friction_coeff) # or 0.02)
 
     def get_eta_tilde(self, prob, i):
         u, eta = prob.fwd_solutions[i].split()

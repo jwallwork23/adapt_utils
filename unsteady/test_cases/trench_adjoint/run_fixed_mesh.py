@@ -12,10 +12,13 @@ outputdir = 'outputs' + st
 
 nx = 0.5
 
+fric_const = Constant(0.025)
+
 inputdir = 'hydrodynamics_trench_' + str(nx)
 print(inputdir)
 kwargs = {
     'approach': 'fixed_mesh',
+    'fric_coeff': fric_const,
     'nx': nx,
     'ny': 1,
     'plot_pvd': True,
@@ -33,6 +36,15 @@ swp = AdaptiveProblem(op)
 t1 = time.time()
 swp.solve_forward()
 t2 = time.time()
+
+J = assemble(swp.fwd_solutions_bathymetry[0]*dx)
+rf = ReducedFunctional(J, Control(alpha))
+
+print(J)
+print(rf(Constant(0.025))
+stop
+
+
 
 new_mesh = RectangleMesh(16*5*5, 5*1, 16, 1.1)
 

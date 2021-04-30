@@ -1,8 +1,8 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.swe.utils import heaviside_approx
-from adapt_utils.options import CoupledOptions
+from adapt_utils.unsteady.swe.utils import heaviside_approx
+from adapt_utils.unsteady.options import CoupledOptions
 
 import numpy as np
 import os
@@ -18,7 +18,7 @@ class BalzanoOptions(CoupledOptions):
     [1] A. Balzano, "Evaluation of methods for numerical simulation of wetting and drying in
         shallow water flow models." Coastal Engineering 34.1-2 (1998): 83-107.
     """
-    def __init__(self, n=1, bathymetry_type=1, plot_timeseries=False, **kwargs):
+    def __init__(self, fric_coeff, n=1, bathymetry_type=1, plot_timeseries=False, **kwargs):
         super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.basin_x = 13800.0  # Length of wet region
@@ -45,8 +45,9 @@ class BalzanoOptions(CoupledOptions):
         except AssertionError:
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
+        import ipdb; ipdb.set_trace()
         self.average_size = 200e-6  # Average sediment size
-        self.friction_coeff = 0.025
+        self.friction_coeff = fric_coeff
         self.ksp = None
         # Stabilisation
         self.stabilisation = None

@@ -21,7 +21,7 @@ __all__ = ["TrenchSedimentOptions"]
 
 class TrenchSedimentOptions(CoupledOptions):
 
-    def __init__(self, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir = None, output_dir = None, **kwargs):
+    def __init__(self, fric_coeff, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir = None, output_dir = None, **kwargs):
         super(TrenchSedimentOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
@@ -43,7 +43,7 @@ class TrenchSedimentOptions(CoupledOptions):
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
         self.average_size = 160e-6  # Average sediment size
-        self.friction_coeff = 0.025
+        self.friction_coeff = fric_coeff #0.025
         self.ksp = Constant(3*self.average_size)
         self.norm_smoother = Constant(0.1)
 
