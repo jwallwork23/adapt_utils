@@ -11,7 +11,6 @@ op = PointDischarge2dOptions(approach='dwr', level=2)
 op.tracer_family = 'cg'                  # TODO: 'dg'
 op.stabilisation_tracer = 'supg'         # TODO: 'lax_friedrichs'
 op.anisotropic_stabilisation = True      # TODO: False
-op.use_automatic_sipg_parameter = False  # TODO: True
 tp = AdaptiveSteadyProblem(op)
 tp.solve_forward()
 

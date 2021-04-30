@@ -32,7 +32,6 @@ kwargs = {
     'tracer_family': args.family or 'dg',
     'stabilisation_tracer': args.stabilisation or 'lax_friedrichs',
     'anisotropic_stabilisation': bool(args.anisotropic_stabilisation or False),
-    'use_automatic_sipg_parameter': False,  # We have an inviscid problem
     'use_limiter_for_tracers': False if args.limiters == "0" else True,
     # 'use_limiter_for_tracers': bool(args.limiters or False),
 

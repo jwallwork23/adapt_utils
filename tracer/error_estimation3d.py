@@ -147,10 +147,10 @@ class TracerGOErrorEstimator3D(TracerGOErrorEstimator):
     def __init__(self, function_space,
                  depth=None,
                  use_lax_friedrichs=True,
-                 sipg_parameter=Constant(10.0),
+                 sipg_factor=Constant(1.0),
                  **kwargs):
         super(TracerGOErrorEstimator, self).__init__(function_space, **kwargs)
-        args = (function_space, depth, stabilisation == 'lax_friedrichs', sipg_parameter)
+        args = (function_space, depth, stabilisation == 'lax_friedrichs', sipg_factor)
         self.add_term(TracerHorizontalAdvectionGOErrorEstimatorTerm3D(*args), 'explicit')
         self.add_term(TracerHorizontalDiffusionGOErrorEstimatorTerm3D(*args), 'explicit')
         self.add_term(TracerSourceGOErrorEstimatorTerm3D(*args), 'source')

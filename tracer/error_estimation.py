@@ -29,12 +29,12 @@ class TracerGOErrorEstimatorTerm(GOErrorEstimatorTerm, TracerTerm):
     def __init__(self, function_space,
                  depth=None,
                  use_lax_friedrichs=True,
-                 sipg_parameter=Constant(10.0)):
+                 sipg_factor=Constant(1.0)):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :kwarg depth: DepthExpression for the domain
         """
-        TracerTerm.__init__(self, function_space, depth, use_lax_friedrichs, sipg_parameter)
+        TracerTerm.__init__(self, function_space, depth, use_lax_friedrichs, sipg_factor)
         GOErrorEstimatorTerm.__init__(self, function_space.mesh())
 
     def inter_element_flux(self, *args, **kwargs):
@@ -196,9 +196,15 @@ class HorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
 
         flux_terms = 0
         if self.horizontal_dg:  # TODO: Check signs
-            alpha = self.sipg_parameter
-            assert alpha is not None
-            sigma = avg(alpha/self.cellsize)
+            alpha = self.sipg_factor_tracer
+            cell = self.mesh.ufl_cell()
+            p = self.function_space.ufl_element().degree()
+            cp = (p + 1)*(p + 2)/2 if cell == triangle else (p + 1)**2
+            l_normal = CellVolume(self.mesh)/FacetArea(self.mesh)
+            sigma = alpha*cp/l_normal
+            sp = sigma('+')
+            sm = sigma('-')
+            sigma = conditional(sp > sm, sp, sm)
             e_star_n = self.restrict(e_star*self.normal)
             flux_terms += -sigma*inner(e_star_n, dot(avg(diff_tensor), jump(c, self.normal)))*self.dS
             flux_terms += inner(e_star_n, avg(dot(diff_tensor, grad(c))))*self.dS
@@ -283,7 +289,7 @@ class TracerGOErrorEstimator(GOErrorEstimator):
                  depth=None,
                  stabilisation='lax_friedrichs',
                  anisotropic=False,
-                 sipg_parameter=Constant(10.0),
+                 sipg_factor=Constant(1.0),
                  su_stabilisation=None,
                  supg_stabilisation=None,
                  conservative=False,
@@ -293,7 +299,7 @@ class TracerGOErrorEstimator(GOErrorEstimator):
         self.supg_stabilisation = supg_stabilisation
         self.adjoint = adjoint
         super(TracerGOErrorEstimator, self).__init__(function_space, anisotropic=anisotropic)
-        args = (function_space, depth, stabilisation == 'lax_friedrichs', sipg_parameter)
+        args = (function_space, depth, stabilisation == 'lax_friedrichs', sipg_factor)
         if conservative:
             self.add_term(ConservativeHorizontalAdvectionGOErrorEstimatorTerm(*args), 'explicit')
         else:

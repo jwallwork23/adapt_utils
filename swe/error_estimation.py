@@ -362,11 +362,19 @@ class HorizontalViscosityGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMoment
         flux_terms += -inner(avg(dot(stress, n)), self.restrict(z))*self.dS
 
         # Terms arising from SIPG
-        alpha = self.options.sipg_parameter
-        assert alpha is not None
-        sigma = avg(alpha/self.cellsize)
-        flux_terms += -inner(sigma*avg(nu)*jump(outer(uv, n)), self.restrict(outer(z, n)))*self.dS  # Penalisation
-        flux_terms += 0.5*inner(stress_jump, self.restrict(grad(z)))*self.dS                        # Symmetrisation
+        alpha = self.options.sipg_factor
+        cell = self.mesh.ufl_cell()
+        p = self.function_space.ufl_element().degree()
+        cp = (p + 1)*(p + 2)/2 if cell == triangle else (p + 1)**2
+        l_normal = CellVolume(self.mesh)/FacetArea(self.mesh)
+        sigma = alpha*cp/l_normal
+        sp = sigma('+')
+        sm = sigma('-')
+        sigma = conditional(sp > sm, sp, sm)
+        flux_terms += -inner(sigma*avg(nu)*jump(outer(uv, n)),
+                             self.restrict(outer(z, n)))*self.dS  # Penalisation
+        flux_terms += 0.5*inner(stress_jump,
+                                self.restrict(grad(z)))*self.dS   # Symmetrisation
 
         return flux_terms
 
@@ -386,9 +394,15 @@ class HorizontalViscosityGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMoment
         n = self.normal
 
         # Terms arising from boundary conditions
-        alpha = self.options.sipg_parameter
-        assert alpha is not None
-        sigma = alpha/self.cellsize
+        alpha = self.options.sipg_factor
+        cell = self.mesh.ufl_cell()
+        p = self.function_space.ufl_element().degree()
+        cp = (p + 1)*(p + 2)/2 if cell == triangle else (p + 1)**2
+        l_normal = CellVolume(self.mesh)/FacetArea(self.mesh)
+        sigma = alpha*cp/l_normal
+        sp = sigma('+')
+        sm = sigma('-')
+        sigma = conditional(sp > sm, sp, sm)
         for bnd_marker in self.boundary_markers:
             funcs = bnd_conditions.get(bnd_marker)
             ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)

@@ -102,7 +102,7 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
             self.Q[i],
             self.depth[i],
             use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
-            sipg_parameter=self.tracer_options[i].sipg_parameter,
+            sipg_factor=self.tracer_options[i].sipg_factor,
             anisotropic=self.tracer_options[i].anisotropic_stabilisation,
             su_stabilisation=op.su_stabilisation,
             supg_stabilisation=op.supg_stabilisation,

@@ -32,12 +32,12 @@ class SedimentTerm(TracerTerm):
     Generic sediment term that provides commonly used members.
     """
     def __init__(self, function_space, depth,
-                 use_lax_friedrichs=True, sipg_parameter=Constant(10.0), conservative=False):
+                 use_lax_friedrichs=True, sipg_factor=Constant(10.0), conservative=False):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
         :kwarg bool use_lax_friedrichs: whether to use Lax Friedrichs stabilisation
-        :kwarg sipg_parameter: :class: `Constant` or :class: `Function` penalty parameter for SIPG
+        :kwarg sipg_factor: :class: `Constant` or :class: `Function` penalty parameter for SIPG
         :kwarg bool conservative: whether to use conservative tracer
         """
         super(SedimentTerm, self).__init__(function_space, depth)
@@ -119,18 +119,18 @@ class SedimentEquation2D(Equation):
     """
     def __init__(self, function_space, depth,
                  use_lax_friedrichs=False,
-                 sipg_parameter=Constant(10.0),
+                 sipg_factor=Constant(10.0),
                  conservative=False):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
         :kwarg bool use_lax_friedrichs: whether to use Lax Friedrichs stabilisation
-        :kwarg sipg_parameter: :class: `Constant` or :class: `Function` penalty parameter for SIPG
+        :kwarg sipg_factor: :class: `Constant` or :class: `Function` penalty parameter for SIPG
         :kwarg bool conservative: whether to use conservative tracer
         """
         super(SedimentEquation2D, self).__init__(function_space)
-        args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
-        args_sediment = (function_space, depth, use_lax_friedrichs, sipg_parameter, conservative)
+        args = (function_space, depth, use_lax_friedrichs, sipg_factor)
+        args_sediment = (function_space, depth, use_lax_friedrichs, sipg_factor, conservative)
         if conservative:
             self.add_term(ConservativeHorizontalAdvectionTerm(*args), 'explicit')
             self.add_term(ConservativeHorizontalDiffusionTerm(*args), 'explicit')

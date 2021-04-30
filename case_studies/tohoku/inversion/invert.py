@@ -100,7 +100,6 @@ kwargs = {
     # Spatial discretisation
     'family': family,
     'stabilisation': stabilisation,
-    'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Inversion
     'synthetic': False,

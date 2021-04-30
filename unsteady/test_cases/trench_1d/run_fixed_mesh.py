@@ -49,7 +49,6 @@ kwargs = {
     'family': 'dg-dg',
     'stabilisation': None,
     'stabilisation_sediment': None,
-    'use_automatic_sipg_parameter': True,
 }
 op = TrenchSedimentOptions(**kwargs)
 if os.getenv('REGRESSION_TEST') is not None:

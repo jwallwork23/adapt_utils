@@ -180,7 +180,7 @@ class TracerEquation2D(Equation):
     def __init__(self, function_space, depth,
                  stabilisation='lax_friedrichs',
                  anisotropic=False,
-                 sipg_parameter=Constant(10.0),
+                 sipg_factor=Constant(1.0),
                  su_stabilisation=None,
                  supg_stabilisation=None):
         """
@@ -188,13 +188,13 @@ class TracerEquation2D(Equation):
         :arg depth: :class: `DepthExpression` containing depth info
         :kwarg stabilisation: method of choice, from {'lax_friedrichs', 'su', 'supg'}.
         :kwarg anisotropic: toggle anisotropic cell size measure
-        :kwarg sipg_parameter: :class: `Constant` or :class: `Function` penalty parameter for SIPG
+        :kwarg sipg_factor: :class: `Constant` or :class: `Function` penalty parameter for SIPG
         """
         self.stabilisation = stabilisation
         self.su_stabilisation = su_stabilisation
         self.supg_stabilisation = supg_stabilisation
         super(TracerEquation2D, self).__init__(function_space, anisotropic=anisotropic)
-        self.add_terms(function_space, depth, stabilisation, sipg_parameter)
+        self.add_terms(function_space, depth, stabilisation, sipg_factor)
 
     def add_term(self, term, label):
         """
@@ -219,17 +219,17 @@ class TracerEquation2D(Equation):
             test = test + self.supg_stabilisation*dot(velocity, grad(test))
         return inner(solution, test)*dx
 
-    def add_terms(self, function_space, depth, stabilisation, sipg_parameter):
+    def add_terms(self, function_space, depth, stabilisation, sipg_factor):
         args = (function_space, depth)
         kwargs = {
             'use_lax_friedrichs': stabilisation == 'lax_friedrichs',
-            'sipg_parameter': sipg_parameter,
+            'sipg_factor': sipg_factor,
         }
         self.add_term(HorizontalAdvectionTerm(*args, **kwargs), 'explicit')
         self.add_term(HorizontalDiffusionTerm(*args, **kwargs), 'explicit')
         self.add_term(SourceTerm(*args, **kwargs), 'source')
         try:
-            args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
+            args = (function_space, depth, use_lax_friedrichs, sipg_factor)
             self.add_term(thetis_tracer.SinkTerm(*args), 'source')
         except Exception:
             if os.environ.get('WARNINGS', '0') != '0':
@@ -240,17 +240,17 @@ class ConservativeTracerEquation2D(TracerEquation2D):
     """
     Copied here from `thetis/conservative_tracer_eq_2d` to hook up modified terms.
     """
-    def add_terms(self, function_space, depth, stabilisation, sipg_parameter):
+    def add_terms(self, function_space, depth, stabilisation, sipg_factor):
         args = (function_space, depth)
         kwargs = {
             'use_lax_friedrichs': stabilisation == 'lax_friedrichs',
-            'sipg_parameter': sipg_parameter,
+            'sipg_factor': sipg_factor,
         }
         self.add_term(ConservativeHorizontalAdvectionTerm(*args, **kwargs), 'explicit')
         self.add_term(ConservativeHorizontalDiffusionTerm(*args, **kwargs), 'explicit')
         self.add_term(ConservativeSourceTerm(*args, **kwargs), 'source')
         try:
-            args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
+            args = (function_space, depth, use_lax_friedrichs, sipg_factor)
             self.add_term(thetis_cons_tracer.ConservativeSinkTerm(*args), 'source')
         except Exception:
             if os.environ.get('WARNINGS', '0') != '0':

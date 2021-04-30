@@ -47,7 +47,6 @@ for level in range(num_levels):
     stabilisation = args.stabilisation or 'supg'
     op.stabilisation_tracer = None if stabilisation == 'none' else stabilisation
     op.anisotropic_stabilisation = False if args.anisotropic_stabilisation == '0' else True
-    op.use_automatic_sipg_parameter = args.family == 'dg'
     tp = AdaptiveSteadyProblem(op)
     tp.solve_forward()
 
