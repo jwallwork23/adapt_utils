@@ -19,9 +19,7 @@ from ..swe.utils import *
 __all__ = ["AdaptiveProblem"]
 
 
-# TODO:
-#  * Mesh movement ALE formulation
-#  * Allow mesh dependent Lax-Friedrichs parameter(s)
+# TODO: Mesh movement ALE formulation
 
 class AdaptiveProblem(AdaptiveProblemBase):
     """
@@ -51,9 +49,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'use_lax_friedrichs_velocity': op.stabilisation == 'lax_friedrichs',
             'use_wetting_and_drying': op.wetting_and_drying,
             'wetting_and_drying_alpha': op.wetting_and_drying_alpha,
-            # 'check_volume_conservation_2d': True,  # TODO
             'norm_smoother': op.norm_smoother,
             'sipg_factor': None,
+            'lax_friedrichs_velocity_scaling_factor': op.lax_friedrichs_velocity_scaling_factor,
         }
         for i, swo in enumerate(self.shallow_water_options):
             swo.update(static_options)
@@ -81,25 +79,30 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.stabilisation_sediment = op.stabilisation_sediment
         self.exner_options = [AttrDict() for i in range(op.num_meshes)]
         static_options = {
-            # 'check_tracer_conservation': True,  # TODO
             'use_lax_friedrichs_tracer': op.stabilisation_tracer == 'lax_friedrichs',
             'use_limiter_for_tracers': op.use_limiter_for_tracers and op.tracer_family == 'dg',
-            'sipg_factor': None,
+            'use_supg_stabilization_tracer': op.stabilisation_tracer == 'supg',
+            'sipg_factor': Constant(1.0),
             'use_tracer_conservative_form': op.use_tracer_conservative_form,
+            'horizontal_velocity_scale': op.characteristic_speed,
+            'horizontal_diffusivity_scale': op.characteristic_diffusion,
+            'lax_friedrichs_tracer_scaling_factor': op.lax_friedrichs_tracer_scaling_factor,
         }
+        if not op.anisotropic_stabilisation:
+            raise NotImplementedError("Isotropic stabilisation not implemented in Thetis")
         if op.use_tracer_conservative_form and op.approach in ('lagrangian', 'hybrid'):
             raise NotImplementedError  # TODO
         self.tracer_limiters = [None for i in range(op.num_meshes)]
         for i, to in enumerate(self.tracer_options):
             to.update(static_options)
             if hasattr(op, 'sipg_factor_tracer') and op.sipg_factor_tracer is not None:
-                swo['sipg_factor_tracer'] = op.sipg_factor_tracer
-            to.anisotropic_stabilisation = op.anisotropic_stabilisation
-        for i, to in enumerate(self.sediment_options):
-            to.update(static_options)
+                to['sipg_factor_tracer'] = op.sipg_factor_tracer
+            to['use_tracer_conservative_form'] = op.use_tracer_conservative_form
+        for i, so in enumerate(self.sediment_options):
+            so.update(static_options)
             if hasattr(op, 'sipg_factor_sediment') and op.sipg_factor_sediment is not None:
-                swo['sipg_factor_sediment'] = op.sipg_factor_sediment
-            to.anisotropic_stabilisation = op.anisotropic_stabilisation
+                so['sipg_factor_sediment'] = op.sipg_factor_sediment
+            so['use_sediment_conservative_form'] = op.use_tracer_conservative_form
 
         # Lists to be populated
         self.fwd_solutions = [None for i in range(op.num_meshes)]
@@ -389,80 +392,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.bathymetry[i] = None
         self.depth[i] = None
         self.inflow[i] = None
-
-    # --- Stabilisation
-
-    def set_stabilisation_step(self, i):
-        """
-        Set stabilisation mode and corresponding parameter on the ith mesh.
-        """
-        dim = self.meshes[i].topological_dimension()
-        if self.op.solve_swe:
-            self._set_shallow_water_stabilisation_step(i)
-        if self.op.solve_tracer:
-            self._set_tracer_stabilisation_step(i, sediment=False)
-        if self.op.solve_sediment:
-            self._set_tracer_stabilisation_step(i, sediment=True)
-
-    def _set_shallow_water_stabilisation_step(self, i):
-        op = self.op
-
-        # Symmetric Interior Penalty Galerkin (SIPG) method
-        sipg = None
-        if op.family != 'cg-cg':
-            self.shallow_water_options[i].sipg_factor = op.sipg_factor
-
-        # Stabilisation
-        stabilisation = None if self.stabilisation is None else self.stabilisation.lower()
-        if stabilisation is None:
-            return
-        elif stabilisation == 'lax_friedrichs':
-            assert op.family != 'cg-cg'
-            assert hasattr(op, 'lax_friedrichs_velocity_scaling_factor')
-            self.shallow_water_options[i]['lax_friedrichs_velocity_scaling_factor'] = op.lax_friedrichs_velocity_scaling_factor  # TODO: Allow mesh dependent
-        else:
-            msg = "Stabilisation method {:s} not recognised for {:s}"
-            raise ValueError(msg.format(stabilisation, self.__class__.__name__))
-
-    def _set_tracer_stabilisation_step(self, i, sediment=False):
-        op = self.op
-        eq_options = self.sediment_options if sediment else self.tracer_options
-        stabilisation = self.stabilisation_sediment if sediment else self.stabilisation_tracer
-        stabilisation = None if stabilisation is None else stabilisation.lower()
-
-        # Symmetric Interior Penalty Galerkin (SIPG) method
-        family = op.sediment_family if sediment else op.tracer_family
-        if family == 'dg':
-            eq_options[i].sipg_factor = op.sipg_factor_tracer
-
-        # Stabilisation
-        eq_options[i].lax_friedrichs_tracer_scaling_factor = None
-        eq_options[i].su_stabilisation = None
-        eq_options[i].supg_stabilisation = None
-        if stabilisation is None:
-            return
-        elif stabilisation == 'lax_friedrichs':
-            assert hasattr(op, 'lax_friedrichs_tracer_scaling_factor')
-            assert family == 'dg'
-            eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor  # TODO: Allow mesh dependent
-        elif stabilisation in ('su', 'supg'):
-            assert family == 'cg'
-            assert op.characteristic_speed is not None
-            cell_size_measure = anisotropic_cell_size if op.anisotropic_stabilisation else CellSize
-            h = cell_size_measure(self.meshes[i])
-            U = op.characteristic_speed
-            D = op.characteristic_diffusion
-            tau = 0.5*h/U
-            if D is not None:
-                Pe = 0.5*h*U/D
-                tau *= min_value(1, Pe/3)
-            if stabilisation == 'su':
-                eq_options[i].su_stabilisation = tau
-            else:
-                eq_options[i].supg_stabilisation = tau
-        else:
-            msg = "Stabilisation method {:s} not recognised for {:s}"
-            raise ValueError(msg.format(stabilisation, self.__class__.__name__))
 
     # --- Solution initialisation and transfer
 
@@ -778,11 +707,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].tracer = model(
             self.Q[i],
             self.depth[i],
-            stabilisation=self.stabilisation_tracer,
-            anisotropic=op.anisotropic_stabilisation,
-            sipg_factor=op.sipg_factor,
-            su_stabilisation=op.su_stabilisation,
-            supg_stabilisation=op.supg_stabilisation,
+            self.tracer_options[i],
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -797,9 +722,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.Q[i],
             # self.op.sediment_model.depth_expr,
             self.depth[i],
-            use_lax_friedrichs=self.sediment_options[i].use_lax_friedrichs_tracer,
-            sipg_factor=self.sediment_options[i].sipg_factor,
-            conservative=self.op.use_tracer_conservative_form,
+            self.sediment_options[i],
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -855,11 +778,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].adjoint_tracer = model(
             self.Q[i],
             self.depth[i],
-            stabilisation=self.stabilisation_tracer,
-            anisotropic=op.anisotropic_stabilisation,
-            sipg_factor=op.sipg_factor,
-            su_stabilisation=op.su_stabilisation,
-            supg_stabilisation=op.supg_stabilisation,
+            self.tracer_options[i],
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -939,12 +858,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.error_estimators[i].tracer = TracerGOErrorEstimator(
             self.Q[i],
             self.depth[i],
-            stabilisation=self.stabilisation_tracer,
-            anisotropic=self.op.anisotropic_stabilisation,
-            sipg_factor=op.sipg_factor,
-            su_stabilisation=op.su_stabilisation,
-            supg_stabilisation=op.supg_stabilisation,
-            conservative=op.use_tracer_conservative_form,
+            self.tracer_options[i],
             adjoint=False,
         )
 
@@ -964,12 +878,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.error_estimators[i].adjoint_tracer = TracerGOErrorEstimator(
             self.Q[i],
             self.depth[i],
-            stabilisation=self.stabilisation_tracer,
-            anisotropic=self.op.anisotropic_stabilisation,
-            sipg_factor=op.sipg_factor,
-            su_stabilisation=op.su_stabilisation,
-            supg_stabilisation=op.supg_stabilisation,
-            conservative=not op.use_tracer_conservative_form,
+            self.tracer_options[i],
             adjoint=True,
         )
 

@@ -49,7 +49,6 @@ class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
         self.degree_tracer = 1
         self.tracer_family = 'cg'
         self.stabilisation_tracer = 'supg'
-        self.anisotropic_stabilisation = True
         self.use_limiter_for_tracers = False
 
         # Source (outlet pipe)

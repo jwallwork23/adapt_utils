@@ -89,7 +89,7 @@ class Options(FrozenConfigurable):
     stabilisation = Unicode(None, allow_none=True, help="""
         Stabilisation approach to use for hydrodynamic model.
         """).tag(config=True)
-    anisotropic_stabilisation = Bool(False, help="""
+    anisotropic_stabilisation = Bool(True, help="""
         Account for mesh anisotropy by using an alternative cell size measure to `CellSize`.
         """).tag(config=True)
 

@@ -17,7 +17,6 @@ parser.add_argument("-end_time", help="Simulation end time.")
 
 parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 parser.add_argument("-stabilisation", help="Stabilisation method")
-parser.add_argument("-anisotropic_stabilisation", help="Use anisotropic stabilisation.")
 parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
 
 parser.add_argument("-debug", help="Toggle debugging mode.")
@@ -31,7 +30,6 @@ kwargs = {
     # Spatial discretisation
     'tracer_family': args.family or 'dg',
     'stabilisation_tracer': args.stabilisation or 'lax_friedrichs',
-    'anisotropic_stabilisation': bool(args.anisotropic_stabilisation or False),
     'use_limiter_for_tracers': False if args.limiters == "0" else True,
     # 'use_limiter_for_tracers': bool(args.limiters or False),
 
