@@ -1,4 +1,5 @@
-from adapt_utils.unsteady.test_cases.trench_1d.options import TrenchSedimentOptions
+from firedrake_adjoint import *
+from adapt_utils.unsteady.test_cases.trench_adjoint.options import TrenchSedimentOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from thetis import *
 
@@ -12,13 +13,15 @@ outputdir = 'outputs' + st
 
 nx = 0.5
 
-fric_const = Constant(0.025)
+diff_coeff = Constant(0.15)
+fric_coeff = Constant(0.025)
 
 inputdir = 'hydrodynamics_trench_' + str(nx)
 print(inputdir)
 kwargs = {
     'approach': 'fixed_mesh',
-    'fric_coeff': fric_const,
+    'diff_coeff': diff_coeff,
+    'fric_coeff': fric_coeff,
     'nx': nx,
     'ny': 1,
     'plot_pvd': True,
@@ -38,10 +41,10 @@ swp.solve_forward()
 t2 = time.time()
 
 J = assemble(swp.fwd_solutions_bathymetry[0]*dx)
-rf = ReducedFunctional(J, Control(alpha))
+rf = ReducedFunctional(J, Control(fric_coeff))
 
 print(J)
-print(rf(Constant(0.025))
+print(rf(Constant(0.025)))
 stop
 
 

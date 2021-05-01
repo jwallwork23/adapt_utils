@@ -271,7 +271,7 @@ class AdaptiveProblemBase(object):
         This function is designed for use under Monge-Ampere type mesh movement methods.
         """
         for f, f_int in zip(self.fwd_solutions[i].split(), self.intermediary_solutions[i].split()):
-            f.dat.data[:] = f_int.dat.data
+            f.assign(f_int) #.dat.data[:] = f_int.dat.data
 
     def store_plexes(self, di=None):
         """Save meshes to disk using DMPlex format."""
@@ -501,7 +501,7 @@ class AdaptiveProblemBase(object):
 
         # Update physical mesh coordinates
         self.op.print_debug("MESH MOVEMENT: Updating physical mesh coordinates...")
-        self.meshes[i].coordinates.dat.data[:] = self.intermediary_meshes[i].coordinates.dat.data
+        self.meshes[i].coordinates.assign(self.intermediary_meshes[i].coordinates)
         self.op.print_debug("MESH MOVEMENT: Done!")
 
         # Copy over projected solution data

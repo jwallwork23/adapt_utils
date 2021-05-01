@@ -36,7 +36,6 @@ class BalzanoOptions(CoupledOptions):
 
         # Physical
         self.base_viscosity = 1e-6
-        self.base_diffusivity = 0.15
         self.wetting_and_drying = True
         self.wetting_and_drying_alpha = Constant(0.43)
         friction = kwargs.get('friction', 'manning')
@@ -45,7 +44,6 @@ class BalzanoOptions(CoupledOptions):
         except AssertionError:
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
-        import ipdb; ipdb.set_trace()
         self.average_size = 200e-6  # Average sediment size
         self.friction_coeff = fric_coeff
         self.ksp = None

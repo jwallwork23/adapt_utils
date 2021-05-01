@@ -59,11 +59,11 @@ swp = AdaptiveProblem(op)
 # swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
-alpha = 1.0  # size of the dense region surrounding the coast
+alpha = Constant(0.0)  # size of the dense region surrounding the coast
 beta = 10.0  # level of refinement at coast
 
 
-def wet_dry_interface_monitor(mesh, x = None):
+def wet_dry_interface_monitor(mesh, alpha=alpha, x = None):
     """
     Monitor function focused around the wet-dry interface.
 
@@ -85,7 +85,7 @@ swp.solve_forward()
 
 J = assemble(swp.fwd_solutions[0].split()[1]*dx)
 
-rf = ReducedFunctional(J, Control(fric_coef))
-print(rf(Constant(0.025)))
+rf = ReducedFunctional(J, Control(alpha))
+print(rf(Constant(1.0)))
 
 import ipdb; ipdb.set_trace()

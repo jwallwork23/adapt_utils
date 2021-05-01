@@ -29,7 +29,6 @@ kwargs = {
     'fric_coeff': fric_coef,
     'approach': 'fixed_mesh',
     'n': 2,
-    'num_hours': 1,
     # Geometry
     'bathymetry_type': int(1),
 

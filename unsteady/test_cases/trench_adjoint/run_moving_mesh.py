@@ -17,9 +17,12 @@ st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
 res = 0.1
-alpha = AdjFloat(2)
+alpha = Constant(2)
 beta = 0.5
 gamma = 1
+
+diff_coeff = Constant(0.15)
+fric_coeff = Constant(0.025)
 
 tol = 1e-3
 
@@ -27,6 +30,8 @@ inputdir = 'hydrodynamics_trench_' + str(res)
 
 kwargs = {
     'approach': 'monge_ampere',
+    'diff_coeff': diff_coeff,
+    'fric_coeff': fric_coeff,
     'nx': res,
     'ny': 1,
     'plot_pvd': True,
@@ -47,7 +52,7 @@ swp = AdaptiveProblem(op)
 # swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
-def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
+def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, x = None):
 
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
@@ -81,11 +86,11 @@ swp.solve_forward()
 t2 = time.time()
 
 J = assemble(swp.fwd_solutions_bathymetry[0]*dx)
-rf = ReducedFunctional(J, Control(alpha))
+rf = ReducedFunctional(J, Control(fric_coeff))
 
 print(J)
-print(rf(AdjFloat(2)))
-stop
+print(rf(fric_coeff))
+import ipdb; ipdb.set_trace()
 
 new_mesh = RectangleMesh(16*5*5, 5*1, 16, 1.1)
 

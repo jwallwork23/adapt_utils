@@ -13,7 +13,7 @@ class CoupledOptions(Options):
 
     # Physics
     base_viscosity = NonNegativeFloat(0.0).tag(config=True)
-    base_diffusivity = NonNegativeFloat(0.0).tag(config=True)
+    base_diffusivity = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
     base_velocity = [0.0, 0.0]
     g = FiredrakeScalarExpression(Constant(9.81)).tag(config=True)
     friction = Unicode(None, allow_none=True).tag(config=True)
@@ -167,7 +167,7 @@ class CoupledOptions(Options):
 
     def set_diffusivity(self, fs):
         """Should be implemented in derived class."""
-        return None if np.allclose(self.base_diffusivity, 0.0) else Constant(self.base_diffusivity)
+        return self.base_diffusivity #None if np.allclose(self.base_diffusivity, 0.0) else Constant(self.base_diffusivity)
 
     def set_inflow(self, fs):
         """Should be implemented in derived class."""

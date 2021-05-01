@@ -5,6 +5,7 @@ from adapt_utils.unsteady.options import CoupledOptions
 from adapt_utils.unsteady.swe.utils import heaviside_approx
 from thetis.options import ModelOptions2d
 from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
+from adapt_utils.io import initialise_hydrodynamics
 
 import os
 import numpy as np
@@ -21,12 +22,12 @@ __all__ = ["TrenchSedimentOptions"]
 
 class TrenchSedimentOptions(CoupledOptions):
 
-    def __init__(self, fric_coeff, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir = None, output_dir = None, **kwargs):
+    def __init__(self, diff_coeff, fric_coeff, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir = None, output_dir = None, **kwargs):
         super(TrenchSedimentOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
         self.plot_pvd = True
-        self.num_hours = 5 #15
+        self.num_hours = 2.5 #15
 
         if output_dir is not None:
             self.di = output_dir
@@ -42,7 +43,7 @@ class TrenchSedimentOptions(CoupledOptions):
         except AssertionError:
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
-        self.average_size = 160e-6  # Average sediment size
+        self.average_size = Constant(160e-6)  # Average sediment size
         self.friction_coeff = fric_coeff #0.025
         self.ksp = Constant(3*self.average_size)
         self.norm_smoother = Constant(0.1)
@@ -51,9 +52,11 @@ class TrenchSedimentOptions(CoupledOptions):
         self.stabilisation = 'lax_friedrichs'
 
         # Initial
-        self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
+        self.uv_init_tmp, self.elev_init_tmp = initialise_hydrodynamics(
+            input_dir, outputdir=self.di, op=self, variant = None,
+        )
 
-        self.set_up_morph_model(input_dir, self.default_mesh)
+        self.set_up_morph_model(input_dir, diff_coeff, self.default_mesh)
 
         self.morphological_acceleration_factor = Constant(100)
 
@@ -67,35 +70,34 @@ class TrenchSedimentOptions(CoupledOptions):
         self.family = 'dg-dg'
 
 
-    def set_up_morph_model(self, input_dir, mesh = None):
+    def set_up_morph_model(self, input_dir, diff_coeff, mesh = None):
 
         # Physical
-        self.base_diffusivity = 0.18011042551606954
-
+        self.base_diffusivity = diff_coeff #0.18011042551606954
         self.porosity = Constant(0.4)
-        self.ks = Constant(0.025)
-        self.average_size = 160*(10**(-6))  # Average sediment size
+        self.ks = self.friction_coeff #Constant(0.025)
+        self.average_size = Constant(160*(10**(-6)))  # Average sediment size
 
         self.wetting_and_drying = False
         self.conservative = False
-        self.slope_eff = True
-        self.angle_correction = True
-        self.suspended = True
-        self.convective_vel_flag = True
+        self.slope_eff = False #True
+        self.angle_correction = False #True
+        self.suspended = False
+        self.convective_vel_flag = False #True
         self.bedload = True
-
-        #if not hasattr(self, 'bathymetry') or self.bathymetry is None:
-        #    self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
-        #    self.bathymetry = self.set_bathymetry(self.P1)
 
 
     def create_sediment_model(self, mesh, bathymetry):
         self.P1DG = FunctionSpace(mesh, "DG", 1)
         self.P1_vec_dg = VectorFunctionSpace(mesh, "DG", 1)
 
-        self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
+        self.uv_d = Function(self.P1_vec_dg)
+        import ipdb; ipdb.set_trace()
+        self.uv_d.assign(self.uv_init_tmp)
 
-        self.eta_d = Function(self.P1DG).project(self.elev_init)
+        self.eta_d = Function(self.P1DG)
+        self.eta_d.assign(self.elev_init_tmp)
+
         self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
             bedload=self.bedload, angle_correction=self.angle_correction, slope_eff=self.slope_eff, seccurrent=False,
             mesh2d=mesh, bathymetry_2d=bathymetry,
@@ -144,15 +146,21 @@ class TrenchSedimentOptions(CoupledOptions):
                 outflow_tag: {'elev': Constant(0.397)},
             },
 	   'sediment': {
-                inflow_tag: {'value': self.sediment_model.equiltracer}
+                #inflow_tag: {'value': self.sediment_model.equiltracer}
             }
         }
         return boundary_conditions
 
     def set_initial_condition(self, prob):
         u, eta = prob.fwd_solutions[0].split()
-        u.project(self.uv_init)
-        eta.project(self.elev_init)
+        uv_init = Function(self.P1_vec_dg)
+        uv_init.assign(self.uv_init_tmp)
+
+        elev_init = Function(self.P1DG)
+        elev_init.assign(self.elev_init_tmp)
+
+        u.project(uv_init)
+        eta.project(elev_init)
 
     def set_sediment_source(self, fs):
         if self.suspended:
@@ -183,7 +191,6 @@ class TrenchSedimentOptions(CoupledOptions):
 
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
-        #self.eta_tilde_file._topology = None
         if self.plot_timeseries:
             u, eta = prob.fwd_solutions[i].split()
             b = prob.bathymetry[i]
@@ -191,47 +198,7 @@ class TrenchSedimentOptions(CoupledOptions):
 
         def export_func():
             eta_tilde.project(self.get_eta_tilde(prob, i))
-            #self.eta_tilde_file.write(eta_tilde)
             u, eta = prob.fwd_solutions[i].split()
-            #if self.plot_timeseries:
-
-                # Store modified bathymetry timeseries
-            #    wd.project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha))
-            #    self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
 
         return export_func
-
-    def initialise_fields(self, inputdir, outputdir):
-        """
-        Initialise simulation with results from a previous simulation
-        """
-        from firedrake.petsc import PETSc
-        #try:
-        #    import firedrake.cython.dmplex as dmplex
-        #except:
-        #    import firedrake.dmplex as dmplex  # Older version
-        # mesh
-        with timed_stage('mesh'):
-            # Load
-            newplex = PETSc.DMPlex().create()
-            newplex.createFromFile(inputdir + '/myplex.h5')
-            mesh = Mesh(newplex)
-
-        DG_2d = FunctionSpace(mesh, "DG", 1)
-        # elevation
-        with timed_stage('initialising elevation'):
-            chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_READ)
-            elev_init = Function(DG_2d, name="elevation")
-            chk.load(elev_init)
-            File(outputdir + "/elevation_imported.pvd").write(elev_init)
-            chk.close()
-        # velocity
-        with timed_stage('initialising velocity'):
-            chk = DumbCheckpoint(inputdir + "/velocity", mode=FILE_READ)
-            V = VectorFunctionSpace(mesh, "DG", 1)
-            uv_init = Function(V, name="velocity")
-            chk.load(uv_init)
-            File(outputdir + "/velocity_imported.pvd").write(uv_init)
-            chk.close()
-        return elev_init, uv_init,
 
