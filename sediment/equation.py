@@ -34,7 +34,7 @@ class SedimentTerm(TracerTerm):
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
         """
-        super(SedimentTerm, self).__init__(function_space, depth)
+        super(SedimentTerm, self).__init__(function_space, depth, options)
         self.conservative = options.use_tracer_conservative_form
 
 

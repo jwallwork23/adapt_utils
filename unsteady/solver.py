@@ -50,7 +50,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'use_wetting_and_drying': op.wetting_and_drying,
             'wetting_and_drying_alpha': op.wetting_and_drying_alpha,
             'norm_smoother': op.norm_smoother,
-            'sipg_factor': None,
+            'sipg_factor': Constant(1.0),
             'lax_friedrichs_velocity_scaling_factor': op.lax_friedrichs_velocity_scaling_factor,
         }
         for i, swo in enumerate(self.shallow_water_options):
@@ -82,7 +82,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'use_lax_friedrichs_tracer': op.stabilisation_tracer == 'lax_friedrichs',
             'use_limiter_for_tracers': op.use_limiter_for_tracers and op.tracer_family == 'dg',
             'use_supg_tracer': op.stabilisation_tracer == 'supg',
-            'sipg_factor': Constant(1.0),
+            'sipg_factor_tracer': Constant(1.0),
             'use_tracer_conservative_form': op.use_tracer_conservative_form,
             'horizontal_velocity_scale': op.characteristic_speed,
             'horizontal_diffusivity_scale': op.characteristic_diffusion,
@@ -730,6 +730,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def create_forward_exner_equation_step(self, i):
         from thetis.exner_eq import ExnerEquation
 
+        self.op.sediment_model.solve_suspended_sediment = self.op.solve_sediment
+        self.op.sediment_model.use_bedload = self.op.solve_exner
         self.equations[i].exner = ExnerEquation(
             self.W[i],
             self.depth[i],
