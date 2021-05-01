@@ -33,7 +33,7 @@ class TrenchSedimentOptions(CoupledOptions):
             self.di = output_dir
 
         # Physical
-        self.base_viscosity = 1e-6
+        self.base_viscosity = Constant(1e-6)
         self.wetting_and_drying = False
         self.solve_sediment = True
         self.solve_exner = True
@@ -45,7 +45,7 @@ class TrenchSedimentOptions(CoupledOptions):
         self.friction = friction
         self.average_size = Constant(160e-6)  # Average sediment size
         self.friction_coeff = fric_coeff #0.025
-        self.ksp = Constant(3*self.average_size)
+        self.ksp = fric_coeff #Constant(3*self.average_size)
         self.norm_smoother = Constant(0.1)
 
         # Stabilisation
@@ -80,9 +80,9 @@ class TrenchSedimentOptions(CoupledOptions):
 
         self.wetting_and_drying = False
         self.conservative = False
-        self.slope_eff = False #True
-        self.angle_correction = False #True
-        self.suspended = False
+        self.slope_eff = True
+        self.angle_correction = True
+        self.suspended = True
         self.convective_vel_flag = False #True
         self.bedload = True
 
@@ -92,7 +92,6 @@ class TrenchSedimentOptions(CoupledOptions):
         self.P1_vec_dg = VectorFunctionSpace(mesh, "DG", 1)
 
         self.uv_d = Function(self.P1_vec_dg)
-        import ipdb; ipdb.set_trace()
         self.uv_d.assign(self.uv_init_tmp)
 
         self.eta_d = Function(self.P1DG)
@@ -130,10 +129,10 @@ class TrenchSedimentOptions(CoupledOptions):
                              conditional(le(x, 9.5), depth_trench, conditional(le(x, 11), -(1/1.5)*depth_diff*(x-11) + depth_riv, depth_riv))))
         return interpolate(-trench, fs)
 
-    def set_viscosity(self, fs):
-        self.viscosity = Function(fs)
-        self.viscosity.assign(self.base_viscosity)
-        return self.viscosity
+    #def set_viscosity(self, fs):
+    #    self.viscosity = Function(fs)
+    #    self.viscosity.assign(self.base_viscosity)
+    #    return self.base_viscosity
 
     def set_boundary_conditions(self, prob, i):
         inflow_tag = 1

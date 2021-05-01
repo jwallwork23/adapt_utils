@@ -85,7 +85,7 @@ swp.solve_forward()
 
 J = assemble(swp.fwd_solutions[0].split()[1]*dx)
 
-rf = ReducedFunctional(J, Control(alpha))
-print(rf(Constant(1.0)))
+rf = ReducedFunctional(J, Control(fric_coef))
+print(rf(Constant(0.025)))
 
 import ipdb; ipdb.set_trace()

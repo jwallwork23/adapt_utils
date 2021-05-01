@@ -39,7 +39,7 @@ swp = AdaptiveProblem(op)
 t1 = time.time()
 swp.solve_forward()
 t2 = time.time()
-
+import ipdb; ipdb.set_trace()
 J = assemble(swp.fwd_solutions_bathymetry[0]*dx)
 rf = ReducedFunctional(J, Control(fric_coeff))
 

@@ -142,7 +142,6 @@ class SedimentModel(object):
         self.taucr = Function(self.R_1d).assign((self.rhos-self.rhow)*self.g*self.average_size*self.thetacr)
 
         # calculate settling velocity
-        import ipdb; ipdb.set_trace()
         self.settling_velocity = Function(self.R_1d).assign(conditional(self.average_size <= 1e-04, self.g*(self.average_size**2)*self.R/(18*self.viscosity),
                                                                         conditional(self.average_size <= 1e-03, (10*self.viscosity*(self.average_size**(-1)))
                                                                                     * (sqrt(1 + 0.01*((self.R*self.g*(self.average_size**3))

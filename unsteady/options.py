@@ -12,7 +12,7 @@ class CoupledOptions(Options):
     """Parameters for coupled shallow water - tracer transport model."""
 
     # Physics
-    base_viscosity = NonNegativeFloat(0.0).tag(config=True)
+    base_viscosity = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
     base_diffusivity = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
     base_velocity = [0.0, 0.0]
     g = FiredrakeScalarExpression(Constant(9.81)).tag(config=True)
@@ -163,7 +163,7 @@ class CoupledOptions(Options):
 
     def set_viscosity(self, fs):
         """Should be implemented in derived class."""
-        return None if np.allclose(self.base_viscosity, 0.0) else Constant(self.base_viscosity)
+        return self.base_viscosity #None if np.allclose(self.base_viscosity, 0.0) else self.base_viscosity
 
     def set_diffusivity(self, fs):
         """Should be implemented in derived class."""
