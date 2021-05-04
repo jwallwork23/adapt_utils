@@ -24,7 +24,8 @@ outputdir = 'outputs' + st
 
 res = 0.5
 
-diff_coeff = Constant(0.15)
+#diff_coeff = Constant(0.15)
+diff_coeff = Constant(0.18011042551606954)
 fric_coeff = Constant(0.025)
 
 # to create the input hydrodynamics directiory please run hydro_trench_slant.py
@@ -59,7 +60,11 @@ op = TrenchSedimentOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
 
-def gradient_interface_monitor(mesh, x=None):
+alpha = Constant(1)
+beta = Constant(0.5)
+gamma = Constant(1)
+
+def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, x=None):
 
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
@@ -67,10 +72,6 @@ def gradient_interface_monitor(mesh, x=None):
     NOTE: Defined on the *computational* mesh.
 
     """
-
-    alpha = Constant(1)
-    beta = Constant(0.5)
-    gamma = Constant(1)
 
     P1 = FunctionSpace(mesh, "CG", 1)
 
@@ -89,7 +90,7 @@ def gradient_interface_monitor(mesh, x=None):
     comp_new2 = interpolate(conditional(comp_new > Constant(0.0), comp_new, Constant(0.0)), P1)
     mon_init = project(Constant(1.0) + comp_new2, P1)
 
-    return Constant(1) #mon_init
+    return mon_init
 
 swp.set_monitor_functions(gradient_interface_monitor)
 
@@ -101,16 +102,14 @@ t1 = time.time()
 swp.solve_forward()
 t2 = time.time()
 
-J = assemble(swp.fwd_solutions_bathymetry[0]*dx)
-rf = ReducedFunctional(J, Control(diff_coeff))
+#J = assemble(swp.fwd_solutions_bathymetry[0]*dx)
+#rf = ReducedFunctional(J, Control(diff_coeff))
 
-print(J)
-print(rf(Constant(0.15)))
+#print(J)
+#print(rf(Constant(0.15)))
 
-h2 = Constant(5e-3)
-conv_rate = taylor_test(rf, diff_coeff, h2)
-
-import ipdb; ipdb.set_trace()
+#h2 = Constant(5e-3)
+#conv_rate = taylor_test(rf, diff_coeff, h2)
 
 # Save solution data
 new_mesh = RectangleMesh(16*5*5, 5*1, 16, 1.1)
@@ -137,9 +136,9 @@ df_exp = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathym
 
 # Print to screen
 print("res = {:.4f}".format(res))
-print("alpha = {:.1f}".format(alpha))
-print("beta = {:.1f}".format(beta))
-print("gamma = {:.1f}".format(gamma))
+#print("alpha = {:.1f}".format(alpha))
+#print("beta = {:.1f}".format(beta))
+#print("gamma = {:.1f}".format(gamma))
 print("Time: {:.1f}s".format(t2 - t1))
 print("Total error: {:.4e}".format(np.sqrt(sum(diff_thetis))))
 df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.0000.csv')

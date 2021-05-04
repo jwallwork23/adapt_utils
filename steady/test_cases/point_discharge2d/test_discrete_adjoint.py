@@ -51,7 +51,7 @@ tp.solve_forward()
 def reduced_functional(m):
     with pyadjoint.stop_annotating():
         _op = op.copy()
-        _op.base_diffusivity = m.dat.data[0]
+        _op.base_diffusivity = m
         _tp = tp.__class__(_op, print_progress=False)
         _tp.control_field.assign(m)
         _tp.solve_forward()

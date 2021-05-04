@@ -76,8 +76,8 @@ class BeachOptions(CoupledOptions):
     def set_up_morph_model(self, mesh=None):
 
         # Physics
-        self.base_viscosity = 0.5
-        self.base_diffusivity = 100
+        self.base_viscosity = Constant(0.5)
+        self.base_diffusivity = Constant(100)
         self.gravity = Constant(9.81)
         self.porosity = Constant(0.4)
         self.ks = Constant(0.025)

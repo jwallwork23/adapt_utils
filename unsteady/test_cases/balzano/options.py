@@ -36,7 +36,6 @@ class BalzanoOptions(CoupledOptions):
 
         # Physical
         self.base_viscosity = Constant(1e-6)
-        self.base_diffusivity = 0.15
         self.wetting_and_drying = True
         self.wetting_and_drying_alpha = Constant(0.43)
         friction = kwargs.get('friction', 'manning')

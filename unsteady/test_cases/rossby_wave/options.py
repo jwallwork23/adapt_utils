@@ -41,7 +41,7 @@ class BoydOptions(CoupledOptions):
 
         # Physics
         self.g.assign(1.0)
-        self.base_viscosity = 0.0
+        self.base_viscosity = Constant(0.0)
         self.modon_propagation_speed = -1.0/3.0
         if self.order != 0:
             self.modon_propagation_speed -= 0.395*self.soliton_amplitude**2

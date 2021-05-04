@@ -165,6 +165,9 @@ class Options(FrozenConfigurable):
     hybrid_mode = Enum(['h', 'm'], default_value='m', help="""
         Adaptation mode used for detangling.
         """).tag(coonfig=True)
+    reinitialise = Bool(True, help="""
+        Reinitialise the fields after the first mesh movement but before the simulation starts.
+        """).tag(config=True)
 
     # Recovery
     gradient_recovery = Enum(['L2', 'ZZ'], default_value='L2', help="""
@@ -396,10 +399,10 @@ class CoupledOptions(Options):
 
     # Physics
     base_viscosity = FiredrakeScalarExpression(Constant(0.0), help="""
-        Non-negative value providing the default constant viscosity field.
+        Non-negative constant providing the default constant viscosity field.
         """).tag(config=True)
     min_viscosity = NonNegativeFloat(0.0, help="""
-        Non-negative value providing the minimum tolerated viscosity.
+        Non-negative constant providing the minimum tolerated viscosity.
         """).tag(config=True)
     base_diffusivity = FiredrakeScalarExpression(Constant(0.0), help="""
         Non-negative value providing the default constant diffusivity field.
@@ -618,13 +621,11 @@ class CoupledOptions(Options):
 
     def set_viscosity(self, fs):
         """Should be implemented in derived class."""
-        # return None if np.isclose(self.base_viscosity, 0.0) else Constant(self.base_viscosity)
-        return self.base_viscosity #None if np.isclose(self.base_viscosity, 0.0) else Function(fs).assign(self.base_viscosity)
+        return self.base_viscosity
 
     def set_diffusivity(self, fs):
         """Should be implemented in derived class."""
-        # return None if np.isclose(self.base_diffusivity, 0.0) else Constant(self.base_diffusivity)
-        return self.base_diffusivity #None if np.isclose(self.base_diffusivity, 0.0) else Function(fs).assign(self.base_diffusivity)
+        return self.base_diffusivity
 
     def set_inflow(self, fs):
         """Should be implemented in derived class."""

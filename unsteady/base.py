@@ -189,7 +189,7 @@ class AdaptiveProblemBase(object):
         self.set_finite_elements()
         self.create_function_spaces()
         self.create_solutions()
-        self.set_fields(init=1)
+        self.set_fields(init=True, reinit=False)
         self.set_stabilisation()
         self.set_boundary_conditions()
         self.create_outfiles(restarted=restarted)
@@ -281,7 +281,7 @@ class AdaptiveProblemBase(object):
         self.fwd_solutions[i] = None
         self.adj_solutions[i] = None
 
-    def set_fields(self, init, **kwargs):
+    def set_fields(self, init, reinit, **kwargs):
         """
         Set various fields *on each mesh*, including:
 
@@ -295,7 +295,7 @@ class AdaptiveProblemBase(object):
         """
         self.op.print_debug("SETUP: Creating fields...")
         for i in range(self.num_meshes):
-            self.set_fields_step(i, init, **kwargs)
+            self.set_fields_step(i, init, reinit, **kwargs)
 
     def set_fields_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
@@ -656,7 +656,7 @@ class AdaptiveProblemBase(object):
             args = (Mesh(self.meshes[i].coordinates.copy(deepcopy=True)), monitors[i])
             self.mesh_movers[i] = MeshMover(*args, **kwargs)
 
-    def move_mesh(self, i, init=False):
+    def move_mesh(self, i, init=False, reinit=False):
         """
         Move the mesh using an r-adaptive or hybrid method of choice.
         """
@@ -665,7 +665,7 @@ class AdaptiveProblemBase(object):
         elif self.op.approach == 'ale':
             raise NotImplementedError  # TODO
         elif self.mesh_movers[i] is not None:
-            return self.move_mesh_monge_ampere(i, init)
+            return self.move_mesh_monge_ampere(i, init, reinit)
 
     def move_lagrangian_mesh(self, i):
         """
@@ -727,7 +727,7 @@ class AdaptiveProblemBase(object):
             warnings.warn("Mesh has {:d} inverted element(s)!".format(num_inverted))
         return restarted
 
-    def move_mesh_monge_ampere(self, i, init):  # TODO: Annotation
+    def move_mesh_monge_ampere(self, i, init, reinit):  # TODO: Annotation
         """
         Move the physical mesh using a monitor based approach driven by solutions of a Monge-Ampere
         type equation.
@@ -770,7 +770,7 @@ class AdaptiveProblemBase(object):
 
         # Re-interpolate fields
         self.op.print_debug("MESH MOVEMENT: Re-interpolating fields...")
-        #self.set_fields(init)
+        self.set_fields(init, reinit)
         return False
 
     # --- Error estimation

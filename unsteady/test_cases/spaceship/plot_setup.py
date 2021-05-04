@@ -91,12 +91,12 @@ for ext in ("png", "pdf"):
 # --- Plot linear and exponential sponges
 
 ticks = np.linspace(0.0, op.max_viscosity, 5)
-ticks[0] = op.base_viscosity
+ticks[0] = float(op.base_viscosity)
 for sponge_type in ('linear', 'exponential'):
     fig, axes = plt.subplots(figsize=(5, 4))
     op.viscosity_sponge_type = sponge_type
     nu = op.set_viscosity(swp.P1[0])
-    cbar_range = np.linspace(op.base_viscosity - eps, op.max_viscosity + eps, 50)
+    cbar_range = np.linspace(float(op.base_viscosity) - eps, op.max_viscosity + eps, 50)
     cbar = fig.colorbar(tricontourf(nu, levels=cbar_range, axes=axes, cmap='coolwarm'), ax=axes)
     cbar.set_ticks(ticks)
     cbar.set_label(r"Kinematic viscosity $[m^2\,s^{-1}]$")

@@ -41,8 +41,8 @@ class TurbineArrayOptions(SteadyTurbineOptions):
         # Physics
         self.inflow_velocity = [5.0, 0.0]  # Typical fast flow in Pentland Firth
         self.base_velocity = self.inflow_velocity
-        self.base_viscosity = 0.5          # Chosen to give a moderately advection-dominated problem
-        self.base_bathymetry = 40.0        # Typical depth in Pentland Firth
+        self.base_viscosity = Constant(0.5) # Chosen to give a moderately advection-dominated problem
+        self.base_bathymetry = 40.0         # Typical depth in Pentland Firth
         self.friction_coeff = 0.0025
 
         # Tidal farm

@@ -24,7 +24,7 @@ class CosinePrescribedVelocityOptions(CoupledOptions):
         self.end_time = 10.0
 
         # self.base_diffusivity = 1.0e-8
-        self.base_diffusivity = 0.0
+        self.base_diffusivity = Constant(0.0)
         self.base_velocity = [1.0, 0.0]
         self.characteristic_speed = Constant(1.0)
 

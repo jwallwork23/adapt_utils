@@ -65,7 +65,7 @@ class LeVequeOptions(CoupledOptions):
         self.set_region_of_interest(shape=shape)
 
         # Physics
-        self.base_diffusivity = 0.0
+        self.base_diffusivity = Constant(0.0)
         self.characteristic_speed = Constant(1.0)  # TODO: check
 
         # Spatial discretisation

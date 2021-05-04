@@ -42,7 +42,7 @@ class TsunamiOptions(CoupledOptions):
         self.shift_bathymetry_flag = False
 
         # Stabilisation
-        self.base_viscosity = 1.0e-03
+        self.base_viscosity = Constant(1.0e-03)
         self.use_automatic_sipg_parameter = True
 
         # Quantity of interest

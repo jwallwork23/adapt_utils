@@ -28,7 +28,7 @@ class TrenchSedimentOptions(CoupledOptions):
             self.di = output_dir
 
         # Physical
-        self.base_viscosity = 1e-6
+        self.base_viscosity = Constant(1e-6)
         self.wetting_and_drying = False
         self.solve_sediment = True
         self.solve_exner = True
@@ -62,7 +62,7 @@ class TrenchSedimentOptions(CoupledOptions):
         self.family = 'dg-dg'
 
     def set_up_morph_model(self, input_dir, mesh=None):
-        self.base_diffusivity = 0.18011042551606954
+        self.base_diffusivity = Constant(0.18011042551606954)
         self.porosity = Constant(0.4)
         self.ks = Constant(0.025)
 
@@ -116,11 +116,6 @@ class TrenchSedimentOptions(CoupledOptions):
                     le(x, 9.5), depth_trench, conditional(
                         le(x, 11), -(1/1.5)*depth_diff*(x-11) + depth_riv, depth_riv))))
         return interpolate(-trench, fs)
-
-    def set_viscosity(self, fs):
-        self.viscosity = Function(fs)
-        self.viscosity.assign(self.base_viscosity)
-        return self.viscosity
 
     def set_boundary_conditions(self, prob, i):
         inflow_tag = 1

@@ -105,7 +105,7 @@ kwargs = {
 
     # Physics
     'bathymetry_cap': 30.0,
-    'base_viscosity': float(args.base_viscosity or 1.0e-03),
+    'base_viscosity': Constant(args.base_viscosity or 1.0e-03),
 
     # Solver
     'family': family,
