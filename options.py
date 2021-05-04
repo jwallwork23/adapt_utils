@@ -395,13 +395,13 @@ class CoupledOptions(Options):
         """).tag(config=True)
 
     # Physics
-    base_viscosity = NonNegativeFloat(0.0, help="""
+    base_viscosity = FiredrakeScalarExpression(Constant(0.0), help="""
         Non-negative value providing the default constant viscosity field.
         """).tag(config=True)
     min_viscosity = NonNegativeFloat(0.0, help="""
         Non-negative value providing the minimum tolerated viscosity.
         """).tag(config=True)
-    base_diffusivity = NonNegativeFloat(0.0, help="""
+    base_diffusivity = FiredrakeScalarExpression(Constant(0.0), help="""
         Non-negative value providing the default constant diffusivity field.
         """).tag(config=True)
     base_bathymetry = PositiveFloat(1.0, help="""
@@ -416,7 +416,7 @@ class CoupledOptions(Options):
     friction = Unicode(None, allow_none=True, help="""
         Friction parametrisation for the drag term. Choose from {'nikuradse', 'manning'}.
         """).tag(config=True)
-    friction_coeff = NonNegativeFloat(None, allow_none=True, help="""
+    friction_coeff = FiredrakeScalarExpression(None, allow_none=True, help="""
         Non-negative value providing the default constant drag parameter.
         """).tag(config=True)
 
@@ -619,12 +619,12 @@ class CoupledOptions(Options):
     def set_viscosity(self, fs):
         """Should be implemented in derived class."""
         # return None if np.isclose(self.base_viscosity, 0.0) else Constant(self.base_viscosity)
-        return None if np.isclose(self.base_viscosity, 0.0) else Function(fs).assign(self.base_viscosity)
+        return self.base_viscosity #None if np.isclose(self.base_viscosity, 0.0) else Function(fs).assign(self.base_viscosity)
 
     def set_diffusivity(self, fs):
         """Should be implemented in derived class."""
         # return None if np.isclose(self.base_diffusivity, 0.0) else Constant(self.base_diffusivity)
-        return None if np.isclose(self.base_diffusivity, 0.0) else Function(fs).assign(self.base_diffusivity)
+        return self.base_diffusivity #None if np.isclose(self.base_diffusivity, 0.0) else Function(fs).assign(self.base_diffusivity)
 
     def set_inflow(self, fs):
         """Should be implemented in derived class."""
@@ -660,7 +660,7 @@ class CoupledOptions(Options):
 
     def set_manning_drag_coefficient(self, fs):
         if self.friction == 'manning':
-            return Constant(self.friction_coeff or 0.02)
+            return self.friction_coeff #Constant(self.friction_coeff or 0.02)
 
     def get_velocity(self, t):
         raise NotImplementedError("Should be implemented in derived class.")

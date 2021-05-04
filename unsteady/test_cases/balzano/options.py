@@ -18,8 +18,7 @@ class BalzanoOptions(CoupledOptions):
     [1] A. Balzano, "Evaluation of methods for numerical simulation of wetting and drying in
         shallow water flow models." Coastal Engineering 34.1-2 (1998): 83-107.
     """
-    def __init__(self, n=1, bathymetry_type=1, plot_timeseries=False, **kwargs):
-        self.timestepper = 'CrankNicolson'
+    def __init__(self, fric_coeff, n=1, bathymetry_type=1, plot_timeseries=False, **kwargs):
         super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.basin_x = 13800.0  # Length of wet region
@@ -36,7 +35,7 @@ class BalzanoOptions(CoupledOptions):
         self.di = os.path.join(self.di, 'bathymetry{:d}'.format(self.bathymetry_type))
 
         # Physical
-        self.base_viscosity = 1e-6
+        self.base_viscosity = Constant(1e-6)
         self.base_diffusivity = 0.15
         self.wetting_and_drying = True
         self.wetting_and_drying_alpha = Constant(0.43)
@@ -47,7 +46,7 @@ class BalzanoOptions(CoupledOptions):
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
         self.average_size = 200e-6  # Average sediment size
-        self.friction_coeff = 0.025
+        self.friction_coeff = fric_coeff
         self.ksp = None
         # Stabilisation
         self.stabilisation = None
@@ -62,7 +61,8 @@ class BalzanoOptions(CoupledOptions):
         self.dt = 600.0
         self.end_time = self.num_hours*3600.0
         # self.dt_per_export = 6
-        self.dt_per_export = 1
+        self.dt_per_export = 6
+        self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 0.5
 
         # Timeseries
@@ -116,10 +116,10 @@ class BalzanoOptions(CoupledOptions):
         top_wall_tag = 4
         boundary_conditions = {
             'shallow_water': {
-                inflow_tag: {'elev': self.elev_in},
-                outflow_tag: {'un': Constant(0.0)},
-                bottom_wall_tag: {'un': Constant(0.0)},
-                top_wall_tag: {'un': Constant(0.0)},
+                #inflow_tag: {'elev': self.elev_in},
+                #outflow_tag: {'un': Constant(0.0)},
+                #bottom_wall_tag: {'un': Constant(0.0)},
+                #top_wall_tag: {'un': Constant(0.0)},
             }
         }
         return boundary_conditions
@@ -129,8 +129,8 @@ class BalzanoOptions(CoupledOptions):
 
     def set_initial_condition(self, prob):
         u, eta = prob.fwd_solutions[0].split()
-        u.interpolate(as_vector([1.0e-7, 0.0]))
-        eta.assign(0.0)
+        u.interpolate(as_vector((1.0e-7, 0.0)))
+        eta.assign(Constant(0.0))
 
     def get_update_forcings(self, prob, i, adjoint=False):
         u, eta = prob.fwd_solutions[i].split()
@@ -146,7 +146,7 @@ class BalzanoOptions(CoupledOptions):
                     depth.project(eta + bathymetry_displacement(eta) + prob.bathymetry[i])
                 prob.fields[i].quadratic_drag_coefficient.interpolate(self.get_cfactor(depth))
 
-        return update_forcings
+        return None #update_forcings
 
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")

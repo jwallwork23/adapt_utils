@@ -770,7 +770,7 @@ class AdaptiveProblemBase(object):
 
         # Re-interpolate fields
         self.op.print_debug("MESH MOVEMENT: Re-interpolating fields...")
-        self.set_fields(init)
+        #self.set_fields(init)
         return False
 
     # --- Error estimation
