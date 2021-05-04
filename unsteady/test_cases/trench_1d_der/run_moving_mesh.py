@@ -24,8 +24,6 @@ outputdir = 'outputs' + st
 
 res = 0.5
 
-#diff_coeff = Constant(0.15)
-diff_coeff = Constant(0.18011042551606954)
 fric_coeff = Constant(0.025)
 
 # to create the input hydrodynamics directiory please run hydro_trench_slant.py
@@ -43,7 +41,6 @@ kwargs = {
     'approach': 'monge_ampere',
     'nx': res,
     'ny': 1 if res < 4 else 2,
-    'diff_coeff': diff_coeff,
     'fric_coeff': fric_coeff,
     'plot_pvd': True,
     'input_dir': inputdir,

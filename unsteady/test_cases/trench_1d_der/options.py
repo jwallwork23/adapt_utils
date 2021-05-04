@@ -23,7 +23,7 @@ class TrenchSedimentOptions(CoupledOptions):
         dredged trenches: Semi-empirical model for the flow in dredged trenches", Delft, the
         Netherlands, 1980.
     """
-    def __init__(self, diff_coeff, fric_coeff, friction='nik_solver', nx=1, ny=1, input_dir=None, output_dir=None, **kwargs):
+    def __init__(self, fric_coeff, friction='nik_solver', nx=1, ny=1, input_dir=None, output_dir=None, **kwargs):
         self.timestepper = 'CrankNicolson'
         super(TrenchSedimentOptions, self).__init__(**kwargs)
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
@@ -57,7 +57,7 @@ class TrenchSedimentOptions(CoupledOptions):
             input_dir, outputdir=output_dir, op=self, variant = None,
         )
 
-        self.set_up_morph_model(input_dir, fric_coeff, diff_coeff, self.default_mesh)
+        self.set_up_morph_model(input_dir, fric_coeff, self.default_mesh)
         self.morphological_acceleration_factor = Constant(100)
 
         # Time integration
@@ -69,17 +69,17 @@ class TrenchSedimentOptions(CoupledOptions):
         self.implicitness_theta = 1.0
         self.family = 'dg-dg'
 
-    def set_up_morph_model(self, input_dir, fric_coeff, diff_coeff, mesh=None):
-        self.base_diffusivity = diff_coeff #Constant(0.18011042551606954)
+    def set_up_morph_model(self, input_dir, fric_coeff, mesh=None):
+        self.base_diffusivity = Constant(0.18011042551606954)
         self.porosity = Constant(0.4)
         self.ks = fric_coeff
         self.wetting_and_drying = False
         self.conservative = False
-        self.slope_eff = False
-        self.angle_correction = False
+        self.slope_eff = True
+        self.angle_correction = True
         self.suspended = True
-        self.convective_vel_flag = False
-        self.bedload = False
+        self.convective_vel_flag = True
+        self.bedload = True
 
     def create_sediment_model(self, mesh, bathymetry):
         self.P1DG = FunctionSpace(mesh, "DG", 1)
@@ -146,7 +146,7 @@ class TrenchSedimentOptions(CoupledOptions):
                 outflow_tag: {'elev': Constant(0.397)},
             },
             'sediment': {
-                #inflow_tag: {'value': self.sediment_model.equiltracer}
+                inflow_tag: {'value': self.sediment_model.equiltracer}
             }
         }
         return boundary_conditions
