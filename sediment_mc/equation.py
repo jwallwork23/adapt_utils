@@ -21,23 +21,22 @@ velocities, and :math:`\mu_h` denotes horizontal diffusivity.
 """
 from __future__ import absolute_import
 from thetis.utility import *
-from thetis.equation import Equation
 from thetis.tracer_eq_2d import *
 from thetis.conservative_tracer_eq_2d import ConservativeHorizontalAdvectionTerm
+
 
 class SedimentTerm(TracerTerm):
     """
     Generic sediment term that provides commonly used members.
     """
-    def __init__(self, function_space, depth, options, sediment_model, conservative=False):
+    def __init__(self, function_space, depth, options, sediment_model):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
-        :kwarg bool conservative: whether to use conservative tracer
         """
         super(SedimentTerm, self).__init__(function_space, depth, options)
+        self.conservative = options.use_tracer_conservative_form
         self.sediment_model = sediment_model
-        self.conservative = conservative
 
 class ConservativeSedimentAdvectionTerm(SedimentTerm, ConservativeHorizontalAdvectionTerm):
     """
@@ -75,14 +74,12 @@ class SedimentErosionTerm(SedimentTerm):
 
     """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
-        source = fields.get('source')
-        if self.conservative:
-            H = self.depth.get_total_depth(fields['elev_2d'])
-            f = inner(H*source, self.test)*self.dx
-        else:
-            f = inner(source, self.test)*self.dx
+        ero = self.sediment_model.get_erosion_term()
+        if not self.conservative:
+            elev = fields['elev_2d']
+            ero = ero / self.depth.get_total_depth(elev)
+        f = self.test * ero * self.dx
         return f
-
 
 class SedimentDepositionTerm(SedimentTerm):
     r"""
@@ -97,26 +94,25 @@ class SedimentDepositionTerm(SedimentTerm):
 
     """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
-        sink = fields.get('sink')
-        H = self.depth.get_total_depth(fields['elev_2d'])
-        f = inner(-sink*solution, self.test)*self.dx
-        return f
+        depo = self.sediment_model.get_deposition_coefficient()
+        elev = fields['elev_2d']
+        H = self.depth.get_total_depth(elev)
+        f = -self.test * depo/H * solution * self.dx
+        return -f
 
 
-class SedimentEquation2D(Equation):
+class SedimentEquation2D(TracerEquation2D):
     """
     2D sediment advection-diffusion equation: eq:`tracer_eq` or `conservative_tracer_eq`
     with sediment source and sink term
     """
-    def __init__(self, function_space, depth, options, sediment_model,
-                 conservative=False):
+    def __init__(self, function_space, depth, options, sediment_model, conservative):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
-        :kwarg bool conservative: whether to use conservative tracer
         """
-        super(SedimentEquation2D, self).__init__(function_space)
-        args = (function_space, depth, options, sediment_model, conservative)
+        super(SedimentEquation2D, self).__init__(function_space, depth, options, None)
+        args = (function_space, depth, options, sediment_model)
         if conservative:
             self.add_term(ConservativeSedimentAdvectionTerm(*args), 'explicit')
         else:

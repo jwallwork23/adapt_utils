@@ -156,14 +156,6 @@ class TrenchSedimentOptions(CoupledOptions):
         u.project(self.uv_init)
         eta.project(self.elev_init)
 
-    def set_sediment_source(self, fs):
-        if self.suspended:
-            return self.sediment_model.ero_term
-
-    def set_sediment_sink(self, fs):
-        if self.suspended:
-            return self.sediment_model.depo_term
-
     def set_advective_velocity_factor(self, fs):
         if self.convective_vel_flag:
             return self.sediment_model.corr_factor_model.corr_vel_factor

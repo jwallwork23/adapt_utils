@@ -199,15 +199,14 @@ class SedimentModel(object):
                 self.equiltracer = Function(self.P1_2d).interpolate(self.ceq/self.integrated_rouse)
 
             # get individual terms
-            self.depo = Function(self.P1_2d).project(self.settling_velocity*self.integrated_rouse)
+            self.depo = self.settling_velocity*self.integrated_rouse
             self.ero = Function(self.P1_2d).project(self.settling_velocity*self.ceq)
 
-            self.depo_term = Function(self.P1_2d).project(self.depo/self.depth)
-            self.ero_term = Function(self.P1_2d).project(self.ero/self.depth)
-
+            self.options.solve_sediment = True
             self.options.use_tracer_conservative_form = self.cons_tracer
             if self.convectivevel:
                 self.options.tracer_advective_velocity_factor = self.corr_factor_model.corr_vel_factor
+
         if self.use_bedload:
             # calculate angle of flow
             self.calfa = Function(self.V).interpolate(self.horizontal_velocity/sqrt(self.unorm))
@@ -215,6 +214,25 @@ class SedimentModel(object):
             if self.angle_correction:
                 # slope effect angle correction due to gravity
                 self.stress = Function(self.V).interpolate(self.rhow*Constant(0.5)*self.qfc*self.unorm)
+
+
+    def get_erosion_term(self):
+        """Returns expression for (depth-integrated) erosion."""
+        return self.ero
+
+
+    def get_deposition_coefficient(self):
+        """Returns coefficient :math:`C` such that :math:`C/H*sediment` is deposition term in sediment equation
+        If sediment field is depth-averaged, :math:`C*sediment` is (total) deposition (over the column)
+        as it appears in the Exner equation, but deposition term in sediment equation needs
+        averaging: :math:`C*sediment/H`
+        If sediment field is depth-integrated, :math:`C*sediment/H` is (total) deposition (over the column)
+        as it appears in the Exner equation, and is the same in the sediment equation."""
+        return self.depo
+
+    def get_equilibrium_tracer(self):
+        """Returns expression for (depth-averaged) equilibrium tracer."""
+        return self.equilibrium_tracer
 
     def get_bedload_term(self, solution):
 
@@ -329,6 +347,7 @@ class SedimentModel(object):
         return diff_tensor
 
     def update(self, fwd_solution, fwd_solution_bathymetry):
+        import ipdb; ipdb.set_trace()
         # update bathymetry
         self.old_bathymetry_2d.interpolate(fwd_solution_bathymetry)
         # extract new elevation and velocity and project onto CG space
@@ -343,12 +362,7 @@ class SedimentModel(object):
         if self.solve_suspended_sediment:
             # erosion flux - above critical velocity bed is eroded
             self.ceq.project(Constant(0.015)*(self.average_size/self.a) * ((conditional(self.s0 < Constant(0), Constant(0), self.s0))**(1.5))/(self.dstar**0.3))
-
             self.ero.project(self.settling_velocity*self.ceq)
-            self.depo.project(self.settling_velocity*self.integrated_rouse)
-            self.ero_term.project(self.ero/self.depth)
-            self.depo_term.project(self.depo/self.depth)
-
             # update sediment rate to ensure equilibrium at inflow
             if self.cons_tracer:
                 self.equiltracer.interpolate(self.depth*self.ceq/self.integrated_rouse)

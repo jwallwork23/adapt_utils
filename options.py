@@ -416,6 +416,7 @@ class CoupledOptions(Options):
     friction_coeff = FiredrakeScalarExpression(None, allow_none=True, help="""
         Non-negative value providing the default constant drag parameter.
         """).tag(config=True)
+    use_white_colebrook = Bool(False, help='Use white colebrook friction formulation').tag(config=True)
 
     # Shallow water model
     solve_swe = Bool(True, help="Toggle solving the shallow water model.").tag(config=True)
@@ -635,14 +636,6 @@ class CoupledOptions(Options):
         return
 
     def set_sediment_sink(self, sediment_model, fs):
-        """Should be implemented in derived class."""
-        return
-
-    def set_sediment_depth_integ_source(self, fs):
-        """Should be implemented in derived class."""
-        return
-
-    def set_sediment_depth_integ_sink(self, fs):
         """Should be implemented in derived class."""
         return
 

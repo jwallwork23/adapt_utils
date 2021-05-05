@@ -385,11 +385,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.fields[i].update({
                 'tracer_source_2d': self.op.set_tracer_source(self.P1DG[i]),
             })
-        if self.op.solve_sediment or self.op.solve_exner:
-            self.fields[i].update({
-                'sediment_source_2d': self.op.set_sediment_source(self.P1DG[i]),
-                'sediment_sink_2d': self.op.set_sediment_sink(self.P1DG[i]),
-            })
         self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
 
     def free_fields_step(self, i):
@@ -723,28 +718,25 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def create_forward_sediment_equation_step(self, i):
         from ..sediment.equation import SedimentEquation2D
 
-        op = self.sediment_options[i]
-        model = SedimentEquation2D
-        self.equations[i].sediment = model(
+        self.equations[i].sediment = SedimentEquation2D(
             self.Q[i],
             self.depth[i],
-            op,
+            self.sediment_options[i],
             self.op.sediment_model,
-            conservative=self.op.use_tracer_conservative_form,
+            conservative = self.op.use_tracer_conservative_form
         )
-        if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
+        if self.sediment_options[i].use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
         self.equations[i].sediment.bnd_functions = self.boundary_conditions[i]['sediment']
 
     def create_forward_exner_equation_step(self, i):
-        from ..sediment.exner_eq import ExnerEquation
+        from thetis.exner_eq import ExnerEquation
 
-        model = ExnerEquation
-        self.equations[i].exner = model(
+        self.equations[i].exner = ExnerEquation(
             self.W[i],
             self.depth[i],
-            conservative=self.op.use_tracer_conservative_form,
-            sed_model=self.op.sediment_model,
+            self.op.sediment_model,
+            depth_integrated_sediment=self.op.use_tracer_conservative_form,
         )
 
     def free_forward_equations_step(self, i):
@@ -960,8 +952,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'elev_2d': eta,
             'uv_2d': u,
             'diffusivity_h': self.fields[i].horizontal_diffusivity,
-            'source': self.fields[i].sediment_source_2d,
-            'sink': self.fields[i].sediment_sink_2d,
             'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,
             'lax_friedrichs_tracer_scaling_factor': self.sediment_options[i].lax_friedrichs_tracer_scaling_factor,
         })
@@ -975,8 +965,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         u, eta = self.fwd_solutions[i].split()
         fields = AttrDict({
             'elev_2d': eta,
-            'source': self.fields[i].sediment_source_2d,
-            'sink': self.fields[i].sediment_sink_2d,
             'sediment': self.fwd_solutions_sediment[i],
             'morfac': self.op.morphological_acceleration_factor,
             'porosity': self.op.porosity,
@@ -1317,6 +1305,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     self.op.sediment_model.update(ts.shallow_water.solution, self.fwd_solutions_bathymetry[i])
                 else:
                     self.op.sediment_model.update(ts.shallow_water.solution, self.bathymetry[i])
+                import ipdb; ipdb.set_trace()
                 ts.sediment.advance(self.simulation_time, update_forcings)
                 if self.sediment_options[i].use_limiter_for_tracers:
                     self.tracer_limiters[i].apply(self.fwd_solutions_sediment[i])
