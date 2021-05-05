@@ -306,8 +306,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.intermediary_ceq = [Function(space) for space in space_dg]
                 self.intermediary_equiltracer = [Function(space) for space in space_dg]
                 self.intermediary_ero = [Function(space) for space in space_dg]
-                self.intermediary_ero_term = [Function(space) for space in space_dg]
-                self.intermediary_depo_term = [Function(space) for space in space_dg]
 
     def create_solutions_step(self, i):
         super(AdaptiveProblem, self).create_solutions_step(i)
@@ -384,11 +382,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_tracer:
             self.fields[i].update({
                 'tracer_source_2d': self.op.set_tracer_source(self.P1DG[i]),
-            })
-        if self.op.solve_sediment or self.op.solve_exner:
-            self.fields[i].update({
-                'sediment_source_2d': self.op.set_sediment_source(self.P1DG[i]),
-                'sediment_sink_2d': self.op.set_sediment_sink(self.P1DG[i]),
             })
         self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
 
@@ -536,8 +529,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.intermediary_ceq[i].project(self.op.sediment_model.ceq)
                 self.intermediary_equiltracer[i].project(self.op.sediment_model.equiltracer)
                 self.intermediary_ero[i].project(self.op.sediment_model.ero)
-                self.intermediary_ero_term[i].project(self.op.sediment_model.ero_term)
-                self.intermediary_depo_term[i].project(self.op.sediment_model.depo_term)
 
         def debug(a, b, name, idx=None):
             msg = "WARNING: Is the intermediary {:s} solution just copied?".format(name)
@@ -579,10 +570,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                           self.intermediary_equiltracer[i], "equiltracer")
                     debug(self.op.sediment_model.ero,
                           self.intermediary_ero[i], "ero")
-                    debug(self.op.sediment_model.ero_term,
-                          self.intermediary_ero_term[i], "ero_term")
-                    debug(self.op.sediment_model.depo_term,
-                          self.intermediary_depo_term[i], "depo_term")
                 if self.op.bedload:
                     debug(self.op.sediment_model.calfa,
                           self.intermediary_solutions_calfa[i], "calfa")
@@ -614,23 +601,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.fwd_solutions_bathymetry[i].assign(self.intermediary_solutions_bathymetry[i])
 
         if hasattr(self.op, 'sediment_model'):
-            self.op.sediment_model.old_bathymetry_2d.assign(self.intermediary_solutions_old_bathymetry[i])
+            self.op.sediment_model.old_bathymetry_2d.project(self.intermediary_solutions_old_bathymetry[i])
             self.op.sediment_model.uv_cg.assign(self.intermediary_solutions_uv_cg[i])
-            self.op.sediment_model.bed_stress.assign(self.intermediary_solutions_bed_stress[i])
-            self.op.sediment_model.depth.assign(self.intermediary_solutions_depth[i])
+            self.op.sediment_model.bed_stress.project(self.intermediary_solutions_bed_stress[i])
+            self.op.sediment_model.depth.project(self.intermediary_solutions_depth[i])
             if self.op.suspended:
                 if self.op.convective_vel_flag:
-                    self.op.sediment_model.corr_factor_model.corr_vel_factor.assign(self.intermediary_corr_vel_factor[i])
-                self.op.sediment_model.ceq.assign(self.intermediary_ceq[i])
-                self.op.sediment_model.equiltracer.assign(self.intermediary_equiltracer[i])
+                    self.op.sediment_model.corr_factor_model.corr_vel_factor.project(self.intermediary_corr_vel_factor[i])
+                self.op.sediment_model.ceq.project(self.intermediary_ceq[i])
+                self.op.sediment_model.equiltracer.project(self.intermediary_equiltracer[i])
                 self.op.sediment_model.ero.assign(self.intermediary_ero[i])
-                self.op.sediment_model.ero_term.assign(self.intermediary_ero_term[i])
-                self.op.sediment_model.depo_term.assign(self.intermediary_depo_term[i])
             if self.op.bedload:
-                self.op.sediment_model.calfa.assign(self.intermediary_solutions_calfa[i])
-                self.op.sediment_model.salfa.assign(self.intermediary_solutions_salfa[i])
+                self.op.sediment_model.calfa.project(self.intermediary_solutions_calfa[i])
+                self.op.sediment_model.salfa.project(self.intermediary_solutions_salfa[i])
                 if self.op.angle_correction:
-                    self.op.sediment_model.stress.assign(self.intermediary_solutions_stress[i])
+                    self.op.sediment_model.stress.project(self.intermediary_solutions_stress[i])
 
     # --- I/O
 
@@ -743,8 +728,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].exner = model(
             self.W[i],
             self.depth[i],
-            conservative=self.op.use_tracer_conservative_form,
-            sed_model=self.op.sediment_model,
+            depth_integrated_sediment=self.op.use_tracer_conservative_form,
+            sediment_model=self.op.sediment_model,
         )
 
     def free_forward_equations_step(self, i):
@@ -960,8 +945,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'elev_2d': eta,
             'uv_2d': u,
             'diffusivity_h': self.fields[i].horizontal_diffusivity,
-            'source': self.fields[i].sediment_source_2d,
-            'sink': self.fields[i].sediment_sink_2d,
             'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,
             'lax_friedrichs_tracer_scaling_factor': self.sediment_options[i].lax_friedrichs_tracer_scaling_factor,
         })
@@ -975,8 +958,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         u, eta = self.fwd_solutions[i].split()
         fields = AttrDict({
             'elev_2d': eta,
-            'source': self.fields[i].sediment_source_2d,
-            'sink': self.fields[i].sediment_sink_2d,
             'sediment': self.fwd_solutions_sediment[i],
             'morfac': self.op.morphological_acceleration_factor,
             'porosity': self.op.porosity,

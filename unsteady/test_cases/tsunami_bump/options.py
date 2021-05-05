@@ -102,7 +102,6 @@ class BeachOptions(CoupledOptions):
 
         self.wetting_and_drying = True
         self.sediment_slide = True
-        self.depth_integrated = True
         self.use_tracer_conservative_form = True
         self.slope_eff = False
         self.angle_correction = False

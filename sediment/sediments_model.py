@@ -199,11 +199,11 @@ class SedimentModel(object):
                 self.equiltracer = Function(self.P1_2d).interpolate(self.ceq/self.integrated_rouse)
 
             # get individual terms
-            self.depo = Function(self.P1_2d).project(self.settling_velocity*self.integrated_rouse)
+            self.depo = self.settling_velocity*self.integrated_rouse
             self.ero = Function(self.P1_2d).project(self.settling_velocity*self.ceq)
 
-            self.depo_term = Function(self.P1_2d).project(self.depo/self.depth)
-            self.ero_term = Function(self.P1_2d).project(self.ero/self.depth)
+            self.depo_term = self.depo/self.depth
+            self.ero_term = self.ero/self.depth
 
             self.options.use_tracer_conservative_form = self.cons_tracer
             if self.convectivevel:
@@ -215,6 +215,21 @@ class SedimentModel(object):
             if self.angle_correction:
                 # slope effect angle correction due to gravity
                 self.stress = Function(self.V).interpolate(self.rhow*Constant(0.5)*self.qfc*self.unorm)
+
+    def get_deposition_coefficient(self):
+        """Returns coefficient :math:`C` such that :math:`C/H*sediment` is deposition term in sediment equation
+        If sediment field is depth-averaged, :math:`C*sediment` is (total) deposition (over the column)
+        as it appears in the Exner equation, but deposition term in sediment equation needs
+        averaging: :math:`C*sediment/H`
+        If sediment field is depth-integrated, :math:`C*sediment/H` is (total) deposition (over the column)
+        as it appears in the Exner equation, and is the same in the sediment equation."""
+        return self.depo_term
+
+    def get_erosion_term(self):
+        """Returns expression for (depth-integrated) erosion."""
+        return self.ero_term
+
+
 
     def get_bedload_term(self, solution):
 
@@ -345,9 +360,6 @@ class SedimentModel(object):
             self.ceq.project(Constant(0.015)*(self.average_size/self.a) * ((conditional(self.s0 < Constant(0), Constant(0), self.s0))**(1.5))/(self.dstar**0.3))
 
             self.ero.project(self.settling_velocity*self.ceq)
-            self.depo.project(self.settling_velocity*self.integrated_rouse)
-            self.ero_term.project(self.ero/self.depth)
-            self.depo_term.project(self.depo/self.depth)
 
             # update sediment rate to ensure equilibrium at inflow
             if self.cons_tracer:

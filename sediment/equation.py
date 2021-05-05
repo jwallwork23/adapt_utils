@@ -15,52 +15,14 @@ where :math:'S' is :math:'q' for conservative and :math:'T' for non-conservative
 velocities, and :math:`\mu_h` denotes horizontal diffusivity.
 
 **********************************************************************************************
-*  NOTE: This file is based on the Thetis project (https://thetisproject.org) and contains   *
-*        some copied code.                                                                   *
+*  NOTE: This file is based on the Thetis project (https://thetisproject.org)               *
 **********************************************************************************************
 """
 from __future__ import absolute_import
 from thetis.utility import *
 from thetis.equation import Equation
 from thetis.tracer_eq_2d import *
-from thetis.conservative_tracer_eq_2d import ConservativeHorizontalAdvectionTerm
-
-class SedimentTerm(TracerTerm):
-    """
-    Generic sediment term that provides commonly used members.
-    """
-    def __init__(self, function_space, depth, options, sediment_model, conservative=False):
-        """
-        :arg function_space: :class:`FunctionSpace` where the solution belongs
-        :arg depth: :class: `DepthExpression` containing depth info
-        :kwarg bool conservative: whether to use conservative tracer
-        """
-        super(SedimentTerm, self).__init__(function_space, depth, options)
-        self.sediment_model = sediment_model
-        self.conservative = conservative
-
-class ConservativeSedimentAdvectionTerm(SedimentTerm, ConservativeHorizontalAdvectionTerm):
-    """
-    Advection term for sediment equation
-    Same as :class:`ConservativeHorizontalAdvectionTerm` but allows for equilibrium boundary condition
-    through get_bnd_conditions() inherited from :class:`SedimentTerm`."""
-    pass
-
-
-class SedimentAdvectionTerm(SedimentTerm, HorizontalAdvectionTerm):
-    """
-    Advection term for sediment equation
-    Same as :class:`HorizontalAdvectionTerm` but allows for equilibrium boundary condition
-    through get_bnd_conditions() inherited from :class:`SedimentTerm`."""
-    pass
-
-
-class SedimentDiffusionTerm(SedimentTerm, HorizontalDiffusionTerm):
-    """
-    Diffusion term for sediment equation
-    Same as :class:`HorizontalDiffusionTerm` but allows for equilibrium boundary condition
-    through get_bnd_conditions() inherited from :class:`SedimentTerm`."""
-    pass
+from thetis.sediment_eq_2d import SedimentTerm, ConservativeSedimentAdvectionTerm, SedimentAdvectionTerm, SedimentDiffusionTerm
 
 class SedimentErosionTerm(SedimentTerm):
     r"""
@@ -75,7 +37,7 @@ class SedimentErosionTerm(SedimentTerm):
 
     """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
-        source = fields.get('source')
+        source = self.sediment_model.get_erosion_term()
         if self.conservative:
             H = self.depth.get_total_depth(fields['elev_2d'])
             f = inner(H*source, self.test)*self.dx
@@ -97,7 +59,7 @@ class SedimentDepositionTerm(SedimentTerm):
 
     """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
-        sink = fields.get('sink')
+        sink = self.sediment_model.get_deposition_coefficient()
         H = self.depth.get_total_depth(fields['elev_2d'])
         f = inner(-sink*solution, self.test)*self.dx
         return f

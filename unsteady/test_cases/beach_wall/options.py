@@ -93,7 +93,6 @@ class BeachOptions(CoupledOptions):
         self.average_size = Constant(0.0002)  # Average sediment size
 
         self.wetting_and_drying = False
-        self.depth_integrated = True
         self.use_tracer_conservative_form = True
         self.slope_eff = True
         self.angle_correction = False
