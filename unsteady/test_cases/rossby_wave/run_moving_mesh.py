@@ -102,7 +102,7 @@ if initial_monitor is not None:
 
 # --- Monitor function definitions
 
-def elevation_norm_monitor(mesh, alpha=40.0, norm_type='H1'):
+def elevation_norm_monitor(mesh, alpha=40.0, norm_type='H1', **kwargs):
     """
     Monitor function derived from the elevation `norm_type` norm.
 
@@ -117,7 +117,7 @@ def elevation_norm_monitor(mesh, alpha=40.0, norm_type='H1'):
         return 1.0 + alpha*local_norm(eta, norm_type=norm_type)
 
 
-def velocity_norm_monitor(mesh, alpha=40.0, norm_type='HDiv'):
+def velocity_norm_monitor(mesh, alpha=40.0, norm_type='HDiv', **kwargs):
     """
     Monitor function derived from the velocity `norm_type` norm.
 
@@ -133,7 +133,7 @@ def velocity_norm_monitor(mesh, alpha=40.0, norm_type='HDiv'):
         return 1.0 + alpha*local_norm(u, norm_type=norm_type)
 
 
-def mixed_monitor(mesh):
+def mixed_monitor(mesh, **kwargs):
     return 0.5*(velocity_norm_monitor(mesh, norm_type='HDiv') + elevation_norm_monitor(mesh, norm_type='H1'))
 
 

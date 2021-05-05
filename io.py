@@ -105,13 +105,22 @@ def initialise_hydrodynamics(inputdir='.', outputdir=None, op=CoupledOptions(), 
     # Get finite element
     if op.family == 'dg-dg':
         uv_element = VectorElement("DG", triangle, 1)
-        elev_element = FiniteElement("DG", triangle, 1, variant=variant)
+        if variant is None:
+            elev_element = FiniteElement("DG", triangle, 1)
+        else:
+             elev_element = FiniteElement("DG", triangle, 1, variant=variant)
     elif op.family == 'dg-cg':
         uv_element = VectorElement("DG", triangle, 1)
-        elev_element = FiniteElement("CG", triangle, 2, variant=variant)
+        if variant is None:
+            elev_element = FiniteElement("CG", triangle, 2)
+        else:
+            elev_element = FiniteElement("CG", triangle, 2, variant=variant)
     elif op.family == 'cg-cg':
         uv_element = VectorElement("CG", triangle, 2)
-        elev_element = FiniteElement("CG", triangle, 1, variant=variant)
+        if variant is None:
+            elev_element = FiniteElement("CG", triangle, 1)
+        else:
+            elev_element = FiniteElement("CG", triangle, 1, variant=variant)
 
     # Load mesh
     with timed_stage('mesh'):

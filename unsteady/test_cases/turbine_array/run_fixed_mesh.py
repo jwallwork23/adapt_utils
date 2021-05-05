@@ -57,12 +57,12 @@ if plot_pdf:
     extensions.append('pdf')
 if plot_png:
     extensions.append('png')
-base_viscosity = float(args.base_viscosity or 0.0)
+base_viscosity = Constant(args.base_viscosity or 0.0)
 kwargs = {
     'approach': approach,
     'level': level,
     'num_meshes': int(args.num_meshes or 1),
-    'target_viscosity': float(args.target_viscosity or base_viscosity),
+    'target_viscosity': Constant(args.target_viscosity or base_viscosity),
     'plot_pvd': plot_pvd,
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',

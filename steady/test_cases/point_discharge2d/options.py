@@ -51,7 +51,7 @@ class PointDischarge2dOptions(CoupledOptions):
 
         # Hydrodynamics
         self.base_velocity = [1.0, 0.0]
-        self.base_diffusivity = 0.1
+        self.base_diffusivity = Constant(0.1)
         self.diffusivity_space_family = "R"
         self.diffusivity_space_degree = 0
         self.characteristic_speed = Constant(1.0)
@@ -144,7 +144,7 @@ class PointDischarge2dOptions(CoupledOptions):
         x, y = SpatialCoordinate(mesh)
         x0, y0, r = self.source_loc[0]
         u = Constant(as_vector(self.base_velocity))
-        D = Constant(self.base_diffusivity)
+        D = self.base_diffusivity
         Pe = 0.5*u[0]/D
         # q = 0.01  # sediment discharge of source (kg/s)
         q = 1
@@ -161,7 +161,7 @@ class PointDischarge2dOptions(CoupledOptions):
         x, y = SpatialCoordinate(mesh)
         x0, y0, r = self.source_loc[0]
         u = Constant(as_vector(self.base_velocity))
-        D = Constant(self.base_diffusivity)
+        D = self.base_diffusivity
         Pe = 0.5*u[0]/D
         # q = 0.01  # sediment discharge of source (kg/s)
         q = 1

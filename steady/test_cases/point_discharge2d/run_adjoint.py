@@ -60,7 +60,7 @@ op.di = create_directory(os.path.join(op.di, op.stabilisation_tracer or family, 
 tp = AdaptiveSteadyProblem(op, print_progress=False)
 n = FacetNormal(tp.mesh)
 D = tp.fields[0].horizontal_diffusivity
-h = D.copy(deepcopy=True)
+h = Constant(D)
 h.assign(0.1)
 
 timestamp = perf_counter()
@@ -92,7 +92,7 @@ def reduced_functional(m):
     """
     Evaluate the reduced functional for diffusivity `m`.
     """
-    op.base_diffusivity = m.dat.data[0]
+    op.base_diffusivity = m
     tp.__init__(op, print_progress=False)
     tp.solve_forward()
     return tp.quantity_of_interest()
@@ -103,7 +103,7 @@ def gradient_discrete(m):
     Evaluate the gradient of the reduced functional using the discrete adjoint solution.
     """
     c_star = adj
-    # op.base_diffusivity = m.dat.data[0]
+    # op.base_diffusivity = m
     # tp.__init__(op, print_progress=False)
     # tp.solve_forward()
     # tp._solve_discrete_adjoint()
@@ -132,7 +132,7 @@ def gradient_continuous(m):
     Evaluate the gradient of the reduced functional for diffusivity `m` using the continuous
     adjoint method.
     """
-    op.base_diffusivity = m.dat.data[0]
+    op.base_diffusivity = m
     tp.__init__(op, print_progress=False)
     tp.solve_forward()
     tp.solve_adjoint()

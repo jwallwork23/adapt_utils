@@ -1,11 +1,16 @@
 from thetis import *
 from thetis.configuration import *
+import matplotlib
+
+matplotlib.rc('text', usetex=True)
+matplotlib.rc('font', family='serif')
 from thetis.options import ModelOptions2d
+
+import numpy as np
 
 from adapt_utils.io import initialise_hydrodynamics
 from adapt_utils.options import CoupledOptions
 from adapt_utils.sediment.sediments_model import SedimentModel
-
 
 __all__ = ["TrenchSedimentOptions"]
 
@@ -18,7 +23,7 @@ class TrenchSedimentOptions(CoupledOptions):
         dredged trenches: Semi-empirical model for the flow in dredged trenches", Delft, the
         Netherlands, 1980.
     """
-    def __init__(self, friction='nik_solver', nx=1, ny=1, input_dir=None, output_dir=None, **kwargs):
+    def __init__(self, fric_coeff, friction='nik_solver', nx=1, ny=1, input_dir=None, output_dir=None, **kwargs):
         self.timestepper = 'CrankNicolson'
         super(TrenchSedimentOptions, self).__init__(**kwargs)
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
@@ -32,13 +37,14 @@ class TrenchSedimentOptions(CoupledOptions):
         self.wetting_and_drying = False
         self.solve_sediment = True
         self.solve_exner = True
+
         try:
             assert friction in ('nikuradse', 'manning', 'nik_solver')
         except AssertionError:
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
         self.average_size = Constant(160e-6)  # Average sediment size
-        self.friction_coeff = Constant(0.025)
+        self.friction_coeff = fric_coeff
         self.ksp = Constant(3*self.average_size)
         self.norm_smoother = Constant(0.1)
 
@@ -47,25 +53,26 @@ class TrenchSedimentOptions(CoupledOptions):
         self.stabilisation_sediment = 'lax_friedrichs'
 
         # Initialisation
-        self.uv_init, self.elev_init = initialise_hydrodynamics(
-            input_dir, outputdir=output_dir, op=self,
+        self.uv_init_tmp, self.elev_init_tmp = initialise_hydrodynamics(
+            input_dir, outputdir=output_dir, op=self, variant = None,
         )
-        self.set_up_morph_model(input_dir, self.default_mesh)
+
+        self.set_up_morph_model(input_dir, fric_coeff, self.default_mesh)
         self.morphological_acceleration_factor = Constant(100)
 
         # Time integration
-        self.dt = 0.25 if nx < 4 else 0.1
+        self.dt = 0.25 if nx < 2 else 0.05
+        print(self.dt)
         self.end_time = self.num_hours*3600.0/float(self.morphological_acceleration_factor)
         self.dt_per_mesh_movement = 40
         self.dt_per_export = 40
         self.implicitness_theta = 1.0
         self.family = 'dg-dg'
 
-    def set_up_morph_model(self, input_dir, mesh=None):
+    def set_up_morph_model(self, input_dir, fric_coeff, mesh=None):
         self.base_diffusivity = Constant(0.18011042551606954)
         self.porosity = Constant(0.4)
-        self.ks = Constant(0.025)
-
+        self.ks = fric_coeff
         self.wetting_and_drying = False
         self.conservative = False
         self.slope_eff = True
@@ -76,13 +83,21 @@ class TrenchSedimentOptions(CoupledOptions):
 
     def create_sediment_model(self, mesh, bathymetry):
         self.P1DG = FunctionSpace(mesh, "DG", 1)
+        self.P1CG = FunctionSpace(mesh, "CG", 1)
         self.P1_vec_dg = VectorFunctionSpace(mesh, "DG", 1)
+
+        self.uv_init = Function(self.P1_vec_dg)
+        self.uv_init.assign(self.uv_init_tmp)
+
+        self.elev_init = Function(self.P1DG)
+        self.elev_init.assign(self.elev_init_tmp)
 
         self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
 
         self.eta_d = Function(self.P1DG).project(self.elev_init)
+
         self.sediment_model = SedimentModel(
-            ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
+            options=ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
             bedload=self.bedload, angle_correction=self.angle_correction,
             slope_eff=self.slope_eff, seccurrent=False, mesh2d=mesh, bathymetry_2d=bathymetry,
             uv_init=self.uv_d, elev_init=self.eta_d, ks=self.ks, average_size=self.average_size,
@@ -117,6 +132,11 @@ class TrenchSedimentOptions(CoupledOptions):
                         le(x, 11), -(1/1.5)*depth_diff*(x-11) + depth_riv, depth_riv))))
         return interpolate(-trench, fs)
 
+    #def set_viscosity(self, fs):
+    #    self.viscosity = Function(fs)
+    #    self.viscosity.assign(self.base_viscosity)
+    #    return self.viscosity
+
     def set_boundary_conditions(self, prob, i):
         inflow_tag = 1
         outflow_tag = 2
@@ -139,14 +159,10 @@ class TrenchSedimentOptions(CoupledOptions):
     def set_sediment_source(self, fs):
         if self.suspended:
             return self.sediment_model.ero_term
-        else:
-            return None
 
     def set_sediment_sink(self, fs):
         if self.suspended:
             return self.sediment_model.depo_term
-        else:
-            return None
 
     def set_advective_velocity_factor(self, fs):
         if self.convective_vel_flag:
@@ -155,18 +171,10 @@ class TrenchSedimentOptions(CoupledOptions):
             return Constant(1.0)
 
     def set_initial_condition_sediment(self, prob):
-        prob.fwd_solutions_sediment[0].interpolate(Constant(0.0))
+        prob.fwd_solutions_sediment[0].interpolate(Constant(0.0)) #self.sediment_model.equiltracer)
 
     def set_initial_condition_bathymetry(self, prob):
-        prob.fwd_solutions_bathymetry[0].interpolate(
-            self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space())
-        )
+        prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))
 
-    def get_export_func(self, prob, i):
-        eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
-
-        def export_func():
-            eta_tilde.project(self.get_eta_tilde(prob, i))
-            u, eta = prob.fwd_solutions[i].split()
-
-        return export_func
+    def get_update_forcings(self, prob, i, adjoint):
+        return None

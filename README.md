@@ -71,6 +71,10 @@ version of Firedrake, please follow the instructions [here][7].
     * Test cases: `steady/test_cases/point_discharge2d` (Section 4.2), `steady/test_cases/point_discharge3d` (Section 4.3), `unsteady/test_cases/idealised_desalination` (Section 5.1).
 
   * J. G. Wallwork, <em>'Mesh Adaptation and Adjoint Methods for Finite Element Coastal Ocean Modelling'</em>, PhD thesis, Imperial College London (2021).
+    * Code:
+      * `adapt_utils`: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4692664.svg)](https://doi.org/10.5281/zenodo.4692664) (`adapt_utils_20210415`). 
+      * Firedrake: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4561836.svg)](https://doi.org/10.5281/zenodo.4561836).
+      * Thetis: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4560054.svg)](https://doi.org/10.5281/zenodo.4560054).
     * Test cases:
       * `test/interp` (Sections 2.8 and 3.4);
       * `steady/test_cases/point_discharge2d` (Sections 2.7, 3.6, 7.3 and 7.5);
