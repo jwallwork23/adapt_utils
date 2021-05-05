@@ -61,7 +61,7 @@ op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
 tp = AdaptiveSteadyProblem(op, print_progress=False)
 n = FacetNormal(tp.mesh)
 D = tp.fields[0].horizontal_diffusivity
-h = D.copy(deepcopy=True)
+h = Constant(D)
 h.assign(0.1)
 
 timestamp = perf_counter()

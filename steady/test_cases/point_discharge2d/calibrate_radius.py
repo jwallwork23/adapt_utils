@@ -61,9 +61,9 @@ def analytical_solution(r):
     """
     Compute analytical solution field for a given source radius.
     """
-    u = Constant(as_vector(op.base_velocity))
+    u = Constant(op.base_velocity[0])
     D = op.base_diffusivity
-    Pe = 0.5*u[0]/D
+    Pe = 0.5*u/D
     q = 1.0
     rr = max_value(sqrt((x - x0)**2 + (y - y0)**2), r)
     return 0.5*q/(pi*D)*exp(Pe*(x - x0))*bessk0(Pe*rr)

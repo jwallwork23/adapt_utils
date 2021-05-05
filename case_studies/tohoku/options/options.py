@@ -23,7 +23,7 @@ class TohokuOptions(TsunamiOptions):
         :kwarg level: mesh resolution level, to be used if no mesh is provided.
         :kwarg force_zone_number: allow to use a specific UTM zone even if some mesh coordinates lie
             outside of it.
-        :kwarg base_viscosity: :type Constant value.
+        :kwarg base_viscosity: :type:`Constant` base viscosity value.
         """
         super(TohokuOptions, self).__init__(force_zone_number=force_zone_number, **kwargs)
 
@@ -45,11 +45,11 @@ class TohokuOptions(TsunamiOptions):
         # Physics
         self.friction = None
         # self.friction = 'manning'  # FIXME
-        self.friction_coeff = 0.0025
+        self.friction_coeff = Constant(0.0025)
         self.base_viscosity = kwargs.get('base_viscosity', Constant(0.0))
 
         # Stabilisation
-        self.use_automatic_sipg_parameter = not np.isclose(float(self.base_viscosity), 0.0)
+        self.use_automatic_sipg_parameter = not np.isclose(self.base_viscosity.values()[0], 0.0)
         self.sipg_parameter = kwargs.get('sipg_parameter', None)
 
         # Timestepping

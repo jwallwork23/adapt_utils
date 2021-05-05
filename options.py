@@ -439,7 +439,7 @@ class CoupledOptions(Options):
     lax_friedrichs_velocity_scaling_factor = FiredrakeConstantTraitlet(Constant(1.0), help="""
         Scaling factor for Lax Friedrichs stabilisation term in horizontal momentum advection.
         """).tag(config=True)
-    sipg_parameter = FiredrakeScalarExpression(None, allow_none=True, help="""
+    sipg_parameter = FiredrakeScalarExpression(Constant(10.0), allow_none=True, help="""
         Optional user-provided symemetric interior penalty parameter for the shallow water model.
         Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
         """).tag(config=True)
@@ -488,7 +488,7 @@ class CoupledOptions(Options):
     lax_friedrichs_tracer_scaling_factor = FiredrakeScalarExpression(Constant(1.0), help="""
         Scaling factor for Lax Friedrichs stabilisation term in tracer advection.
         """).tag(config=True)
-    sipg_parameter_tracer = FiredrakeScalarExpression(None, allow_none=True, help="""
+    sipg_parameter_tracer = FiredrakeScalarExpression(Constant(10.0), allow_none=True, help="""
         Optional user-provided symemetric interior penalty parameter for the tracer model.
         Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
         """).tag(config=True)
@@ -514,7 +514,7 @@ class CoupledOptions(Options):
     stabilisation_sediment = Unicode(None, allow_none=True, help="""
         Stabilisation approach for sediment model, set to 'lax_friedrichs', if not None.
         """).tag(config=True)
-    sipg_parameter_sediment = FiredrakeScalarExpression(None, allow_none=True, help="""
+    sipg_parameter_sediment = FiredrakeScalarExpression(Constant(10.0), allow_none=True, help="""
         Optional user-provided symemetric interior penalty parameter for the sediment model.
         Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
         """).tag(config=True)
@@ -661,7 +661,7 @@ class CoupledOptions(Options):
 
     def set_manning_drag_coefficient(self, fs):
         if self.friction == 'manning':
-            return self.friction_coeff #Constant(self.friction_coeff or 0.02)
+            return self.friction_coeff
 
     def get_velocity(self, t):
         raise NotImplementedError("Should be implemented in derived class.")

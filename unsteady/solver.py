@@ -54,7 +54,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'wetting_and_drying_alpha': op.wetting_and_drying_alpha,
             # 'check_volume_conservation_2d': True,  # TODO
             'norm_smoother': op.norm_smoother,
-            'sipg_parameter': None,
+            'sipg_parameter': Constant(10.0),
         }
         for i, swo in enumerate(self.shallow_water_options):
             swo.update(static_options)
@@ -86,7 +86,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # 'check_tracer_conservation': True,  # TODO
             'use_lax_friedrichs_tracer': op.stabilisation_tracer == 'lax_friedrichs',
             'use_limiter_for_tracers': op.use_limiter_for_tracers and op.tracer_family == 'dg',
-            'sipg_parameter': None,
+            'sipg_parameter': Constant(10.0),
             'use_tracer_conservative_form': op.use_tracer_conservative_form,
         }
         if op.use_tracer_conservative_form and op.approach in ('lagrangian', 'hybrid'):
@@ -421,8 +421,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op = self.op
 
         # Symmetric Interior Penalty Galerkin (SIPG) method
-        sipg = None
         if op.family != 'cg-cg':
+            sipg = Constant(10.0)
             if hasattr(op, 'sipg_parameter'):
                 sipg = op.sipg_parameter
             if self.shallow_water_options[i].use_automatic_sipg_parameter:
@@ -446,7 +446,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Set parameter and print to screen
             self.shallow_water_options[i].sipg_parameter = sipg
             if sipg is None:
-                pass
+                raise ValueError
             elif isinstance(sipg, Constant):
                 msg = "SETUP: constant shallow water SIPG parameter on mesh {:d}: {:.4e}"
                 op.print_debug(msg.format(i, sipg.dat.data[0]))
@@ -462,7 +462,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         elif stabilisation == 'lax_friedrichs':
             assert op.family != 'cg-cg'
             assert hasattr(op, 'lax_friedrichs_velocity_scaling_factor')
-            self.shallow_water_options[i]['lax_friedrichs_velocity_scaling_factor'] = op.lax_friedrichs_velocity_scaling_factor  # TODO: Allow mesh dependent
+            self.shallow_water_options[i]['lax_friedrichs_velocity_scaling_factor'] = op.lax_friedrichs_velocity_scaling_factor
         else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
             raise ValueError(msg.format(stabilisation, self.__class__.__name__))
@@ -476,11 +476,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Symmetric Interior Penalty Galerkin (SIPG) method
         family = op.sediment_family if sediment else op.tracer_family
         if family == 'dg':
-            sipg = None
+            sipg = Constant(10.0)
             if hasattr(op, 'sipg_parameter_tracer'):
-                sipg = op.sipg_parameter_tracer if not sediment else None
+                sipg = op.sipg_parameter_tracer
             if hasattr(op, 'sipg_parameter_sediment'):
-                sipg = op.sipg_parameter_sediment if sediment else None
+                sipg = op.sipg_parameter_sediment
             if eq_options[i].use_automatic_sipg_parameter:
                 if op.use_maximal_sipg:
                     cot_theta = 1.0/tan(self.minimum_angles[i].vector().gather().min())
@@ -503,7 +503,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             eq_options[i].sipg_parameter = sipg
             model = 'sediment' if sediment else 'tracer'
             if sipg is None:
-                pass
+                raise ValueError
             elif isinstance(sipg, Constant):
                 msg = "SETUP: constant {:s} SIPG parameter on mesh {:d}: {:.4e}"
                 op.print_debug(msg.format(model, i, sipg.dat.data[0]))
@@ -521,7 +521,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         elif stabilisation == 'lax_friedrichs':
             assert hasattr(op, 'lax_friedrichs_tracer_scaling_factor')
             assert family == 'dg'
-            eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor  # TODO: Allow mesh dependent
+            eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor
         elif stabilisation in ('su', 'supg'):
             assert family == 'cg'
             assert op.characteristic_speed is not None
@@ -682,75 +682,58 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.intermediary_ero_term[i].project(self.op.sediment_model.ero_term)
                 self.intermediary_depo_term[i].project(self.op.sediment_model.depo_term)
 
-        def debug(a, b, name):
-            if not self.op.debug:
-                return
-            if np.allclose(a, b):
-                self.warning("WARNING: Is the intermediary {:s} solution just copied?".format(name))
+        def debug(a, b, name, idx=None):
+            msg = "WARNING: Is the intermediary {:s} solution just copied?".format(name)
+            if idx is not None:
+                if np.allclose(a.dat.data[idx], b.dat.data[idx]):
+                    self.warning(msg)
+            else:
+                if np.allclose(a.dat.data, b.dat.data):
+                    self.warning(msg)
 
         if self.op.debug:
-            debug(self.fwd_solutions[i].dat.data[0],
-                  self.intermediary_solutions[i].dat.data[0],
-                  "velocity")
-            debug(self.fwd_solutions[i].dat.data[1],
-                  self.intermediary_solutions[i].dat.data[1],
-                  "elevation")
+            debug(self.fwd_solutions[i], self.intermediary_solutions[i], "velocity", 0)
+            debug(self.fwd_solutions[i], self.intermediary_solutions[i], "elevation", 1)
             if self.op.solve_tracer:
-                debug(self.fwd_solutions_tracer[i].dat.data,
-                      self.intermediary_solutions_tracer[i].dat.data,
-                      "tracer")
+                debug(self.fwd_solutions_tracer[i],
+                      self.intermediary_solutions_tracer[i], "tracer")
             if self.op.solve_sediment:
-                debug(self.fwd_solutions_sediment[i].dat.data,
-                      self.intermediary_solutions_sediment[i].dat.data,
-                      "sediment")
+                debug(self.fwd_solutions_sediment[i],
+                      self.intermediary_solutions_sediment[i], "sediment")
             if self.op.solve_exner:
-                debug(self.fwd_solutions_bathymetry[i].dat.data,
-                      self.intermediary_solutions_bathymetry[i].dat.data,
-                      "bathymetry")
+                debug(self.fwd_solutions_bathymetry[i],
+                      self.intermediary_solutions_bathymetry[i], "bathymetry")
             if hasattr(self.op, 'sediment_model'):
-                debug(self.op.sediment_model.old_bathymetry_2d.dat.data,
-                      self.intermediary_solutions_old_bathymetry[i].dat.data,
-                      "old_bathymetry")
-                debug(self.op.sediment_model.uv_cg.dat.data,
-                      self.intermediary_solutions_uv_cg[i].dat.data,
-                      "uv_cg")
-                debug(self.op.sediment_model.bed_stress.dat.data,
-                      self.intermediary_solutions_bed_stress[i].dat.data,
-                      "bed_stress")
-                debug(self.op.sediment_model.depth.dat.data,
-                      self.intermediary_solutions_depth[i].dat.data,
-                      "depth")
+                debug(self.op.sediment_model.old_bathymetry_2d,
+                      self.intermediary_solutions_old_bathymetry[i], "old_bathymetry")
+                debug(self.op.sediment_model.uv_cg,
+                      self.intermediary_solutions_uv_cg[i], "uv_cg")
+                debug(self.op.sediment_model.bed_stress,
+                      self.intermediary_solutions_bed_stress[i], "bed_stress")
+                debug(self.op.sediment_model.depth,
+                      self.intermediary_solutions_depth[i], "depth")
                 if self.op.suspended:
                     if self.op.convective_vel_flag:
-                        debug(self.op.sediment_model.corr_factor_model.corr_vel_factor.dat.data,
-                              self.intermediary_corr_vel_factor[i].dat.data,
-                              "corr_vel_factor")
-                    debug(self.op.sediment_model.ceq.dat.data,
-                          self.intermediary_ceq[i].dat.data,
-                          "ceq")
-                    debug(self.op.sediment_model.equiltracer.dat.data,
-                          self.intermediary_equiltracer[i].dat.data,
-                          "equiltracer")
-                    debug(self.op.sediment_model.ero.dat.data,
-                          self.intermediary_ero[i].dat.data,
-                          "ero")
-                    debug(self.op.sediment_model.ero_term.dat.data,
-                          self.intermediary_ero_term[i].dat.data,
-                          "ero_term")
-                    debug(self.op.sediment_model.depo_term.dat.data,
-                          self.intermediary_depo_term[i].dat.data,
-                          "depo_term")
+                        debug(self.op.sediment_model.corr_factor_model.corr_vel_factor,
+                              self.intermediary_corr_vel_factor[i], "corr_vel_factor")
+                    debug(self.op.sediment_model.ceq,
+                          self.intermediary_ceq[i], "ceq")
+                    debug(self.op.sediment_model.equiltracer,
+                          self.intermediary_equiltracer[i], "equiltracer")
+                    debug(self.op.sediment_model.ero,
+                          self.intermediary_ero[i], "ero")
+                    debug(self.op.sediment_model.ero_term,
+                          self.intermediary_ero_term[i], "ero_term")
+                    debug(self.op.sediment_model.depo_term,
+                          self.intermediary_depo_term[i], "depo_term")
                 if self.op.bedload:
-                    debug(self.op.sediment_model.calfa.dat.data,
-                          self.intermediary_solutions_calfa[i].dat.data,
-                          "calfa")
-                    debug(self.op.sediment_model.salfa.dat.data,
-                          self.intermediary_solutions_salfa[i].dat.data,
-                          "salfa")
+                    debug(self.op.sediment_model.calfa,
+                          self.intermediary_solutions_calfa[i], "calfa")
+                    debug(self.op.sediment_model.salfa,
+                          self.intermediary_solutions_salfa[i], "salfa")
                     if self.op.angle_correction:
-                        debug(self.op.sediment_model.stress.dat.data,
-                              self.intermediary_solutions_stress[i].dat.data,
-                              "stress")
+                        debug(self.op.sediment_model.stress,
+                              self.intermediary_solutions_stress[i], "stress")
 
     def project_from_intermediary_mesh(self, i):
         if self.op.solve_swe:
@@ -764,7 +747,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if hasattr(self.op, 'sediment_model'):
             raise NotImplementedError
 
-    # TODO: Use par_loop
     def copy_data_from_intermediary_mesh(self, i):
         super(AdaptiveProblem, self).copy_data_from_intermediary_mesh(i)
         if self.op.solve_tracer:
