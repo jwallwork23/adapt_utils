@@ -96,7 +96,7 @@ class BeachOptions(CoupledOptions):
         self.gravity = Constant(9.81)
         self.porosity = Constant(0.4)
         self.ks = Constant(0.00054)
-        self.average_size = 1.8e-4  # Average sediment size
+        self.average_size = Constant(1.8e-4)  # Average sediment size
         self.max_angle = 20
         self.meshgrid_size = 0.2
 

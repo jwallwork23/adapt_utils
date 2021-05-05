@@ -34,7 +34,7 @@ class TrenchSlantOptions(CoupledOptions):
         except AssertionError:
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
-        self.average_size = 160e-6  # Average sediment size
+        self.average_size = Constant(160e-6)  # Average sediment size
         self.friction_coeff = Constant(0.025)
         self.ksp = Constant(3*self.average_size)
         self.norm_smoother = Constant(0.1)
@@ -71,7 +71,7 @@ class TrenchSlantOptions(CoupledOptions):
 
         self.porosity = Constant(0.4)
         self.ks = Constant(0.025)
-        self.average_size = 160*(10**(-6))  # Average sediment size
+        self.average_size = Constant(160*(10**(-6)))  # Average sediment size
 
         self.wetting_and_drying = False
         self.conservative = False

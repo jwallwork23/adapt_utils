@@ -81,7 +81,7 @@ class BeachOptions(CoupledOptions):
         self.gravity = Constant(9.81)
         self.porosity = Constant(0.4)
         self.ks = Constant(0.025)
-        self.average_size = 0.0002  # Average sediment size
+        self.average_size = Constant(0.0002)  # Average sediment size
 
         self.wetting_and_drying = True
         self.depth_integrated = True

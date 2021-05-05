@@ -2,7 +2,7 @@
 Migrating Trench Test case
 =======================
 
-Solves the hydro-morphodynamic simulation of a migrating trench using mesh movement methods
+Testing the adjoint method for the hydro-morphodynamic simulation of a migrating trench using mesh movement methods
 """
 from firedrake_adjoint import *
 from thetis import *
@@ -62,12 +62,9 @@ beta = Constant(0.5)
 gamma = Constant(1)
 
 def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, x=None):
-
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
-
     NOTE: Defined on the *computational* mesh.
-
     """
 
     P1 = FunctionSpace(mesh, "CG", 1)
@@ -99,44 +96,12 @@ t1 = time.time()
 swp.solve_forward()
 t2 = time.time()
 
-#J = assemble(swp.fwd_solutions_bathymetry[0]*dx)
-#rf = ReducedFunctional(J, Control(diff_coeff))
+J = assemble(swp.fwd_solutions_bathymetry[0]*dx)
+rf = ReducedFunctional(J, Control(diff_coeff))
 
-#print(J)
-#print(rf(Constant(0.15)))
+print(J)
+print(rf(Constant(0.15)))
 
-#h2 = Constant(5e-3)
-#conv_rate = taylor_test(rf, diff_coeff, h2)
+h2 = Constant(5e-3)
+conv_rate = taylor_test(rf, diff_coeff, h2)
 
-# Save solution data
-new_mesh = RectangleMesh(16*5*5, 5*1, 16, 1.1)
-bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
-bathymetrythetis1 = []
-diff_thetis = []
-datathetis = np.linspace(0, 15.9, 160)
-bathymetrythetis1 = [-bath.at([i, 0.55]) for i in datathetis]
-df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
-#df.to_csv('adapt_output/bed_trench_output_uni_s_{:.4f}_{:.1f}_{:.1f}_{:.1f}.csv'.format(res, alpha, beta, gamma))
-
-# Compute l2 error against experimental data
-datathetis = []
-bathymetrythetis1 = []
-diff_thetis = []
-data = pd.read_csv('experimental_data.csv', header=None)
-for i in range(len(data[0].dropna())):
-    datathetis.append(data[0].dropna()[i])
-    bathymetrythetis1.append(-bath.at([np.round(data[0].dropna()[i], 3), 0.55]))
-    diff_thetis.append((data[1].dropna()[i] - bathymetrythetis1[-1])**2)
-
-df_exp = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
-#df_exp.to_csv('adapt_output/bed_trench_output_s_{:.4f}_{:.1f}_{:.1f}_{:1f}.csv'.format(res, alpha, beta, gamma))
-
-# Print to screen
-print("res = {:.4f}".format(res))
-#print("alpha = {:.1f}".format(alpha))
-#print("beta = {:.1f}".format(beta))
-#print("gamma = {:.1f}".format(gamma))
-print("Time: {:.1f}s".format(t2 - t1))
-print("Total error: {:.4e}".format(np.sqrt(sum(diff_thetis))))
-df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.0000.csv')
-print("Discretisation error: {:.4e}".format(np.sqrt(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))))

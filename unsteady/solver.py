@@ -750,30 +750,30 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def copy_data_from_intermediary_mesh(self, i):
         super(AdaptiveProblem, self).copy_data_from_intermediary_mesh(i)
         if self.op.solve_tracer:
-            self.fwd_solutions_tracer[i].project(self.intermediary_solutions_tracer[i])
+            self.fwd_solutions_tracer[i].assign(self.intermediary_solutions_tracer[i])
         if self.op.solve_sediment:
-            self.fwd_solutions_sediment[i].project(self.intermediary_solutions_sediment[i])
+            self.fwd_solutions_sediment[i].assign(self.intermediary_solutions_sediment[i])
         if self.op.solve_exner:
-            self.fwd_solutions_bathymetry[i].project(self.intermediary_solutions_bathymetry[i])
+            self.fwd_solutions_bathymetry[i].assign(self.intermediary_solutions_bathymetry[i])
 
         if hasattr(self.op, 'sediment_model'):
-            self.op.sediment_model.old_bathymetry_2d.project(self.intermediary_solutions_old_bathymetry[i])
-            self.op.sediment_model.uv_cg.project(self.intermediary_solutions_uv_cg[i])
-            self.op.sediment_model.bed_stress.project(self.intermediary_solutions_bed_stress[i])
-            self.op.sediment_model.depth.project(self.intermediary_solutions_depth[i])
+            self.op.sediment_model.old_bathymetry_2d.assign(self.intermediary_solutions_old_bathymetry[i])
+            self.op.sediment_model.uv_cg.assign(self.intermediary_solutions_uv_cg[i])
+            self.op.sediment_model.bed_stress.assign(self.intermediary_solutions_bed_stress[i])
+            self.op.sediment_model.depth.assign(self.intermediary_solutions_depth[i])
             if self.op.suspended:
                 if self.op.convective_vel_flag:
-                    self.op.sediment_model.corr_factor_model.corr_vel_factor.project(self.intermediary_corr_vel_factor[i])
-                self.op.sediment_model.ceq.project(self.intermediary_ceq[i])
-                self.op.sediment_model.equiltracer.project(self.intermediary_equiltracer[i])
-                self.op.sediment_model.ero.project(self.intermediary_ero[i])
-                self.op.sediment_model.ero_term.project(self.intermediary_ero_term[i])
-                self.op.sediment_model.depo_term.project(self.intermediary_depo_term[i])
+                    self.op.sediment_model.corr_factor_model.corr_vel_factor.assign(self.intermediary_corr_vel_factor[i])
+                self.op.sediment_model.ceq.assign(self.intermediary_ceq[i])
+                self.op.sediment_model.equiltracer.assign(self.intermediary_equiltracer[i])
+                self.op.sediment_model.ero.assign(self.intermediary_ero[i])
+                self.op.sediment_model.ero_term.assign(self.intermediary_ero_term[i])
+                self.op.sediment_model.depo_term.assign(self.intermediary_depo_term[i])
             if self.op.bedload:
-                self.op.sediment_model.calfa.project(self.intermediary_solutions_calfa[i])
-                self.op.sediment_model.salfa.project(self.intermediary_solutions_salfa[i])
+                self.op.sediment_model.calfa.assign(self.intermediary_solutions_calfa[i])
+                self.op.sediment_model.salfa.assign(self.intermediary_solutions_salfa[i])
                 if self.op.angle_correction:
-                    self.op.sediment_model.stress.project(self.intermediary_solutions_stress[i])
+                    self.op.sediment_model.stress.assign(self.intermediary_solutions_stress[i])
 
     # --- I/O
 
@@ -1457,10 +1457,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Mesh movement
             if self.iteration % op.dt_per_mesh_movement == 0:
-                if self.iteration == 0 and op.reinitialise:
-                    inverted = self.move_mesh(i, reinit=True)
-                else:
-                    inverted = self.move_mesh(i)
+                inverted = self.move_mesh(i, reinit=(self.iteration==0 and op.reinitialise))
                 if inverted and op.approach in ('lagrangian', 'hybrid'):
                     self.simulation_time += op.dt
                     self.iteration += 1

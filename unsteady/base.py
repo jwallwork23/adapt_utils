@@ -475,7 +475,7 @@ class AdaptiveProblemBase(object):
         This function is designed for use under Monge-Ampere type mesh movement methods.
         """
         for f, f_int in zip(self.fwd_solutions[i].split(), self.intermediary_solutions[i].split()):
-            f.project(f_int) #dat.data[:] = f_int.dat.data
+            f.assign(f_int)
 
     def save_meshes(self, fname='plex', fpath=None):
         """

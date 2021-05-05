@@ -159,14 +159,10 @@ class TrenchSedimentOptions(CoupledOptions):
     def set_sediment_source(self, fs):
         if self.suspended:
             return self.sediment_model.ero_term
-        else:
-            return None
 
     def set_sediment_sink(self, fs):
         if self.suspended:
             return self.sediment_model.depo_term
-        else:
-            return None
 
     def set_advective_velocity_factor(self, fs):
         if self.convective_vel_flag:
