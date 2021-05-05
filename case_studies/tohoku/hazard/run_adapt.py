@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import os
 from time import perf_counter
 
+from firedrake import Constant
+
 from adapt_utils.case_studies.tohoku.hazard.options import TohokuHazardOptions
 from adapt_utils.io import TimeDependentAdaptationLogger
 from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
