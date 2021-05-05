@@ -38,7 +38,7 @@ class TrenchSedimentOptions(CoupledOptions):
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
         self.average_size = 160e-6  # Average sediment size
-        self.friction_coeff = 0.025
+        self.friction_coeff = Constant(0.025)
         self.ksp = Constant(3*self.average_size)
         self.norm_smoother = Constant(0.1)
 

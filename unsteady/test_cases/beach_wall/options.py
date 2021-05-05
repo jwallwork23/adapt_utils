@@ -39,7 +39,7 @@ class BeachOptions(CoupledOptions):
 
         self.default_mesh = RectangleMesh(np.int(220*nx), np.int(10*ny), self.lx, self.ly)
 
-        self.friction_coeff = 0.02
+        self.friction_coeff = Constant(0.02)
 
         self.set_up_morph_model(self.default_mesh)
 

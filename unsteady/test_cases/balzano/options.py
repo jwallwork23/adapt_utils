@@ -46,7 +46,7 @@ class BalzanoOptions(CoupledOptions):
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
         self.average_size = 200e-6  # Average sediment size
-        self.friction_coeff = 0.025
+        self.friction_coeff = Constant(0.025)
         self.ksp = None
         # Stabilisation
         self.stabilisation = None

@@ -26,7 +26,7 @@ class BeachOptions(CoupledOptions):
         except AssertionError:
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
-        self.friction_coeff = 0.02
+        self.friction_coeff = Constant(0.02)
 
         # Mesh
         self.lx = 220
