@@ -165,6 +165,9 @@ class Options(FrozenConfigurable):
     hybrid_mode = Enum(['h', 'm'], default_value='m', help="""
         Adaptation mode used for detangling.
         """).tag(coonfig=True)
+    reinitialise = Bool(True, help="""
+        Reinitialise the fields after the first mesh movement but before the simulation starts.
+        """).tag(config=True)
 
     # Recovery
     gradient_recovery = Enum(['L2', 'ZZ'], default_value='L2', help="""
@@ -395,13 +398,13 @@ class CoupledOptions(Options):
         """).tag(config=True)
 
     # Physics
-    base_viscosity = NonNegativeFloat(0.0, help="""
-        Non-negative value providing the default constant viscosity field.
+    base_viscosity = FiredrakeScalarExpression(Constant(0.0), help="""
+        Non-negative constant providing the default constant viscosity field.
         """).tag(config=True)
     min_viscosity = NonNegativeFloat(0.0, help="""
-        Non-negative value providing the minimum tolerated viscosity.
+        Non-negative constant providing the minimum tolerated viscosity.
         """).tag(config=True)
-    base_diffusivity = NonNegativeFloat(0.0, help="""
+    base_diffusivity = FiredrakeScalarExpression(Constant(0.0), help="""
         Non-negative value providing the default constant diffusivity field.
         """).tag(config=True)
     base_bathymetry = PositiveFloat(1.0, help="""
@@ -416,7 +419,7 @@ class CoupledOptions(Options):
     friction = Unicode(None, allow_none=True, help="""
         Friction parametrisation for the drag term. Choose from {'nikuradse', 'manning'}.
         """).tag(config=True)
-    friction_coeff = NonNegativeFloat(None, allow_none=True, help="""
+    friction_coeff = FiredrakeScalarExpression(None, allow_none=True, help="""
         Non-negative value providing the default constant drag parameter.
         """).tag(config=True)
 
@@ -436,7 +439,7 @@ class CoupledOptions(Options):
     lax_friedrichs_velocity_scaling_factor = FiredrakeConstantTraitlet(Constant(1.0), help="""
         Scaling factor for Lax Friedrichs stabilisation term in horizontal momentum advection.
         """).tag(config=True)
-    sipg_parameter = FiredrakeScalarExpression(None, allow_none=True, help="""
+    sipg_parameter = FiredrakeScalarExpression(Constant(10.0), allow_none=True, help="""
         Optional user-provided symemetric interior penalty parameter for the shallow water model.
         Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
         """).tag(config=True)
@@ -485,7 +488,7 @@ class CoupledOptions(Options):
     lax_friedrichs_tracer_scaling_factor = FiredrakeScalarExpression(Constant(1.0), help="""
         Scaling factor for Lax Friedrichs stabilisation term in tracer advection.
         """).tag(config=True)
-    sipg_parameter_tracer = FiredrakeScalarExpression(None, allow_none=True, help="""
+    sipg_parameter_tracer = FiredrakeScalarExpression(Constant(10.0), allow_none=True, help="""
         Optional user-provided symemetric interior penalty parameter for the tracer model.
         Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
         """).tag(config=True)
@@ -511,7 +514,7 @@ class CoupledOptions(Options):
     stabilisation_sediment = Unicode(None, allow_none=True, help="""
         Stabilisation approach for sediment model, set to 'lax_friedrichs', if not None.
         """).tag(config=True)
-    sipg_parameter_sediment = FiredrakeScalarExpression(None, allow_none=True, help="""
+    sipg_parameter_sediment = FiredrakeScalarExpression(Constant(10.0), allow_none=True, help="""
         Optional user-provided symemetric interior penalty parameter for the sediment model.
         Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
         """).tag(config=True)
@@ -618,13 +621,11 @@ class CoupledOptions(Options):
 
     def set_viscosity(self, fs):
         """Should be implemented in derived class."""
-        # return None if np.isclose(self.base_viscosity, 0.0) else Constant(self.base_viscosity)
-        return None if np.isclose(self.base_viscosity, 0.0) else Function(fs).assign(self.base_viscosity)
+        return self.base_viscosity
 
     def set_diffusivity(self, fs):
         """Should be implemented in derived class."""
-        # return None if np.isclose(self.base_diffusivity, 0.0) else Constant(self.base_diffusivity)
-        return None if np.isclose(self.base_diffusivity, 0.0) else Function(fs).assign(self.base_diffusivity)
+        return self.base_diffusivity
 
     def set_inflow(self, fs):
         """Should be implemented in derived class."""
@@ -660,7 +661,7 @@ class CoupledOptions(Options):
 
     def set_manning_drag_coefficient(self, fs):
         if self.friction == 'manning':
-            return Constant(self.friction_coeff or 0.02)
+            return self.friction_coeff
 
     def get_velocity(self, t):
         raise NotImplementedError("Should be implemented in derived class.")

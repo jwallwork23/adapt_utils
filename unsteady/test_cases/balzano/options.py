@@ -36,8 +36,7 @@ class BalzanoOptions(CoupledOptions):
         self.di = os.path.join(self.di, 'bathymetry{:d}'.format(self.bathymetry_type))
 
         # Physical
-        self.base_viscosity = 1e-6
-        self.base_diffusivity = 0.15
+        self.base_viscosity = Constant(1e-6)
         self.wetting_and_drying = True
         self.wetting_and_drying_alpha = Constant(0.43)
         friction = kwargs.get('friction', 'manning')
@@ -46,8 +45,8 @@ class BalzanoOptions(CoupledOptions):
         except AssertionError:
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
-        self.average_size = 200e-6  # Average sediment size
-        self.friction_coeff = 0.025
+        self.average_size = Constant(200e-6)  # Average sediment size
+        self.friction_coeff = Constant(0.025)
         self.ksp = None
         # Stabilisation
         self.stabilisation = None

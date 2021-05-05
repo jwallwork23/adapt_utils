@@ -9,8 +9,6 @@ from firedrake import *
 
 import pytest
 import os
-import numpy as np
-import matplotlib.pyplot as plt
 
 from adapt_utils.adapt.metric import steady_metric, get_density_and_quotients
 from adapt_utils.adapt.r import MeshMover
@@ -35,8 +33,7 @@ def monitor_type(request):
     return request.param
 
 
-@pytest.fixture(params=['quasi_newton'])
-# @pytest.fixture(params=['quasi_newton', 'relaxation'])  # NOTE: Unnecessary
+@pytest.fixture(params=['relaxation'])
 def method(request):
     return request.param
 
@@ -44,42 +41,39 @@ def method(request):
 def test_sensors(sensor, monitor_type, method, plot_mesh=False):
     alpha = Constant(5.0)
     hessian_kwargs = dict(enforce_constraints=False, normalise=True, noscale=True)
-    if monitor_type in ('gradient', 'frobenius') and sensor in (multiscale, interweaved):
-        pytest.xfail("This test requires too much memory / needs tweaking")  # FIXME
-    if monitor_type == 'density' and sensor in (hyperbolic, multiscale, interweaved):
-        pytest.xfail("Monitor function is too kinky!")  # TODO: Apply a smoother
+    pytest.xfail("FIXME")  # FIXME
 
-    def shift_and_scale(mesh):
+    def shift_and_scale(mesh=None, x=None):
         """
         Adapt to the scaled and shifted sensor magnitude.
         """
-        f = interpolate(abs(sensor(mesh)), FunctionSpace(mesh, "CG", 1))
-        return 1.0 + alpha*abs(sensor(mesh))/f.vector().gather().max()
+        f = interpolate(abs(sensor(mesh, xy=x)), FunctionSpace(mesh, "CG", 1))
+        return 1.0 + alpha*abs(sensor(mesh, xy=x))/f.vector().gather().max()
 
-    def gradient(mesh):
+    def gradient(mesh=None, x=None):
         """
         Adapt to a recovered gradient for the sensor.
         """
-        g = recover_gradient(sensor(mesh), mesh=mesh, op=op)
+        g = recover_gradient(sensor(mesh, xy=x), mesh=mesh, op=op)
         gmax = g.vector().gather().max()
         return 1.0 + alpha*dot(g, g)/dot(gmax, gmax)
 
-    def frobenius(mesh):
+    def frobenius(mesh=None, x=None):
         """
         Adapt to the Frobenius norm of an L1-normalised
         Hessian metric for the sensor.
         """
         P1 = FunctionSpace(mesh, "CG", 1)
-        M = steady_metric(sensor(mesh), mesh=mesh, op=op, **hessian_kwargs)
+        M = steady_metric(sensor(mesh, xy=x), mesh=mesh, op=op, **hessian_kwargs)
         M_F = local_frobenius_norm(M, space=P1)
         return 1.0 + alpha*M_F/interpolate(M_F, P1).vector().gather().max()
 
-    def density(mesh):
+    def density(mesh=None, x=None):
         """
         Adapt to the density of an L1-normalised
         Hessian metric for the sensor.
         """
-        M = steady_metric(sensor(mesh), mesh=mesh, op=op, **hessian_kwargs)
+        M = steady_metric(sensor(mesh, xy=x), mesh=mesh, op=op, **hessian_kwargs)
         rho = get_density_and_quotients(M)[0]
         return 1.0 + alpha*rho/rho.vector().gather().max()
 
@@ -123,6 +117,7 @@ def test_sensors(sensor, monitor_type, method, plot_mesh=False):
 
     # Plot mesh
     if plot_mesh:
+        import matplotlib.pyplot as plt
         fig, axes = plt.subplots(figsize=(5, 5))
         triplot(mesh, axes=axes, interior_kw={'linewidth': 0.1}, boundary_kw={'color': 'k'})
         axes.axis(False)

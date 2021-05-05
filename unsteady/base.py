@@ -189,7 +189,7 @@ class AdaptiveProblemBase(object):
         self.set_finite_elements()
         self.create_function_spaces()
         self.create_solutions()
-        self.set_fields(init=True)
+        self.set_fields(init=True, reinit=False)
         self.set_stabilisation()
         self.set_boundary_conditions()
         self.create_outfiles(restarted=restarted)
@@ -281,7 +281,7 @@ class AdaptiveProblemBase(object):
         self.fwd_solutions[i] = None
         self.adj_solutions[i] = None
 
-    def set_fields(self, **kwargs):
+    def set_fields(self, init, reinit, **kwargs):
         """
         Set various fields *on each mesh*, including:
 
@@ -295,7 +295,7 @@ class AdaptiveProblemBase(object):
         """
         self.op.print_debug("SETUP: Creating fields...")
         for i in range(self.num_meshes):
-            self.set_fields_step(i, **kwargs)
+            self.set_fields_step(i, init, reinit, **kwargs)
 
     def set_fields_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
@@ -474,9 +474,8 @@ class AdaptiveProblemBase(object):
 
         This function is designed for use under Monge-Ampere type mesh movement methods.
         """
-        # TODO: Use par_loop
         for f, f_int in zip(self.fwd_solutions[i].split(), self.intermediary_solutions[i].split()):
-            f.dat.data[:] = f_int.dat.data
+            f.assign(f_int)
 
     def save_meshes(self, fname='plex', fpath=None):
         """
@@ -656,7 +655,7 @@ class AdaptiveProblemBase(object):
             args = (Mesh(self.meshes[i].coordinates.copy(deepcopy=True)), monitors[i])
             self.mesh_movers[i] = MeshMover(*args, **kwargs)
 
-    def move_mesh(self, i):
+    def move_mesh(self, i, init=False, reinit=False):
         """
         Move the mesh using an r-adaptive or hybrid method of choice.
         """
@@ -665,7 +664,7 @@ class AdaptiveProblemBase(object):
         elif self.op.approach == 'ale':
             raise NotImplementedError  # TODO
         elif self.mesh_movers[i] is not None:
-            return self.move_mesh_monge_ampere(i)
+            return self.move_mesh_monge_ampere(i, init, reinit)
 
     def move_lagrangian_mesh(self, i):
         """
@@ -727,7 +726,7 @@ class AdaptiveProblemBase(object):
             warnings.warn("Mesh has {:d} inverted element(s)!".format(num_inverted))
         return restarted
 
-    def move_mesh_monge_ampere(self, i):  # TODO: Annotation
+    def move_mesh_monge_ampere(self, i, init, reinit):  # TODO: Annotation
         """
         Move the physical mesh using a monitor based approach driven by solutions of a Monge-Ampere
         type equation.
@@ -741,7 +740,8 @@ class AdaptiveProblemBase(object):
               know how the coordinate transform was derived, only what the result was. In any
               case, the current implementation involves a supermesh projection which is not
               yet annotated in pyadjoint.
-        """  # TODO: documentation on how Monge-Ampere is solved.
+        """
+        # TODO: documentation on how Monge-Ampere is solved.
         if self.mesh_movers[i] is None:
             raise ValueError("No monitor function was provided. Use `set_monitor_functions`.")
 
@@ -751,8 +751,7 @@ class AdaptiveProblemBase(object):
 
         # Update intermediary mesh coordinates
         self.op.print_debug("MESH MOVEMENT: Updating intermediary mesh coordinates...")
-        # TODO: Use par_loop
-        self.intermediary_meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
+        self.intermediary_meshes[i].coordinates.assign(self.mesh_movers[i].x)
 
         # Project a copy of the current solution onto mesh defined on new coordinates
         self.op.print_debug("MESH MOVEMENT: Projecting solutions onto intermediary mesh...")
@@ -760,16 +759,15 @@ class AdaptiveProblemBase(object):
 
         # Update physical mesh coordinates
         self.op.print_debug("MESH MOVEMENT: Updating physical mesh coordinates...")
-        # TODO: Use par_loop
-        self.meshes[i].coordinates.dat.data[:] = self.intermediary_meshes[i].coordinates.dat.data
+        self.meshes[i].coordinates.assign(self.intermediary_meshes[i].coordinates)
 
         # Copy over projected solution data
         self.op.print_debug("MESH MOVEMENT: Transferring solution data from intermediary mesh...")
-        self.copy_data_from_intermediary_mesh(i)  # FIXME: Needs annotation
+        self.copy_data_from_intermediary_mesh(i)
 
         # Re-interpolate fields
         self.op.print_debug("MESH MOVEMENT: Re-interpolating fields...")
-        self.set_fields()
+        self.set_fields(init, reinit)
         return False
 
     # --- Error estimation

@@ -42,7 +42,7 @@ op.update({
     'end_time': 600.0,
 
     # Crank down viscosity and plot vorticity
-    'base_viscosity': 1.0e-05,
+    'base_viscosity': Constant(1.0e-05),
     'characteristic_velocity': Constant(op.inflow_velocity),
     'grad_depth_viscosity': True,
     'max_reynolds_number': 5.0e+05,

@@ -56,3 +56,4 @@ turbine_array/resources/
 turbine_array/screenshots/
 turbine_array/videos/
 turbine_array/__pycache__/
+trench_1d_der/outputs*

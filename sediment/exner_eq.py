@@ -6,19 +6,15 @@ Exner equation
 The equation reads
 
 .. math::
-    \frac{\partial z_b}{\partial t} + (m/(1-p)) \nabla_h \cdot \textbf{Q_b}
-    = (m/(1-p)) H ((F_{sink} S) - F_{source})
+    \frac{\partial z_b}{\partial t} + (morfac/(1-p)) \nabla_h \cdot (Q_b)
+    = (morfac/(1-p)) H ((Sink S) - Source)
     :label: exner_eq
 
-where :math:`z_b` is the bedlevel, :math:`S` is :math:`HT` for conservative (where H is depth
-and T is the sediment field) and :math:`T` for non-conservative (where T is the sediment field),
-:math:`\nabla_h` denotes horizontal gradient, :math:`m` is the morphological scale factor,
-:math:`p` is the porosity and :math:`\textbf{Q_b}` is the bedload transport vector
+where :math:'z_b' is the bedlevel, :math:'S' is :math:'q=HT' for conservative
+and :math:'T' for non-conservative, :math:`\nabla_h` denotes horizontal gradient,
+:math:'morfac' is the morphological scale factor, :math:'p' is the porosity and
+:math:'Q_b' is the bedload transport vector
 
-**********************************************************************************************
-*  NOTE: This file is based on the Thetis project (https://thetisproject.org) and contains   *
-*        some copied code.                                                                   *
-**********************************************************************************************
 """
 
 from __future__ import absolute_import
@@ -129,14 +125,14 @@ class ExnerSourceTerm(ExnerTerm):
 
 class ExnerBedloadTerm(ExnerTerm):
     r"""
-    Bedload transport term, \nabla_h \cdot \textbf{Q_b}
+    Bedload transport term, \nabla_h \cdot \textbf{qb}
 
     The weak form is
 
     .. math::
-        \int_\Omega  \nabla_h \cdot \textbf{Q_b} \psi  dx
-        = - \int_\Omega (\textbf{Q_b} \cdot \nabla) \psi dx
-        + \int_\Gamma \psi \textbf{Q_b} \cdot \textbf{n} dS
+        \int_\Omega  \nabla_h \cdot \textbf{qb} \psi  dx
+        = - \int_\Omega (\textbf{qb} \cdot \nabla) \psi dx
+        + \int_\Gamma \psi \textbf{qb} \cdot \textbf{n} dS
 
     where :math:`\textbf{n}` is the unit normal of the element interfaces.
 
@@ -155,6 +151,22 @@ class ExnerBedloadTerm(ExnerTerm):
 
         return -f
 
+class ExnerSedimentSlideTerm(ExnerTerm):
+    r"""
+    TO DO
+    """
+    def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
+        f = 0
+
+        diff_tensor = self.sed_model.get_sediment_slide_term(solution)
+
+        diff_flux = dot(diff_tensor, grad(-solution))
+        f += inner(grad(self.test), diff_flux)*dx
+        f += -avg(self.sed_model.sigma)*inner(jump(self.test, self.sed_model.n),dot(avg(diff_tensor), jump(solution, self.sed_model.n)))*dS
+        f += -inner(avg(dot(diff_tensor, grad(self.test))),jump(solution, self.sed_model.n))*dS
+        f += -inner(jump(self.test, self.sed_model.n), avg(dot(diff_tensor, grad(solution))))*dS
+
+        return -f
 
 class ExnerEquation(Equation):
     """
@@ -170,7 +182,6 @@ class ExnerEquation(Equation):
         :kwarg bool conservative: whether to use conservative tracer
         """
         super().__init__(function_space)
-
         if sed_model is None:
             raise ValueError('To use the exner equation must define a sediment model')
         self.depth = depth
@@ -179,3 +190,5 @@ class ExnerEquation(Equation):
             self.add_term(ExnerSourceTerm(*args), 'source')
         if sed_model.bedload:
             self.add_term(ExnerBedloadTerm(*args), 'implicit')
+        if sed_model.use_sediment_slide:
+            self.add_term(ExnerSedimentSlideTerm(*args), 'implicit')

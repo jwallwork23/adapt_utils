@@ -75,7 +75,7 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
         x, y, z = SpatialCoordinate(mesh)
         x0, y0, z0, r = self.source_loc[0]
         u = Constant(as_vector(self.base_velocity))
-        D = Constant(self.base_diffusivity)
+        D = self.base_diffusivity
         Pe = 0.5*u[0]/D
         # q = 0.01  # sediment discharge of source (kg/s)
         q = 1
@@ -92,7 +92,7 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
         x, y, z = SpatialCoordinate(mesh)
         x0, y0, z0, r = self.source_loc[0]
         u = Constant(as_vector(self.base_velocity))
-        D = Constant(self.base_diffusivity)
+        D = self.base_diffusivity
         Pe = 0.5*u[0]/D
         # q = 0.01  # sediment discharge of source (kg/s)
         q = 1

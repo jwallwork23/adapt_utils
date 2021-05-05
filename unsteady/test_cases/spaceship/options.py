@@ -42,7 +42,7 @@ class SpaceshipOptions(TurbineOptions):
             raise IOError("Need to make mesh before initialising SpaceshipOptions object.")
 
         # Physics
-        self.base_viscosity = 5.0
+        self.base_viscosity = Constant(5.0)
         self.viscosity_sponge_type = 'linear'
         # self.viscosity_sponge_type = 'exponential'
         self.max_viscosity = 1000.0
@@ -100,7 +100,7 @@ class SpaceshipOptions(TurbineOptions):
         r = sqrt(x**2 + y**2)/R
         base_viscosity = self.base_viscosity
         if self.viscosity_sponge_type is None:
-            return Constant(base_viscosity)
+            return base_viscosity
         if self.viscosity_sponge_type == 'linear':
             sponge = base_viscosity + r*(self.max_viscosity - base_viscosity)
         elif self.viscosity_sponge_type == 'exponential':

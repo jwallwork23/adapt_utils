@@ -85,7 +85,7 @@ else:
     cot_theta = 1.0/tan(min_angles)
     p = op.degree_tracer
     alpha = Constant(5.0*p*(p+1) if p != 0 else 1.5)
-    alpha = alpha*get_sipg_ratio(Constant(op.base_diffusivity))*cot_theta
+    alpha = alpha*get_sipg_ratio(op.base_diffusivity)*cot_theta
     # alpha = interpolate(alpha/h, min_angles.function_space())
     alpha = interpolate(h/alpha, min_angles.function_space())
 

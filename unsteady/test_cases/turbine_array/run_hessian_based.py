@@ -70,13 +70,13 @@ if plot_pdf:
     extensions.append('pdf')
 if plot_png:
     extensions.append('png')
-base_viscosity = float(args.base_viscosity or 1.0)
+base_viscosity = Constant(args.base_viscosity or 1.0)
 kwargs = {
     'approach': approach,
     'level': level,
 
     # Physics
-    'target_viscosity': float(args.target_viscosity or base_viscosity),
+    'target_viscosity': Constant(args.target_viscosity or base_viscosity),
 
     # Mesh adaptation
     'num_meshes': int(args.num_meshes or 10),

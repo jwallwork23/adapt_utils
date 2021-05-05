@@ -57,7 +57,7 @@ alpha = 1.0  # size of the dense region surrounding the coast
 beta = 10.0  # level of refinement at coast
 
 
-def wet_dry_interface_monitor(mesh):
+def wet_dry_interface_monitor(mesh, **kwargs):
     """
     Monitor function focused around the wet-dry interface.
 

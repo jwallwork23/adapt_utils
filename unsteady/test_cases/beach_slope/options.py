@@ -31,7 +31,7 @@ class BeachOptions(CoupledOptions):
 
         self.default_mesh = RectangleMesh(np.int(220*nx), np.int(10*ny), self.lx, self.ly)
 
-        self.friction_coeff = 0.02
+        self.friction_coeff = Constant(0.02)
 
         self.set_up_morph_model(self.default_mesh)
 
@@ -71,12 +71,12 @@ class BeachOptions(CoupledOptions):
     def set_up_morph_model(self, mesh=None):
 
         # Physical
-        self.base_viscosity = 0.5
-        self.base_diffusivity = 100
+        self.base_viscosity = Constant(0.5)
+        self.base_diffusivity = Constant(100)
         self.gravity = Constant(9.81)
         self.porosity = Constant(0.4)
         self.ks = Constant(0.025)
-        self.average_size = 0.0002  # Average sediment size
+        self.average_size = Constant(0.0002)  # Average sediment size
 
         self.wetting_and_drying = True
         self.depth_integrated = True
