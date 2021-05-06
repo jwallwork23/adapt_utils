@@ -23,7 +23,7 @@ class TrenchSedimentOptions(CoupledOptions):
         super(TrenchSedimentOptions, self).__init__(**kwargs)
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
         self.plot_pvd = True
-        self.num_hours = 2.5 #15
+        self.num_hours = 15
         if output_dir is not None:
             self.di = output_dir
 
