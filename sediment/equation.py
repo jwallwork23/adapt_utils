@@ -37,12 +37,8 @@ class SedimentErosionTerm(SedimentTerm):
 
     """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
-        source = self.sediment_model.get_erosion_term()
-        if self.conservative:
-            H = self.depth.get_total_depth(fields['elev_2d'])
-            f = inner(H*source, self.test)*self.dx
-        else:
-            f = inner(source, self.test)*self.dx
+        source = self.sediment_model.get_erosion_term(self.conservative)
+        f = inner(source, self.test)*self.dx
         return f
 
 
@@ -60,7 +56,6 @@ class SedimentDepositionTerm(SedimentTerm):
     """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         sink = self.sediment_model.get_deposition_coefficient()
-        H = self.depth.get_total_depth(fields['elev_2d'])
         f = inner(-sink*solution, self.test)*self.dx
         return f
 

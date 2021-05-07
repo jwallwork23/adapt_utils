@@ -306,6 +306,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.intermediary_ceq = [Function(space) for space in space_dg]
                 self.intermediary_equiltracer = [Function(space) for space in space_dg]
                 self.intermediary_ero = [Function(space) for space in space_dg]
+                self.intermediary_depo = [Function(space) for space in space_dg]
 
     def create_solutions_step(self, i):
         super(AdaptiveProblem, self).create_solutions_step(i)
@@ -529,6 +530,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.intermediary_ceq[i].project(self.op.sediment_model.ceq)
                 self.intermediary_equiltracer[i].project(self.op.sediment_model.equiltracer)
                 self.intermediary_ero[i].project(self.op.sediment_model.ero)
+                self.intermediary_depo[i].project(self.op.sediment_model.depo)
 
         def debug(a, b, name, idx=None):
             msg = "WARNING: Is the intermediary {:s} solution just copied?".format(name)
@@ -570,6 +572,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                           self.intermediary_equiltracer[i], "equiltracer")
                     debug(self.op.sediment_model.ero,
                           self.intermediary_ero[i], "ero")
+                    debug(self.op.sediment_model.depo,
+                          self.intermediary_depo[i], "depo")
                 if self.op.bedload:
                     debug(self.op.sediment_model.calfa,
                           self.intermediary_solutions_calfa[i], "calfa")
@@ -611,6 +615,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.op.sediment_model.ceq.project(self.intermediary_ceq[i])
                 self.op.sediment_model.equiltracer.project(self.intermediary_equiltracer[i])
                 self.op.sediment_model.ero.assign(self.intermediary_ero[i])
+                self.op.sediment_model.depo.assign(self.intermediary_depo[i])
             if self.op.bedload:
                 self.op.sediment_model.calfa.project(self.intermediary_solutions_calfa[i])
                 self.op.sediment_model.salfa.project(self.intermediary_solutions_salfa[i])

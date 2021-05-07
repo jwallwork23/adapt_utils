@@ -39,20 +39,12 @@ class ExnerSourceTerm(ExnerTerm):
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         f = 0
         sediment = fields.get('sediment')
-        source = self.sediment_model.get_erosion_term()
-        sink = self.sediment_model.get_deposition_coefficient()
+        source_dep = self.sediment_model.get_erosion_term(exner = True)
+        sink_dep = self.sediment_model.get_deposition_coefficient(conservative = self.depth_integrated_sediment, exner = True)
         morfac = fields.get('morfac')
         porosity = fields.get('porosity')
 
         fac = Constant(morfac/(1.0-porosity))
-        H = self.depth.get_total_depth(fields_old['elev_2d'])
-
-        source_dep = source*H
-
-        if self.depth_integrated_sediment:
-            sink_dep = sink
-        else:
-            sink_dep = sink*H
 
         f = inner(fac*(source_dep-sediment*sink_dep), self.test)*self.dx
 
