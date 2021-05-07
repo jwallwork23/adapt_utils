@@ -27,7 +27,7 @@ def initialise_fields(mesh2d, inputdir):
 
 new_mesh = th.RectangleMesh(16*5*4, 5*4, 16, 1.1)
 
-bath1 = initialise_fields(new_mesh, 'adapt_output/hydrodynamics_trench_slant_bath_3_0_1-0.8')
+bath1 = initialise_fields(new_mesh, 'adapt_output/hydrodynamics_trench_slant_bath_3_1_0-0.4')
 bath2 = initialise_fields(new_mesh, 'adapt_output/hydrodynamics_trench_slant_bath_3_1_0-0.8')
 bath3 = initialise_fields(new_mesh, 'adapt_output/hydrodynamics_trench_slant_bath_3_1_1-0.8')
 bath4 = initialise_fields(new_mesh, 'adapt_output/hydrodynamics_trench_slant_bath_5_1_0-0.8')
