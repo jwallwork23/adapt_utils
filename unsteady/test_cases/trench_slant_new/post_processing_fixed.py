@@ -27,26 +27,23 @@ def initialise_fields(mesh2d, inputdir):
 
 new_mesh = th.RectangleMesh(16*5*4, 5*4, 16, 1.1)
 
-bath1 = initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_0.1')
-bath2 = initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_0.2')
-bath3 = initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_0.4')
-bath3a = initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_0.5')
-bath4 = initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_0.8')
-bath4a = initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_1')
-bath4b = initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_1.6')
-bath5 =  initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_2.0')
-bath_real = initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_4.0')
+bath1 = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_0.1')
+bath2 = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_0.125')
+bath3 = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_0.25')
+bath4 = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_0.4')
+bath5 = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_0.5')
+bath6 = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_0.8')
+#bath4b = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_1.6')
+#bath5 =  initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_2.0')
+bath_real = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_code_4.0')
 
 errorlist = []
+errorlist.append(fire.errornorm(bath6, bath_real))
 errorlist.append(fire.errornorm(bath5, bath_real))
-errorlist.append(fire.errornorm(bath4b, bath_real))
-errorlist.append(fire.errornorm(bath4a, bath_real))
 errorlist.append(fire.errornorm(bath4, bath_real))
-errorlist.append(fire.errornorm(bath3a, bath_real))
 errorlist.append(fire.errornorm(bath3, bath_real))
 errorlist.append(fire.errornorm(bath2, bath_real))
 errorlist.append(fire.errornorm(bath1, bath_real))
-
 
 print(errorlist)
 

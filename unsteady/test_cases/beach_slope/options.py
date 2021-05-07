@@ -20,7 +20,7 @@ class BeachOptions(CoupledOptions):
     mudflats." Continental Shelf Research 20.10-11 (2000): 1079-1097.
     """
 
-    def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny=1, mesh = None, input_dir = None, output_dir = None, **kwargs):
+    def __init__(self, friction='manning', nx=1, ny=1, mesh = None, input_dir = None, output_dir = None, **kwargs):
         super(BeachOptions, self).__init__(**kwargs)
 
         try:
@@ -242,10 +242,6 @@ class BeachOptions(CoupledOptions):
 
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
-        if self.plot_timeseries:
-            u, eta = prob.fwd_solutions[i].split()
-            b = prob.bathymetry[i]
-            wd = Function(prob.P1DG[i], name="Heaviside approximation")
 
         def export_func():
             eta_tilde.project(self.get_eta_tilde(prob, i))

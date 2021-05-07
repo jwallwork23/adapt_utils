@@ -22,11 +22,11 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs_' + st
 
-fac_x = 0.8
-fac_y = 0.8
-alpha = 1
+fac_x = 0.4
+fac_y = 0.4
+alpha = 3
 beta = 1
-gamma = 1
+gamma = 0
 
 # to create the input hydrodynamics directiory please run hydro_trench_slant.py
 # setting fac_x and fac_y to be the same values as above
