@@ -15,7 +15,7 @@ import sys
 import time
 
 from adapt_utils.io import initialise_bathymetry, export_bathymetry
-from adapt_utils.unsteady.test_cases.trench_slant_new.options import TrenchSlantOptions
+from adapt_utils.unsteady.test_cases.trench_slant.options import TrenchSlantOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 

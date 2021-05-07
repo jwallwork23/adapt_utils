@@ -15,7 +15,7 @@ import time
 from adapt_utils.adapt import recovery
 from adapt_utils.io import initialise_bathymetry, export_bathymetry
 from adapt_utils.norms import local_frobenius_norm, local_norm
-from adapt_utils.unsteady.test_cases.trench_slant_new.options import TrenchSlantOptions
+from adapt_utils.unsteady.test_cases.trench_slant.options import TrenchSlantOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 ts = time.time()
