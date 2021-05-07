@@ -10,6 +10,7 @@ condition.py
 *_old.py
 
 # File types
+*.h5
 *.swp
 *.msh
 *.pvd
