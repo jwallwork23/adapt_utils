@@ -6,12 +6,8 @@ TODO
 FIXME
 .DS_Store
 condition.py
-<<<<<<< HEAD
-=======
-
 # File endings
 *_old.py
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 
 # File types
 *.swp
@@ -26,19 +22,13 @@ condition.py
 *.patch
 *.png
 *.fld
-<<<<<<< HEAD
 *.dbf
 *.prj
 *.cpg
 *.qpj
-=======
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
 *.xyz
 *.tar.gz
 *.tiff
 *.tap
 *.pyc
-<<<<<<< HEAD
-=======
 *.zip
->>>>>>> dfe1c0b3a34dfef1765835b64b574a69fe60dd9a
