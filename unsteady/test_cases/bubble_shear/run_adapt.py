@@ -14,7 +14,6 @@ parser.add_argument("-end_time", help="Simulation end time.")
 
 parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
 parser.add_argument("-stabilisation", help="Stabilisation method")
-parser.add_argument("-anisotropic_stabilisation", help="Toggle anisotropic stabilisation")
 parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 
 parser.add_argument("-approach", help="Mesh adaptation approach")
@@ -34,8 +33,6 @@ kwargs = {
     # Solver
     'tracer_family': args.family or 'cg',
     'stabilisation_tracer': args.stabilisation or 'supg',
-    'anisotropic_stabilisation': False if args.anisotropic_stabilisation == "0" else True,
-    'use_automatic_sipg_parameter': False,  # We have an inviscid problem
     'use_limiter_for_tracers': bool(args.limiters or False),
 
     # Mesh adaptation

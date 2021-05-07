@@ -108,7 +108,6 @@ op = PointDischarge2dOptions(**kwargs)
 op.tracer_family = family
 op.stabilisation_tracer = None if stabilisation == 'none' else stabilisation
 op.anisotropic_stabilisation = anisotropic_stabilisation
-op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
 op.normalisation = args.normalisation or 'complexity'  # FIXME: error
 op.print_debug(op)
 di = os.path.dirname(__file__)

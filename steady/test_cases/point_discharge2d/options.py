@@ -47,7 +47,6 @@ class PointDischarge2dOptions(CoupledOptions):
         self.degree_tracer = 1
         self.tracer_family = 'cg'
         self.stabilisation_tracer = 'SUPG'
-        self.use_automatic_sipg_parameter = True
         self.use_limiter_for_tracers = False
 
         # Hydrodynamics

@@ -89,14 +89,8 @@ class Options(FrozenConfigurable):
     stabilisation = Unicode(None, allow_none=True, help="""
         Stabilisation approach to use for hydrodynamic model.
         """).tag(config=True)
-    anisotropic_stabilisation = Bool(False, help="""
+    anisotropic_stabilisation = Bool(True, help="""
         Account for mesh anisotropy by using an alternative cell size measure to `CellSize`.
-        """).tag(config=True)
-    use_automatic_sipg_parameter = Bool(True, help="""
-        Toggle automatic generation of symmetric interior penalty method.
-        """).tag(config=True)
-    use_maximal_sipg = Bool(False, help="""
-        Use the maximum of the automatically generated SIPG field over the whole domain.
         """).tag(config=True)
 
     # Solver parameters
@@ -422,6 +416,7 @@ class CoupledOptions(Options):
     friction_coeff = FiredrakeScalarExpression(None, allow_none=True, help="""
         Non-negative value providing the default constant drag parameter.
         """).tag(config=True)
+    use_white_colebrook = Bool(False, help='Use white colebrook friction formulation').tag(config=True)
 
     # Shallow water model
     solve_swe = Bool(True, help="Toggle solving the shallow water model.").tag(config=True)
@@ -439,9 +434,8 @@ class CoupledOptions(Options):
     lax_friedrichs_velocity_scaling_factor = FiredrakeConstantTraitlet(Constant(1.0), help="""
         Scaling factor for Lax Friedrichs stabilisation term in horizontal momentum advection.
         """).tag(config=True)
-    sipg_parameter = FiredrakeScalarExpression(Constant(10.0), allow_none=True, help="""
-        Optional user-provided symemetric interior penalty parameter for the shallow water model.
-        Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
+    sipg_factor = FiredrakeScalarExpression(Constant(1.0), allow_none=True, help="""
+        Optional user-provided symmetric interior penalty parameter for the shallow water model.
         """).tag(config=True)
     recover_vorticity = Bool(False, help="""
         If True, a vorticity field is L2-projected from the hydrodynamics velocity output.
@@ -482,15 +476,14 @@ class CoupledOptions(Options):
         polynomial order of the finite element space by incremented?
         """).tag(config=True)
     stabilisation_tracer = Unicode(None, allow_none=True, help="""
-        Stabilisation approach for tracer model, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if
+        Stabilisation approach for tracer model, chosen from {'SUPG', 'lax_friedrichs'}, if
         not None.
         """).tag(config=True)
     lax_friedrichs_tracer_scaling_factor = FiredrakeScalarExpression(Constant(1.0), help="""
         Scaling factor for Lax Friedrichs stabilisation term in tracer advection.
         """).tag(config=True)
-    sipg_parameter_tracer = FiredrakeScalarExpression(Constant(10.0), allow_none=True, help="""
-        Optional user-provided symemetric interior penalty parameter for the tracer model.
-        Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
+    sipg_factor_tracer = FiredrakeScalarExpression(Constant(1.0), allow_none=True, help="""
+        Optional user-provided symmetric interior penalty parameter for the tracer model.
         """).tag(config=True)
     norm_smoother = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)  # TODO: help
     tracer_advective_velocity_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)  # TODO: help
@@ -514,9 +507,8 @@ class CoupledOptions(Options):
     stabilisation_sediment = Unicode(None, allow_none=True, help="""
         Stabilisation approach for sediment model, set to 'lax_friedrichs', if not None.
         """).tag(config=True)
-    sipg_parameter_sediment = FiredrakeScalarExpression(Constant(10.0), allow_none=True, help="""
-        Optional user-provided symemetric interior penalty parameter for the sediment model.
-        Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
+    sipg_factor_sediment = FiredrakeScalarExpression(Constant(1.0), allow_none=True, help="""
+        Optional user-provided symmetric interior penalty parameter for the sediment model.
         """).tag(config=True)
     ksp = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)  # TODO: help
 
@@ -636,22 +628,6 @@ class CoupledOptions(Options):
         return
 
     def set_tracer_source(self, fs):
-        """Should be implemented in derived class."""
-        return
-
-    def set_sediment_source(self, fs):
-        """Should be implemented in derived class."""
-        return
-
-    def set_sediment_sink(self, sediment_model, fs):
-        """Should be implemented in derived class."""
-        return
-
-    def set_sediment_depth_integ_source(self, fs):
-        """Should be implemented in derived class."""
-        return
-
-    def set_sediment_depth_integ_sink(self, fs):
         """Should be implemented in derived class."""
         return
 

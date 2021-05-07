@@ -190,7 +190,6 @@ class AdaptiveProblemBase(object):
         self.create_function_spaces()
         self.create_solutions()
         self.set_fields(init=True, reinit=False)
-        self.set_stabilisation()
         self.set_boundary_conditions()
         self.create_outfiles(restarted=restarted)
         self.create_intermediary_spaces(self.have_intermediaries)
@@ -303,14 +302,6 @@ class AdaptiveProblemBase(object):
     def free_fields_step(self, i):
         """Free the memory associated with fields on mesh i."""
         self.fields[i] = AttrDict()
-
-    def set_stabilisation(self):
-        self.op.print_debug("SETUP: Setting stabilisation parameters...")
-        for i in range(self.num_meshes):
-            self.set_stabilisation_step(i)
-
-    def set_stabilisation_step(self, i):
-        raise NotImplementedError("To be implemented in derived class")
 
     def set_boundary_conditions(self):
         """

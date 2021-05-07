@@ -15,7 +15,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-n", help="Resolution of initial mesh.")
 parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
 parser.add_argument("-stabilisation", help="Stabilisation method")
-parser.add_argument("-anisotropic_stabilisation", help="Toggle anisotropic stabilisation")
 parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 parser.add_argument("-mode", help="Choose from 'h' and 'm'")
 parser.add_argument("-debug", help="Toggle debugging mode.")
@@ -29,8 +28,6 @@ kwargs = {
     # Spatial discretisation
     'tracer_family': args.family or 'cg',
     'stabilisation_tracer': args.stabilisation or 'supg',
-    'use_automatic_sipg_parameter': False,  # We have an inviscid problem
-    'anisotropic_stabilisation': False if args.anisotropic_stabilisation == "0" else True,
     'use_limiter_for_tracers': bool(args.limiters or False),
 
     # Mesh movement

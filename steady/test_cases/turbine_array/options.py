@@ -74,9 +74,6 @@ class TurbineArrayOptions(SteadyTurbineOptions):
 
         # Discretisation
         self.family = 'dg-cg'
-        self.sipg_parameter = None
-        self.use_automatic_sipg_parameter = True
-        self.use_maximal_sipg = True
         self.stabilisation = 'lax_friedrichs'
         self.grad_div_viscosity = False
         self.grad_depth_viscosity = False

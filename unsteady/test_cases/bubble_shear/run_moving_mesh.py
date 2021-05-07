@@ -17,7 +17,6 @@ parser.add_argument("-end_time", help="Simulation end time.")
 
 parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
 parser.add_argument("-stabilisation", help="Stabilisation method")
-parser.add_argument("-anisotropic_stabilisation", help="Toggle anisotropic stabilisation")
 parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 
 parser.add_argument("-dt_per_mesh_movement", help="Mesh movement frequency")
@@ -31,8 +30,6 @@ args = parser.parse_args()
 kwargs = {
     'tracer_family': args.family or 'cg',
     'stabilisation_tracer': args.stabilisation or 'supg',
-    'use_automatic_sipg_parameter': False,  # We have an inviscid problem
-    'anisotropic_stabilisation': False if args.anisotropic_stabilisation == "0" else True,
     'use_limiter_for_tracers': bool(args.limiters or False),
 
     'nonlinear_method': 'relaxation',

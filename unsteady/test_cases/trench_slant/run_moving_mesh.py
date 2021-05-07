@@ -52,7 +52,6 @@ kwargs = {
     'family': 'dg-dg',
     'stabilisation': 'lax_friedrichs',
     'stabilisation_sediment': 'lax_friedrichs',
-    'use_automatic_sipg_parameter': True,
 }
 
 op = TrenchSlantOptions(**kwargs)

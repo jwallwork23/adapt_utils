@@ -26,15 +26,12 @@ class TracerGOErrorEstimatorTerm(GOErrorEstimatorTerm, TracerTerm):
     Generic :class:`GOErrorEstimatorTerm` term in a goal-oriented error estimator for the 2D tracer
     model.
     """
-    def __init__(self, function_space,
-                 depth=None,
-                 use_lax_friedrichs=True,
-                 sipg_parameter=Constant(10.0)):
+    def __init__(self, function_space, depth, options):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :kwarg depth: DepthExpression for the domain
         """
-        TracerTerm.__init__(self, function_space, depth, use_lax_friedrichs, sipg_parameter)
+        TracerTerm.__init__(self, function_space, depth, options)
         GOErrorEstimatorTerm.__init__(self, function_space.mesh())
 
     def inter_element_flux(self, *args, **kwargs):
@@ -56,7 +53,7 @@ class HorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         uv = self.corr_factor*fields_old['uv_2d']
 
         # Apply SUPG stabilisation
-        if not self.horizontal_dg and self.stabilisation in ('su', 'supg'):
+        if not self.horizontal_dg and self.options.use_supg_tracer:
             e_star = e_star + self.supg_stabilisation*dot(uv, grad(e_star))
 
         return -self.p0test*e_star*inner(uv, grad(c))*self.dx
@@ -84,7 +81,7 @@ class HorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
             flux_terms += -c_up*self.restrict(e_star)*jump(uv, self.normal)*ds
 
             # Lax-Friedrichs stabilization
-            if self.use_lax_friedrichs:
+            if self.options.use_lax_friedrichs_tracer:
                 if uv_p1 is not None:
                     gamma = 0.5*abs((avg(uv_p1)[0]*self.normal('-')[0]
                                      + avg(uv_p1)[1]*self.normal('-')[1]))*lax_friedrichs_factor
@@ -133,7 +130,7 @@ class ConservativeHorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimator
         uv = self.corr_factor*fields_old['uv_2d']
 
         # Apply SUPG stabilisation
-        if not self.horizontal_dg and self.stabilisation in ('su', 'supg'):
+        if not self.horizontal_dg and self.options.use_supg_tracer:
             e_star = e_star + self.supg_stabilisation*dot(uv, grad(e_star))
 
         return -self.p0test*e_star*div(uv*c)*self.dx
@@ -180,7 +177,7 @@ class HorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
 
         # Apply SUPG stabilisation
         uv = fields_old.get('uv_2d')
-        if not self.horizontal_dg and self.stabilisation == 'supg' and uv is not None:
+        if not self.horizontal_dg and self.options.use_supg_tracer and uv is not None:
             self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
             uv = self.corr_factor*uv
             e_star = e_star + self.supg_stabilisation*dot(uv, grad(e_star))
@@ -196,9 +193,15 @@ class HorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
 
         flux_terms = 0
         if self.horizontal_dg:  # TODO: Check signs
-            alpha = self.sipg_parameter
-            assert alpha is not None
-            sigma = avg(alpha/self.cellsize)
+            alpha = self.options.sipg_factor_tracer
+            cell = self.mesh.ufl_cell()
+            p = self.function_space.ufl_element().degree()
+            cp = (p + 1)*(p + 2)/2 if cell == triangle else (p + 1)**2
+            l_normal = CellVolume(self.mesh)/FacetArea(self.mesh)
+            sigma = alpha*cp/l_normal
+            sp = sigma('+')
+            sm = sigma('-')
+            sigma = conditional(sp > sm, sp, sm)
             e_star_n = self.restrict(e_star*self.normal)
             flux_terms += -sigma*inner(e_star_n, dot(avg(diff_tensor), jump(c, self.normal)))*self.dS
             flux_terms += inner(e_star_n, avg(dot(diff_tensor, grad(c))))*self.dS
@@ -266,7 +269,7 @@ class SourceGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
 
         # Apply SUPG stabilisation
         uv = fields_old.get('uv_2d')
-        if not self.horizontal_dg and self.stabilisation == 'supg' and uv is not None:
+        if not self.horizontal_dg and self.options.use_supg_tracer and uv is not None:
             self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
             uv = self.corr_factor*uv
             e_star = e_star + self.supg_stabilisation*dot(uv, grad(e_star))
@@ -279,21 +282,27 @@ class TracerGOErrorEstimator(GOErrorEstimator):
     """
     :class:`GOErrorEstimator` for the 2D tracer model.
     """
-    def __init__(self, function_space,
-                 depth=None,
-                 stabilisation='lax_friedrichs',
-                 anisotropic=False,
-                 sipg_parameter=Constant(10.0),
-                 su_stabilisation=None,
-                 supg_stabilisation=None,
-                 conservative=False,
-                 adjoint=False):
-        self.stabilisation = stabilisation
-        self.su_stabilisation = su_stabilisation
-        self.supg_stabilisation = supg_stabilisation
+    def __init__(self, function_space, depth, options, velocity, adjoint=False):
         self.adjoint = adjoint
         super(TracerGOErrorEstimator, self).__init__(function_space, anisotropic=anisotropic)
-        args = (function_space, depth, stabilisation == 'lax_friedrichs', sipg_parameter)
+
+        # Apply SUPG stabilisation
+        tau = None
+        if options.use_supg_tracer:
+            unorm = options.horizontal_velocity_scale
+            if unorm.values()[0] > 0:
+                cellsize = anisotropic_cell_size(function_space.mesh())
+                tau = 0.5*cellsize/unorm
+                D = options.horizontal_diffusivity_scale
+                if D.values()[0] > 0:
+                    Pe = 0.5*unorm*cellsize/D
+                    tau = min_value(tau, Pe/3)
+        self.supg_stabilisation = tau
+
+        args = (function_space, depth, options)
+        self.add_terms(*args)
+
+    def add_terms(self, *args):
         if conservative:
             self.add_term(ConservativeHorizontalAdvectionGOErrorEstimatorTerm(*args), 'explicit')
         else:
@@ -309,8 +318,6 @@ class TracerGOErrorEstimator(GOErrorEstimator):
         """
         super(TracerGOErrorEstimator, self).add_term(term, label)
         key = term.__class__.__name__
-        self.terms[key].stabilisation = self.stabilisation
-        self.terms[key].su_stabilisation = self.su_stabilisation
         self.terms[key].supg_stabilisation = self.supg_stabilisation
         self.terms[key].adjoint = self.adjoint
 
@@ -318,7 +325,7 @@ class TracerGOErrorEstimator(GOErrorEstimator):
         """
         Account for SUPG stabilisation in mass term.
         """
-        if self.stabilisation == 'supg':
+        if self.options.use_supg_tracer:
             e_star = e_star + self.supg_stabilisation*dot(velocity, grad(e_star))
         mass = self.p0test*inner(c, e_star)*dx
         if vector:

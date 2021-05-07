@@ -43,7 +43,6 @@ class TsunamiOptions(CoupledOptions):
 
         # Stabilisation
         self.base_viscosity = Constant(1.0e-03)
-        self.use_automatic_sipg_parameter = True
 
         # Quantity of interest
         self.regularisation = regularisation

@@ -64,9 +64,8 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
         self.equations[i].tracer = model(
             self.Q[i],
             self.depth[i],
-            anisotropic=op.anisotropic_stabilisation,
-            su_stabilisation=op.su_stabilisation,
-            supg_stabilisation=op.supg_stabilisation,
+            self.tracer_options[i],
+            self.fwd_solutions[i].split()[0],
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -82,9 +81,8 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
         self.equations[i].adjoint_tracer = model(
             self.Q[i],
             self.depth[i],
-            anisotropic=op.anisotropic_stabilisation,
-            su_stabilisation=op.su_stabilisation,
-            supg_stabilisation=op.supg_stabilisation,
+            self.tracer_options[i],
+            self.fwd_solutions[i].split()[0],
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -101,11 +99,7 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
         self.error_estimators[i].tracer = estimator(
             self.Q[i],
             self.depth[i],
-            use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
-            sipg_parameter=self.tracer_options[i].sipg_parameter,
-            anisotropic=self.tracer_options[i].anisotropic_stabilisation,
-            su_stabilisation=op.su_stabilisation,
-            supg_stabilisation=op.supg_stabilisation,
+            self.options[i],
         )
 
     def _get_fields_for_tracer_timestepper(self, i):
@@ -119,8 +113,6 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
             'source': self.fields[i].tracer_source_2d,
             'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,
         })
-        if self.stabilisation == 'su':
-            fields['su_stabilisation'] = True
-        elif self.stabilisation == 'supg':
+        if self.stabilisation == 'supg':
             fields['supg_stabilisation'] = True
         return fields

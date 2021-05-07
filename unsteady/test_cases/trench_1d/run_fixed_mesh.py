@@ -36,7 +36,8 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 di = os.path.dirname(__file__)
 outputdir = os.path.join(di, 'outputs' + st)
-inputdir = os.path.join(di, 'hydrodynamics_trench_{:.4f}'.format(res))
+inputdir = os.path.join(di, 'hydrodynamics_trench_{:.1f}'.format(res))
+print(inputdir)
 kwargs = {
     'approach': 'fixed_mesh',
     'nx': res,
@@ -49,7 +50,6 @@ kwargs = {
     'family': 'dg-dg',
     'stabilisation': None,
     'stabilisation_sediment': None,
-    'use_automatic_sipg_parameter': True,
 }
 op = TrenchSedimentOptions(**kwargs)
 if os.getenv('REGRESSION_TEST') is not None:

@@ -342,10 +342,17 @@ class HorizontalViscosityTerm(AdjointShallowWaterMomentumTerm):
         f = inner(grad(self.u_star_test), stress)*self.dx
 
         if self.u_star_continuity in ['dg', 'hdiv']:
-            alpha = self.options.sipg_parameter
-            assert alpha is not None
+            alpha = self.options.sipg_factor
+            cell = self.mesh.ufl_cell()
+            p = self.function_space.ufl_element().degree()
+            cp = (p + 1)*(p + 2)/2 if cell == triangle else (p + 1)**2
+            l_normal = CellVolume(self.mesh)/FacetArea(self.mesh)
+            sigma = alpha*cp/l_normal
+            sp = sigma('+')
+            sm = sigma('-')
+            sigma = conditional(sp > sm, sp, sm)
             f += (
-                + avg(alpha/h)*inner(tensor_jump(self.u_star_test, n), stress_jump)*self.dS
+                + sigma*inner(tensor_jump(self.u_star_test, n), stress_jump)*self.dS
                 - inner(avg(grad(self.u_star_test)), stress_jump)*self.dS
                 - inner(tensor_jump(self.u_star_test, n), avg(stress))*self.dS
             )

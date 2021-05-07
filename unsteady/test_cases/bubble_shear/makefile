@@ -1,7 +1,7 @@
 all: dir uniform intersect integrate on_the_fly metric_advection
 
 dir:
-	mkdir plots
+	mkdir -p plots
 
 uniform:
 	python3 run_uniform_convergence.py

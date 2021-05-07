@@ -102,7 +102,6 @@ class BeachOptions(CoupledOptions):
 
         self.wetting_and_drying = True
         self.sediment_slide = True
-        self.depth_integrated = True
         self.use_tracer_conservative_form = True
         self.slope_eff = False
         self.angle_correction = False
@@ -179,22 +178,6 @@ class BeachOptions(CoupledOptions):
         u, eta = prob.fwd_solutions[0].split()
         u.project(self.uv_init)
         eta.project(self.elev_init)
-
-    def set_sediment_source(self, fs):
-        if self.suspended and not self.depth_integrated:
-            return self.sediment_model.ero_term
-
-    def set_sediment_sink(self, fs):
-        if self.suspended and not self.depth_integrated:
-            return self.sediment_model.depo_term
-
-    def set_sediment_depth_integ_sink(self, fs):
-        if self.suspended and self.depth_integrated:
-            return self.sediment_model.depo_term
-
-    def set_sediment_depth_integ_source(self, fs):
-        if self.suspended and self.depth_integrated:
-            return self.sediment_model.ero
 
     def set_advective_velocity_factor(self, fs):
         if self.convective_vel_flag:

@@ -76,10 +76,10 @@ class SedimentModel(object):
 
         """
 
-        self.suspendedload = suspendedload
+        self.solve_suspended_sediment = suspendedload
         self.cons_tracer = cons_tracer
         self.convectivevel = convectivevel
-        self.bedload = bedload
+        self.use_bedload = bedload
         self.angle_correction = angle_correction
         self.slope_eff = slope_eff
         self.seccurrent = seccurrent
@@ -173,9 +173,7 @@ class SedimentModel(object):
         self.unorm = (self.horizontal_velocity**2) + (self.vertical_velocity**2)
         self.bed_stress = Function(self.V).interpolate(self.rhow*Constant(0.5)*self.qfc*self.unorm)
 
-        options.solve_exner = True
-
-        if self.suspendedload:
+        if self.solve_suspended_sediment:
             # deposition flux - calculating coefficient to account for stronger conc at bed
             self.B = conditional(self.a > self.depth, Constant(1.0), self.a/self.depth)
             ustar = sqrt(Constant(0.5)*self.qfc*self.unorm)
@@ -201,31 +199,43 @@ class SedimentModel(object):
                 self.equiltracer = Function(self.P1_2d).interpolate(self.ceq/self.integrated_rouse)
 
             # get individual terms
-            self.depo = self.settling_velocity*self.integrated_rouse
+            self.depo = Function(self.P1_2d).project(self.settling_velocity*self.integrated_rouse)
             self.ero = Function(self.P1_2d).project(self.settling_velocity*self.ceq)
 
-            self.depo_term = Function(self.P1_2d).project(self.depo/self.depth)
-            self.ero_term = Function(self.P1_2d).project(self.ero/self.depth)
+            self.depo_term = self.depo/self.depth
+            self.ero_term = self.ero/self.depth
 
-            # calculate depth-averaged source term for sediment concentration equation
-            if self.cons_tracer:
-                self.source_exp = Function(self.P1_2d).project(-(self.depo*self.equiltracer/(self.depth**2)) + (self.ero/self.depth))
-            else:
-                self.source_exp = Function(self.P1_2d).project(-(self.depo*self.equiltracer/self.depth) + (self.ero/self.depth))
-
-            self.options.solve_sediment = True
             self.options.use_tracer_conservative_form = self.cons_tracer
             if self.convectivevel:
                 self.options.tracer_advective_velocity_factor = self.corr_factor_model.corr_vel_factor
-        else:
-            self.options.solve_tracer = False
-        if self.bedload:
+        if self.use_bedload:
             # calculate angle of flow
             self.calfa = Function(self.V).interpolate(self.horizontal_velocity/sqrt(self.unorm))
             self.salfa = Function(self.V).interpolate(self.vertical_velocity/sqrt(self.unorm))
             if self.angle_correction:
                 # slope effect angle correction due to gravity
                 self.stress = Function(self.V).interpolate(self.rhow*Constant(0.5)*self.qfc*self.unorm)
+
+    def get_deposition_coefficient(self, conservative=False, exner=False):
+        """Returns coefficient :math:`C` such that :math:`C/H*sediment` is deposition term in sediment equation
+        If sediment field is depth-averaged, :math:`C*sediment` is (total) deposition (over the column)
+        as it appears in the Exner equation, but deposition term in sediment equation needs
+        averaging: :math:`C*sediment/H`
+        If sediment field is depth-integrated, :math:`C*sediment/H` is (total) deposition (over the column)
+        as it appears in the Exner equation, and is the same in the sediment equation."""
+        if exner and not conservative:
+            return self.depo
+        else:
+            return self.depo_term
+
+    def get_erosion_term(self, conservative=False, exner=False):
+        """Returns expression for (depth-integrated) erosion."""
+        if exner:
+            return self.ero
+        elif not exner and conservative:
+            return self.ero
+        else:
+            return self.ero_term
 
     def get_bedload_term(self, solution):
 
@@ -346,18 +356,16 @@ class SedimentModel(object):
         self.uv1, self.elev1 = fwd_solution.split()
         self.uv_cg.project(self.uv1)
 
-        self.bed_stress.interpolate(self.rhow*Constant(0.5)*self.qfc*self.unorm)
-
         self.depth_expr = DepthExpression(self.old_bathymetry_2d, use_wetting_and_drying=self.wetting_and_drying, wetting_and_drying_alpha=self.wetting_alpha)
         self.depth.project(self.depth_expr.get_total_depth(self.elev1))
+        self.bed_stress.interpolate(self.rhow*Constant(0.5)*self.qfc*self.unorm)
 
-        if self.suspendedload:
+        if self.solve_suspended_sediment:
             # erosion flux - above critical velocity bed is eroded
             self.ceq.project(Constant(0.015)*(self.average_size/self.a) * ((conditional(self.s0 < Constant(0), Constant(0), self.s0))**(1.5))/(self.dstar**0.3))
 
             self.ero.project(self.settling_velocity*self.ceq)
-            self.ero_term.project(self.ero/self.depth)
-            self.depo_term.project(self.depo/self.depth)
+            self.depo.project(self.settling_velocity*self.integrated_rouse)
 
             # update sediment rate to ensure equilibrium at inflow
             if self.cons_tracer:
@@ -365,7 +373,7 @@ class SedimentModel(object):
             else:
                 self.equiltracer.interpolate(self.ceq/self.integrated_rouse)
 
-        if self.bedload:
+        if self.use_bedload:
             # calculate angle of flow
             self.calfa.interpolate(self.uv_cg[0]/sqrt(self.unorm))
             self.salfa.interpolate(self.uv_cg[1]/sqrt(self.unorm))

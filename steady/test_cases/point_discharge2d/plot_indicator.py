@@ -36,7 +36,6 @@ op = PointDischarge2dOptions(**kwargs)
 op.tracer_family = 'cg'
 op.stabilisation_tracer = 'supg'
 op.anisotropic_stabilisation = True
-op.use_automatic_sipg_parameter = False
 op.enrichment_method = args.enrichment_method
 
 # Evaluate error indicator field

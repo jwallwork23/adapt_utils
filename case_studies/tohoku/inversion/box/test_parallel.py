@@ -48,7 +48,6 @@ kwargs = {
     # Spatial discretisation
     'family': args.family or 'dg-cg',
     'stabilisation': args.stabilisation,
-    'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Inversion
     'synthetic': False,

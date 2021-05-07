@@ -42,7 +42,7 @@ class SteadyState(thetis_ts.SteadyState):
         )
 
 
-class CrankNicolson(thetis_ts.TimeIntegrator):
+class CrankNicolson(thetis_ts.CrankNicolson):
     """
     Extension of Thetis CrankNicolson time integrator for error estimation.
 
@@ -52,72 +52,17 @@ class CrankNicolson(thetis_ts.TimeIntegrator):
 
     def __init__(self, equation, solution, fields, dt, bnd_conditions=None, solver_parameters={},
                  theta=0.5, semi_implicit=False, error_estimator=None, adjoint=False):
-        super(CrankNicolson, self).__init__(equation, solution, fields, dt, solver_parameters)
+        super(CrankNicolson, self).__init__(
+            equation, solution, fields, dt,
+            bnd_conditions=bnd_conditions, solver_parameters=solver_parameters,
+            theta=theta, semi_implicit=semi_implicit)
         self.semi_implicit = semi_implicit
         self.theta_const = Constant(theta)
         self.adjoint = adjoint
         self.error_estimator = error_estimator
-        if semi_implicit:
-            self.solver_parameters.setdefault('snes_type', 'ksponly')
-        else:
-            self.solver_parameters.setdefault('snes_type', 'newtonls')
-        self.solution_old = Function(self.equation.function_space, name='solution_old')
-
-        # Create functions to hold the values of previous time step
-        self.fields_old = {}
-        for k in sorted(self.fields):
-            if self.fields[k] is not None:
-                if isinstance(self.fields[k], Function):
-                    self.fields_old[k] = Function(
-                        self.fields[k].function_space(), name=self.fields[k].name() + '_old')
-                elif isinstance(self.fields[k], Constant):
-                    self.fields_old[k] = Constant(self.fields[k])
-
-        # Get fields etc.
-        u = self.solution
-        u_old = self.solution_old
-        u_nl = u_old if semi_implicit else u
-        bnd = bnd_conditions
-        f = self.fields
-        f_old = self.fields_old
-        kwargs = {}
-        if 'Tracer' in equation.__class__.__name__:
-            uv = f_old.get('uv_2d', None)
-            uv = f_old.get('uv_3d', uv)
-            kwargs['velocity'] = uv
-
-        # Crank-Nicolson
-        self.F = (self.equation.mass_term(u, **kwargs)
-                  - self.equation.mass_term(u_old, **kwargs)
-                  - self.dt_const*(self.theta_const*self.equation.residual('all', u, u_nl, f, f, bnd)
-                                   + (1-self.theta_const)*self.equation.residual('all', u_old, u_old, f_old, f_old, bnd))
-                  )
-
-        self.update_solver()
         if self.error_estimator is not None:
             if hasattr(self.error_estimator, 'setup_strong_residual'):
                 self.setup_strong_residual(self.solution, self.solution_old)
-
-    def update_solver(self):
-        """
-        Create solver objects
-        """
-        # Ensure LU assembles monolithic matrices
-        if self.solver_parameters.get('pc_type') == 'lu':
-            self.solver_parameters['mat_type'] = 'aij'
-        prob = NonlinearVariationalProblem(self.F, self.solution)
-        self.solver = NonlinearVariationalSolver(prob,
-                                                 solver_parameters=self.solver_parameters,
-                                                 options_prefix=self.name)
-
-    def initialize(self, solution):
-        """
-        Assigns initial conditions to all required fields.
-        """
-        self.solution_old.assign(solution)
-        # assign values to old functions
-        for k in sorted(self.fields_old):
-            self.fields_old[k].assign(self.fields[k])
 
     def advance(self, t, update_forcings=None):
         """

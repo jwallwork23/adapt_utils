@@ -43,7 +43,7 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 di = os.path.dirname(__file__)
 outputdir = os.path.join(di, 'outputs' + st)
-inputdir = os.path.join(di, 'hydrodynamics_trench_{:.4f}'.format(res))
+inputdir = os.path.join(di, 'hydrodynamics_trench_' + str(res))
 kwargs = {
     'approach': 'monge_ampere',
     'nx': res,
@@ -58,7 +58,6 @@ kwargs = {
     'family': 'dg-dg',
     'stabilisation': 'lax_friedrichs',
     'stabilisation_sediment': 'lax_friedrichs',
-    'use_automatic_sipg_parameter': True,
 }
 op = TrenchSedimentOptions(**kwargs)
 op.dt_per_mesh_movement = freq
@@ -77,7 +76,7 @@ def frobenius_monitor(mesh):
     return 1 + alpha_const*frob/interpolate(frob, P1).vector().gather().max()
 
 
-def frobenius_monitor(mesh):  # NOQA: Version above not smooth enough
+def frobenius_monitor(mesh, x=None):  # NOQA: Version above not smooth enough
     """
     Frobenius norm taken element-wise.
     """

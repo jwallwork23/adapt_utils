@@ -32,6 +32,7 @@ class BubbleOptions(CoupledOptions):
         self.source_loc = [(0.5, 0.85, 0.1)]
         self.base_diffusivity = Constant(0.0)
         self.characteristic_speed = Constant(2.0)  # TODO: check
+        self.characteristic_diffusion = Constant(0.0)
 
         # Time integration
         self.period = 6.0

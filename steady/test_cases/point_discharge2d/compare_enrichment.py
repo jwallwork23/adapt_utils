@@ -52,7 +52,6 @@ for method in methods:
         op.tracer_family = 'cg'
         op.stabilisation_tracer = 'supg'
         op.anisotropic_stabilisation = True
-        op.use_automatic_sipg_parameter = False
         op.enrichment_method = method
 
         # Setup problem and solve problems in base space

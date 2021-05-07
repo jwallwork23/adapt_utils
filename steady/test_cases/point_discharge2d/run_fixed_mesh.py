@@ -34,7 +34,6 @@ stabilisation = args.stabilisation or 'supg'
 op.stabilisation_tracer = None if stabilisation == 'none' else stabilisation
 op.anisotropic_stabilisation = False if args.anisotropic_stabilisation == '0' else True
 op.di = os.path.join(op.di, op.stabilisation_tracer or family)
-op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
 if args.load_mesh is not None:
     op.default_mesh = load_mesh("mesh", fpath=op.di)
 

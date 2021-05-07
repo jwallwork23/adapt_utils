@@ -15,36 +15,16 @@ where :math:'S' is :math:'q' for conservative and :math:'T' for non-conservative
 velocities, and :math:`\mu_h` denotes horizontal diffusivity.
 
 **********************************************************************************************
-*  NOTE: This file is based on the Thetis project (https://thetisproject.org) and contains   *
-*        some copied code.                                                                   *
+*  NOTE: This file is based on the Thetis project (https://thetisproject.org)               *
 **********************************************************************************************
 """
 from __future__ import absolute_import
 from thetis.utility import *
 from thetis.equation import Equation
-from thetis.tracer_eq_2d import HorizontalDiffusionTerm, TracerTerm
-from thetis.conservative_tracer_eq_2d import ConservativeHorizontalDiffusionTerm
-from adapt_utils.tracer.equation import HorizontalAdvectionTerm, ConservativeHorizontalAdvectionTerm
+from thetis.tracer_eq_2d import *
+from thetis.sediment_eq_2d import SedimentTerm, ConservativeSedimentAdvectionTerm, SedimentAdvectionTerm, SedimentDiffusionTerm
 
-
-class SedimentTerm(TracerTerm):
-    """
-    Generic sediment term that provides commonly used members.
-    """
-    def __init__(self, function_space, depth,
-                 use_lax_friedrichs=True, sipg_parameter=Constant(10.0), conservative=False):
-        """
-        :arg function_space: :class:`FunctionSpace` where the solution belongs
-        :arg depth: :class: `DepthExpression` containing depth info
-        :kwarg bool use_lax_friedrichs: whether to use Lax Friedrichs stabilisation
-        :kwarg sipg_parameter: :class: `Constant` or :class: `Function` penalty parameter for SIPG
-        :kwarg bool conservative: whether to use conservative tracer
-        """
-        super(SedimentTerm, self).__init__(function_space, depth)
-        self.conservative = conservative
-
-
-class SedimentSourceTerm(SedimentTerm):
+class SedimentErosionTerm(SedimentTerm):
     r"""
     Generic source term
 
@@ -57,31 +37,12 @@ class SedimentSourceTerm(SedimentTerm):
 
     """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
-        f = 0
-        source = fields.get('source')
-        depth_int_source = fields.get('depth_integrated_source')
-        if depth_int_source is not None:
-            if self.conservative:
-                f += -inner(depth_int_source, self.test) * self.dx
-            else:
-                raise NotImplementedError("Depth-integrated source term not implemented for non-conservative case")
-        elif source is not None:
-            if self.conservative:
-                H = self.depth.get_total_depth(fields['elev_2d'])
-                f += -inner(H*source, self.test)*self.dx
-            else:
-                f += -inner(source, self.test)*self.dx
-        else:
-            warning("no source term implemented")
-
-        if source is not None and depth_int_source is not None:
-            raise AttributeError("Assigned both a source term and a depth-integrated source term\
-                                 but only one can be implemented. Choose the most appropriate for your case")
-
-        return -f
+        source = self.sediment_model.get_erosion_term(self.conservative)
+        f = inner(source, self.test)*self.dx
+        return f
 
 
-class SedimentSinkTerm(SedimentTerm):
+class SedimentDepositionTerm(SedimentTerm):
     r"""
     Liner sink term
 
@@ -94,22 +55,9 @@ class SedimentSinkTerm(SedimentTerm):
 
     """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
-        f = 0
-        sink = fields.get('sink')
-        depth_int_sink = fields.get('depth_integrated_sink')
-        if depth_int_sink is not None:
-            if self.conservative:
-                f += -inner(-depth_int_sink*solution, self.test) * self.dx
-            else:
-                raise NotImplementedError("Depth-integrated sink term not implemented for non-conservative case")
-        elif sink is not None:
-            f += -inner(-sink*solution, self.test)*self.dx
-        else:
-            warning("no sink term implemented")
-        if sink is not None and depth_int_sink is not None:
-            raise AttributeError("Assigned both a sink term and a depth-integrated sink term\
-                                 but only one can be implemented. Choose the most appropriate for your case")
-        return -f
+        sink = self.sediment_model.get_deposition_coefficient()
+        f = inner(-sink*solution, self.test)*self.dx
+        return f
 
 
 class SedimentEquation2D(Equation):
@@ -117,25 +65,19 @@ class SedimentEquation2D(Equation):
     2D sediment advection-diffusion equation: eq:`tracer_eq` or `conservative_tracer_eq`
     with sediment source and sink term
     """
-    def __init__(self, function_space, depth,
-                 use_lax_friedrichs=False,
-                 sipg_parameter=Constant(10.0),
+    def __init__(self, function_space, depth, options, sediment_model,
                  conservative=False):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
-        :kwarg bool use_lax_friedrichs: whether to use Lax Friedrichs stabilisation
-        :kwarg sipg_parameter: :class: `Constant` or :class: `Function` penalty parameter for SIPG
         :kwarg bool conservative: whether to use conservative tracer
         """
         super(SedimentEquation2D, self).__init__(function_space)
-        args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
-        args_sediment = (function_space, depth, use_lax_friedrichs, sipg_parameter, conservative)
+        args = (function_space, depth, options, sediment_model, conservative)
         if conservative:
-            self.add_term(ConservativeHorizontalAdvectionTerm(*args), 'explicit')
-            self.add_term(ConservativeHorizontalDiffusionTerm(*args), 'explicit')
+            self.add_term(ConservativeSedimentAdvectionTerm(*args), 'explicit')
         else:
-            self.add_term(HorizontalAdvectionTerm(*args), 'explicit')
-            self.add_term(HorizontalDiffusionTerm(*args), 'explicit')
-        self.add_term(SedimentSourceTerm(*args_sediment), 'source')
-        self.add_term(SedimentSinkTerm(*args_sediment), 'implicit')
+            self.add_term(SedimentAdvectionTerm(*args), 'explicit')
+        self.add_term(SedimentDiffusionTerm(*args), 'explicit')
+        self.add_term(SedimentErosionTerm(*args), 'source')
+        self.add_term(SedimentDepositionTerm(*args), 'implicit')

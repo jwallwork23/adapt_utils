@@ -74,7 +74,6 @@ op.tracer_family = family
 stabilisation = args.stabilisation or 'supg'
 op.stabilisation_tracer = None if stabilisation == 'none' else stabilisation
 op.anisotropic_stabilisation = False if args.anisotropic_stabilisation == '0' else True
-op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
 op.di = create_directory(os.path.join(op.di, op.stabilisation_tracer or family, op.enrichment_method))
 op.normalisation = args.normalisation or 'complexity'  # FIXME: error
 op.print_debug(op)
