@@ -319,7 +319,7 @@ class MeshMover():
                 corners = [(i, j) for i in edges for j in edges.difference([i])]
                 self.bbc = DirichletBC(self.P1_vec, 0, corners)
         self.bc.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary', bcs=self.bbc))
-
+        print('here')
         # Create solver
         prob = LinearVariationalProblem(a, L, self.grad_φ_cts, bcs=self.bc)
         self.l2_projector = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})

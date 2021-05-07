@@ -9,8 +9,8 @@ from thetis.options import ModelOptions2d
 import numpy as np
 
 from adapt_utils.io import initialise_hydrodynamics
-from adapt_utils.options import CoupledOptions
-from adapt_utils.sediment.sediments_model import SedimentModel
+from adapt_utils.unsteady.options import CoupledOptions
+from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
 
 __all__ = ["TrenchSedimentOptions"]
 
@@ -60,10 +60,11 @@ class TrenchSedimentOptions(CoupledOptions):
         self.morphological_acceleration_factor = Constant(100)
 
         # Time integration
-        self.dt = 0.25 if nx < 4 else 0.1
+        self.dt = 0.25 if nx < 2 else 0.05
+        print(self.dt)
         self.end_time = self.num_hours*3600.0/float(self.morphological_acceleration_factor)
-        self.dt_per_mesh_movement = 40
-        self.dt_per_export = 40
+        self.dt_per_mesh_movement = 2160
+        self.dt_per_export = 2160
         self.implicitness_theta = 1.0
         self.family = 'dg-dg'
 
@@ -86,8 +87,9 @@ class TrenchSedimentOptions(CoupledOptions):
         self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
 
         self.eta_d = Function(self.P1DG).project(self.elev_init)
+
         self.sediment_model = SedimentModel(
-            ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
+            options=ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
             bedload=self.bedload, angle_correction=self.angle_correction,
             slope_eff=self.slope_eff, seccurrent=False, mesh2d=mesh, bathymetry_2d=bathymetry,
             uv_init=self.uv_d, elev_init=self.eta_d, ks=self.ks, average_size=self.average_size,
@@ -172,26 +174,6 @@ class TrenchSedimentOptions(CoupledOptions):
 
     def get_update_forcings(self, prob, i, adjoint):
         return None
-
-    def get_export_func(self, prob, i):
-        eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
-        #self.eta_tilde_file._topology = None
-        if self.plot_timeseries:
-            u, eta = prob.fwd_solutions[i].split()
-            b = prob.bathymetry[i]
-            wd = Function(prob.P1DG[i], name="Heaviside approximation")
-
-        def export_func():
-            eta_tilde.project(self.get_eta_tilde(prob, i))
-            #self.eta_tilde_file.write(eta_tilde)
-            u, eta = prob.fwd_solutions[i].split()
-            #if self.plot_timeseries:
-
-                # Store modified bathymetry timeseries
-            #    wd.project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha))
-            #    self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
-
-        return export_func
 
     def initialise_fields(self, inputdir, outputdir):
         """

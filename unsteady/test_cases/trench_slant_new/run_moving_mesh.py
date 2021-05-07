@@ -1,61 +1,64 @@
 """
-Migrating Trench Test case
+Migrating Trench 2D Test case
 =======================
 
-Solves the hydro-morphodynamic simulation of a migrating trench using mesh movement methods
+Solves the hydro-morphodynamic simulation of a 2D migrating trench using moving mesh methods
+
 """
 
 from thetis import *
 import firedrake as fire
 
-import pandas as pd
 import datetime
 import time
 
 from adapt_utils.adapt import recovery
 from adapt_utils.io import initialise_bathymetry, export_bathymetry
 from adapt_utils.norms import local_frobenius_norm, local_norm
-from adapt_utils.unsteady.test_cases.trench_1d_der.options import TrenchSedimentOptions
+from adapt_utils.unsteady.test_cases.trench_slant_new.options import TrenchSlantOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-outputdir = 'outputs' + st
+outputdir = 'outputs_' + st
 
-res = 0.4
-alpha = 3
+fac_x = 0.8
+fac_y = 0.8
+alpha = 1
 beta = 1
 gamma = 1
 
 # to create the input hydrodynamics directiory please run hydro_trench_slant.py
 # setting fac_x and fac_y to be the same values as above
 
-# --- Set parameters
+# We have included the hydrodynamics input dir for fac_x = 0.5 and fac_y = 0.5 as an example
 
-ts = time.time()
-st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-di = os.path.dirname(__file__)
-outputdir = os.path.join(di, 'outputs' + st)
-inputdir = os.path.join(di, 'hydrodynamics_trench_'+ str(res))
-print(inputdir)
+# Note for fac_x=fac_y=1 and fac_x=fac_y=1.6 self.dt should be changed to 0.125
+# and self.dt_per_mesh_movement should be changed to 80 in options.py
+
+inputdir = 'hydrodynamics_trench_slant_' + str(fac_x) #+  str(fac_y)
+
 kwargs = {
     'approach': 'monge_ampere',
-    'nx': res,
-    'ny': 1 if res < 4 else 2,
+    'nx': fac_x,
+    'ny': fac_y,
     'plot_pvd': True,
     'input_dir': inputdir,
     'output_dir': outputdir,
     'nonlinear_method': 'relaxation',
-    'r_adapt_rtol': 1e-3,
+    'r_adapt_rtol': 1.0e-3,
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': 'lax_friedrichs',
     'use_automatic_sipg_parameter': True,
 }
 
-op = TrenchSedimentOptions(**kwargs)
+
+op = TrenchSlantOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
+# swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
+swp.shallow_water_options[0]['mesh_velocity'] = None
 
 def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
 
@@ -86,43 +89,26 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
 
 swp.set_monitor_functions(gradient_interface_monitor)
 
-# --- Simulation and analysis
-
-# Solve forward problem
-
 t1 = time.time()
 swp.solve_forward()
 t2 = time.time()
 
-# Save solution data
-new_mesh = RectangleMesh(16*5*5, 5*1, 16, 1.1)
+new_mesh = RectangleMesh(16*5*4, 5*4, 16, 1.1)
+
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
-bathymetrythetis1 = []
-diff_thetis = []
-datathetis = np.linspace(0, 15.9, 160)
-bathymetrythetis1 = [-bath.at([i, 0.55]) for i in datathetis]
-df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
-#df.to_csv('adapt_output/bed_trench_output_uni_s_{:.4f}_{:.1f}_{:.1f}_{:.1f}.csv'.format(res, alpha, beta, gamma))
 
-# Compute l2 error against experimental data
-datathetis = []
-bathymetrythetis1 = []
-diff_thetis = []
-data = pd.read_csv('experimental_data.csv', header=None)
-for i in range(len(data[0].dropna())):
-    datathetis.append(data[0].dropna()[i])
-    bathymetrythetis1.append(-bath.at([np.round(data[0].dropna()[i], 3), 0.55]))
-    diff_thetis.append((data[1].dropna()[i] - bathymetrythetis1[-1])**2)
+export_bathymetry(bath, "adapt_output/hydrodynamics_trench_slant_bath_"+str(alpha) + "_" + str(beta) + '_' + str(gamma) + '-' + str(fac_x))
 
-df_exp = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
-#df_exp.to_csv('adapt_output/bed_trench_output_s_{:.4f}_{:.1f}_{:.1f}_{:1f}.csv'.format(res, alpha, beta, gamma))
+bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
 
-# Print to screen
-print("res = {:.4f}".format(res))
-print("alpha = {:.1f}".format(alpha))
-print("beta = {:.1f}".format(beta))
-print("gamma = {:.1f}".format(gamma))
-print("Time: {:.1f}s".format(t2 - t1))
-print("Total error: {:.4e}".format(np.sqrt(sum(diff_thetis))))
-df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.0000.csv')
-print("Discretisation error: {:.4e}".format(np.sqrt(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))))
+print(fac_x)
+print(fac_y)
+print(alpha)
+print('L2')
+print(fire.errornorm(bath, bath_real))
+
+print("total time: ")
+print(t2-t1)
+
+print(beta)
+print(gamma)

@@ -36,7 +36,7 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 di = os.path.dirname(__file__)
 outputdir = os.path.join(di, 'outputs' + st)
-inputdir = os.path.join(di, 'hydrodynamics_trench_{:.4f}'.format(res))
+inputdir = os.path.join(di, 'hydrodynamics_trench_' + str(res))
 kwargs = {
     'approach': 'fixed_mesh',
     'nx': res,

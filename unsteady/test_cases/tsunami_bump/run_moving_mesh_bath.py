@@ -141,7 +141,7 @@ new_mesh = RectangleMesh(600, 160, 30, 8)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("adapt_output/bath_fixed_" + str(op.dt_per_export) + "_" +str(int(nx*30)) + "_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + '_' + str(mod), bath)
+#export_final_state("adapt_output/bath_fixed_" + str(op.dt_per_export) + "_" +str(int(nx*30)) + "_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + '_' + str(mod), bath)
 
 bath_real = initialise_fields(new_mesh, 'fixed_output/bath_fixed_600_160')
 

@@ -14,7 +14,7 @@ import sys
 import time
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
-from adapt_utils.unsteady.test_cases.trench_1d.options import TrenchSedimentOptions
+from adapt_utils.unsteady.test_cases.trench_1d_der.options import TrenchSedimentOptions
 
 
 # To create the input hydrodynamics directiory please run trench_hydro.py
@@ -29,14 +29,14 @@ args = parser.parse_args()
 
 res = float(args.res or 0.5)
 
-
 # --- Set parameters
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 di = os.path.dirname(__file__)
 outputdir = os.path.join(di, 'outputs' + st)
-inputdir = os.path.join(di, 'hydrodynamics_trench_{:.4f}'.format(res))
+inputdir = os.path.join(di, 'hydrodynamics_trench_' + str(res))
+print(inputdir)
 kwargs = {
     'approach': 'fixed_mesh',
     'nx': res,
@@ -92,6 +92,8 @@ df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetry
 df.to_csv(os.path.join(di, 'fixed_output/bed_trench_output_c_{:.4f}.csv'.format(res)))
 
 # Print to screen
-print("res = {:.4f}".format(res))
-print("Time: {:.1f}s".format(t2 - t1))
-print("Total error: {:.4e}".format(np.sqrt(sum(diff_thetis))))
+f = open(str(res) + '.txt', 'a')
+f.write("res = {:.4f}".format(res))
+f.write("Time: {:.1f}s".format(t2 - t1))
+f.write("Total error: {:.4e}".format(np.sqrt(sum(diff_thetis))))
+f.close()

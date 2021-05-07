@@ -32,11 +32,11 @@ def export_final_state(inputdir, uv, elev,):
     File(inputdir + '/elevationout.pvd').write(elev)
     chk.close()
 
-    plex = elev.function_space().mesh()._plex
+    plex = elev.function_space().mesh()._topology_dm
     viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
     viewer(plex)
 
-res = 0.4
+res = 0.1
 
 # define mesh
 lx = 16
@@ -128,4 +128,4 @@ solver_obj.assign_initial_conditions(uv=uv_init, elev=elev_init)
 solver_obj.iterate()
 
 uv, elev = solver_obj.fields.solution_2d.split()
-export_final_state("hydrodynamics_trench" + str(res), uv, elev)
+export_final_state("hydrodynamics_trench_" + str(res), uv, elev)
