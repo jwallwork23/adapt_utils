@@ -14,7 +14,6 @@ condition.py
 *.msh
 *.pvd
 *.vtu
-*.h5
 *.txt
 *.pdf
 *.ipynb_checkpoints
