@@ -33,8 +33,8 @@ def monitor_combine(monitor1, monitor2, mode):
     return {
         1: monitor1,
         2: monitor2,
-        'avg': lambda mesh: 0.5*(monitor1(mesh) + monitor2(mesh)),
-        'int': lambda mesh: max_value(monitor1(mesh), monitor2(mesh)),
+        'avg': lambda mesh=None, x=None: 0.5*(monitor1(mesh=mesh, x=x) + monitor2(mesh=mesh, x=x)),
+        'int': lambda mesh=None, x=None: max_value(monitor1(mesh=mesh, x=x), monitor2(mesh=mesh, x=x)),
     }[mode]
 
 
@@ -106,6 +106,10 @@ def test_combine_metric(plot_mesh=False):
     elements and vertices in the metric
     average is usually lower.
     """
+    try:
+        from firedrake import adapt
+    except ImportError:
+        pytest.xfail("Need Pragmatic")
     kwargs = {
         'approach': 'hessian',
         'max_adapt': 4,
@@ -190,12 +194,12 @@ def test_combine_monitor(plot_mesh=False):
     alpha = Constant(10.0)  # Controls magnitude of arc
     beta = Constant(10.0)   # Controls width of arc
 
-    def monitor1(mesh):
-        x, y = SpatialCoordinate(mesh)
+    def monitor1(mesh=None, x=None):
+        x, y = x or SpatialCoordinate(mesh)
         return 1.0 + alpha*exp(-beta*abs(0.5 - x**2 - y**2))
 
-    def monitor2(mesh):
-        x, y = SpatialCoordinate(mesh)
+    def monitor2(mesh=None, x=None):
+        x, y = x or SpatialCoordinate(mesh)
         return 1.0 + alpha*exp(-beta*abs(0.5 - (1 - x)**2 - y**2))
 
     # Set parameters
