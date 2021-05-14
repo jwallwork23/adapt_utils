@@ -52,7 +52,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'norm_smoother': op.norm_smoother,
             'sipg_factor': Constant(1.0),
             'lax_friedrichs_velocity_scaling_factor': op.lax_friedrichs_velocity_scaling_factor,
-            'use_white_colebrook': op.use_white_colebrook,
         }
         for i, swo in enumerate(self.shallow_water_options):
             swo.update(static_options)
