@@ -122,8 +122,8 @@ else:
         xaxisthetis1.append(i)
         elevthetis1.append(eta_tilde.at([i, 5]))
 
-    plt.plot(xaxisthetis1, elevthetis1, label = 'water surface')
-    plt.plot(x, bath, label = 'bed height')
+    plt.plot(xaxisthetis1, elevthetis1, label = 'Water surface')
+    plt.plot(x, bath, label = 'Bed height')
     plt.xlabel(r'$x$ (m)')
-    plt.ylabel(r'height (m)')
+    plt.ylabel(r'Height (m)')
     plt.legend(loc = 3)

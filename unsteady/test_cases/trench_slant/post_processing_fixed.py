@@ -60,7 +60,7 @@ print(poly[0])
 
 fig, ax = plt.subplots()
 ax.loglog([8, 10, 20, 32, 40, 64], errorlist, '-o', label = '__no_label__')
-ax.loglog([8, 10, 20, 32, 40, 64], [i**(-1) for i in [8, 10, 20, 32, 40, 64]], '--', label = '1st order')
+ax.loglog([8, 10, 20, 32, 40, 64], [i**(-1) for i in [8, 10, 20, 32, 40, 64]], 'k--', label = '1st order')
 ax.set_xlabel(r'Number of mesh elements in $x$-direction')
 ax.set_ylabel("L2 error norm")
 ax.set_xticks([10, 20, 30, 40, 60])

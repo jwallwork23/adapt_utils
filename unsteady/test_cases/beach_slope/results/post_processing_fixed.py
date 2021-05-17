@@ -121,16 +121,16 @@ bath5_mod = th.Function(V).interpolate(th.conditional(x > 70, bath5, th.Constant
 bath6_mod = th.Function(V).interpolate(th.conditional(x > 70, bath6, th.Constant(0.0)))
 bath_real_mod = th.Function(V).interpolate(th.conditional(x > 70, bath_real, th.Constant(0.0)))
 
-errorlist = []
-errorlist.append(fire.errornorm(bath6_mod, bath_real_mod))
-errorlist.append(fire.errornorm(bath5_mod, bath_real_mod))
-errorlist.append(fire.errornorm(bath4_mod, bath_real_mod))
-errorlist.append(fire.errornorm(bath3_mod, bath_real_mod))
-errorlist.append(fire.errornorm(bath2_mod, bath_real_mod))
-errorlist.append(fire.errornorm(bath1_mod, bath_real_mod))
-errorlist.append(fire.errornorm(bath0_mod, bath_real_mod))
+errorlist2 = []
+errorlist2.append(fire.errornorm(bath6_mod, bath_real_mod))
+errorlist2.append(fire.errornorm(bath5_mod, bath_real_mod))
+errorlist2.append(fire.errornorm(bath4_mod, bath_real_mod))
+errorlist2.append(fire.errornorm(bath3_mod, bath_real_mod))
+errorlist2.append(fire.errornorm(bath2_mod, bath_real_mod))
+errorlist2.append(fire.errornorm(bath1_mod, bath_real_mod))
+errorlist2.append(fire.errornorm(bath0_mod, bath_real_mod))
 
-print(errorlist)
+print(errorlist2)
 
 no_of_elements = [220/i for i in [2/3, 1, 4/3, 5/3, 2, 4, 5]]
 
@@ -138,14 +138,26 @@ fig1, ax1 = plt.subplots()
 
 
 logx = np.log(no_of_elements)
-log_error = np.log(errorlist)
+log_error = np.log(errorlist2)
 poly = np.polyfit(logx, log_error, 1)
 print(poly[0])
 
 y = [-x + poly[1] +1.1 for x in logx[1:-1]]
 y2 = [-2*x + poly[1] +4.8 for x in logx[1:-1]]
 
+ax1.plot(no_of_elements, errorlist2, '-o')
+ax1.plot([np.exp(i) for i in logx[1:-1]], [np.exp(i) for i in y], 'k--', label = '1st order')
+ax1.set_xscale('log')
+ax1.set_yscale('log')
+ax1.set_ylabel('Error norm (m)')
+ax1.set_xlabel('Number of mesh elements in x-direction')
+plt.legend()
+plt.show()
+
+
+fig1, ax1 = plt.subplots()
 ax1.plot(no_of_elements, errorlist, '-o')
+ax1.plot(no_of_elements, errorlist2, '-o')
 ax1.plot([np.exp(i) for i in logx[1:-1]], [np.exp(i) for i in y], 'k--', label = '1st order')
 ax1.set_xscale('log')
 ax1.set_yscale('log')
