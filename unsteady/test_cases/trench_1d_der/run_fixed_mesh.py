@@ -75,7 +75,7 @@ diff_thetis = []
 datathetis = np.linspace(0, 15.9, 160)
 bathymetrythetis1 = [-bath.at([i, 0.55]) for i in datathetis]
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
-df.to_csv(os.path.join(di, 'fixed_output/bed_trench_output_uni_c_{:.4f}.csv'.format(res)))
+#df.to_csv(os.path.join(di, 'fixed_output/bed_trench_output_uni_c_{:.4f}.csv'.format(res)))
 
 # Compute l2 error against experimental data
 datathetis = []
@@ -89,7 +89,7 @@ for i in range(len(data[0].dropna())):
     diff_thetis.append((data[1].dropna()[i] - bathymetrythetis1[-1])**2)
 
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
-df.to_csv(os.path.join(di, 'fixed_output/bed_trench_output_c_{:.4f}.csv'.format(res)))
+#df.to_csv(os.path.join(di, 'fixed_output/bed_trench_output_c_{:.4f}.csv'.format(res)))
 
 # Print to screen
 f = open(str(res) + '.txt', 'a')

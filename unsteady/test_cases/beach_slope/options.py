@@ -20,7 +20,7 @@ class BeachOptions(CoupledOptions):
     mudflats." Continental Shelf Research 20.10-11 (2000): 1079-1097.
     """
 
-    def __init__(self, friction='manning', nx=1, ny=1, mesh = None, input_dir = None, output_dir = None, **kwargs):
+    def __init__(self, dt_exp=72, friction='manning', nx=1, ny=1, mesh = None, input_dir = None, output_dir = None, **kwargs):
         super(BeachOptions, self).__init__(**kwargs)
 
         try:
@@ -71,8 +71,8 @@ class BeachOptions(CoupledOptions):
 
         self.dt = 0.5
         self.end_time = float(self.num_hours*3600.0/self.morphological_acceleration_factor)
-        self.dt_per_mesh_movement = 72
-        self.dt_per_export = 72
+        self.dt_per_mesh_movement = dt_exp
+        self.dt_per_export = dt_exp
         self.implicitness_theta = 1.0
 
     def set_up_morph_model(self, mesh=None):

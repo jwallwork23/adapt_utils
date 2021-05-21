@@ -22,8 +22,8 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-res = 0.4
-alpha = 3
+res = 0.5
+alpha = 1
 beta = 1
 gamma = 1
 

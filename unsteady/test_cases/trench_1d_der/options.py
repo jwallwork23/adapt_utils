@@ -63,8 +63,8 @@ class TrenchSedimentOptions(CoupledOptions):
         self.dt = 0.25 if nx < 2 else 0.05
         print(self.dt)
         self.end_time = self.num_hours*3600.0/float(self.morphological_acceleration_factor)
-        self.dt_per_mesh_movement = 2160
-        self.dt_per_export = 2160
+        self.dt_per_mesh_movement = 40
+        self.dt_per_export = 40
         self.implicitness_theta = 1.0
         self.family = 'dg-dg'
 

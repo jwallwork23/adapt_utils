@@ -51,8 +51,8 @@ def initialise_fields(mesh2d, inputdir):
 
 t1 = time.time()
 
-fac_x = 0.5
-fac_y = 1
+fac_x = 0.25
+fac_y = 0.5
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -64,7 +64,7 @@ outputdir = os.path.join(di, 'outputs' + st)
 
 # we have included the hydrodynamics input dir for fac_x = 0.5 and fac_y = 1 as an example
 
-inputdir = os.path.join(di, 'hydrodynamics_beach_l_sep_nx_' + str(int(fac_x*220)) + '_' + str(int(fac_y*10)))
+inputdir = os.path.join(di, 'hydrodynamics_beach_l_sep_nx_' + str(int(fac_x*220))) # + '_' + str(int(fac_y*10)))
 print(inputdir)
 kwargs = {
     'approach': 'fixed_mesh',

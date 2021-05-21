@@ -24,8 +24,8 @@ st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 di = os.path.dirname(__file__)
 outputdir = os.path.join(di, 'outputs' + st)
 
-fac_x = 4.0
-fac_y = 4.0
+fac_x = 0.8
+fac_y = 0.8
 
 # to create the input hydrodynamics directiory please run hydro_trench_slant.py
 # setting fac_x and fac_y to be the same values as above

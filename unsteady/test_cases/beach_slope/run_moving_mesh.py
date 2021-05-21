@@ -19,14 +19,16 @@ from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.beach_slope.options import BeachOptions
 
-fac_x = 0.5
-fac_y = 1
+fac_x = 0.2
+fac_y = 0.5
+
+dt_exp = 72
 
 alpha = 5
-beta = 1
-gamma = 0
+beta = 0
+gamma = 1
 
-kappa = 80
+kappa = 200
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -48,6 +50,7 @@ tol_value = 1e-3
 
 kwargs = {
     'approach': 'monge_ampere',
+    'dt_exp': dt_exp,
     'nx': fac_x,
     'ny': fac_y,
     'plot_pvd': True,
@@ -79,8 +82,8 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kapp
     P1 = FunctionSpace(mesh, "CG", 1)
 
     b = swp.fwd_solutions_bathymetry[0]
-    bath_gradient = recovery.recover_gradient(b)
-    bath_hess = recovery.recover_hessian(b, op=op)
+    bath_gradient = recovery.construct_gradient(b)
+    bath_hess = recovery.construct_hessian(b, op=op)
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
 
     if max(abs(frob_bath_hess.dat.data[:])) < 1e-10:
