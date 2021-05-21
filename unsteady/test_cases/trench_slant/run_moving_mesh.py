@@ -31,10 +31,9 @@ gamma = 0
 # to create the input hydrodynamics directiory please run hydro_trench_slant.py
 # setting fac_x and fac_y to be the same values as above
 
-# We have included the hydrodynamics input dir for fac_x = 0.5 and fac_y = 0.5 as an example
+# We have included the hydrodynamics input dir for fac_x = 0.8 and fac_y = 0.8 as an example
 
 # Note for fac_x=fac_y=1 and fac_x=fac_y=1.6 self.dt should be changed to 0.125
-# and self.dt_per_mesh_movement should be changed to 80 in options.py
 
 inputdir = 'hydrodynamics_trench_slant_' + str(fac_x) #+  str(fac_y)
 
@@ -57,8 +56,6 @@ kwargs = {
 op = TrenchSlantOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
-# swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
-swp.shallow_water_options[0]['mesh_velocity'] = None
 
 def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
 
@@ -70,7 +67,6 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
     """
     P1 = FunctionSpace(mesh, "CG", 1)
 
-    # eta = swp.solution.split()[1]
     b = swp.fwd_solutions_bathymetry[0]
     bath_gradient = recovery.construct_gradient(b)
     bath_hess = recovery.construct_hessian(b, op=op)
@@ -97,18 +93,14 @@ new_mesh = RectangleMesh(16*5*4, 5*4, 16, 1.1)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
+# export and save bathymetry in readable format
 export_bathymetry(bath, "adapt_output/hydrodynamics_trench_slant_bath_"+str(alpha) + "_" + str(beta) + '_' + str(gamma) + '-' + str(fac_x))
 
 bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
 
-print(fac_x)
-print(fac_y)
-print(alpha)
+# calculate error to true value
 print('L2')
 print(fire.errornorm(bath, bath_real))
 
 print("total time: ")
 print(t2-t1)
-
-print(beta)
-print(gamma)

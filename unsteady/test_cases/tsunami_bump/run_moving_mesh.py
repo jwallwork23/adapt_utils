@@ -1,11 +1,18 @@
+"""
+Tsunami Bump Test case
+=======================
+
+Solves the hydro-morphodynamic simulation of a tsunami-like wave with an obstacle in the profile 
+on a fixed uniform mesh
+
+"""
+
 from firedrake.petsc import PETSc
 import firedrake as fire
 from thetis import *
 
 import numpy as np
 
-
-from adapt_utils.io import initialise_bathymetry, export_bathymetry
 from adapt_utils.unsteady.test_cases.tsunami_bump.options import BeachOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.adapt import recovery
@@ -17,7 +24,7 @@ import datetime
 
 def export_final_state(inputdir, bathymetry_2d):
     """
-    Export fields to be used in a subsequent simulation
+    Export bathymetry and mesh
     """
     if not os.path.exists(inputdir):
         os.makedirs(inputdir)
@@ -34,10 +41,10 @@ def export_final_state(inputdir, bathymetry_2d):
 
 def initialise_fields(mesh2d, inputdir):
     """
-    Initialise simulation with results from a previous simulation
+    Initialise true value bathymetry
     """
     V = FunctionSpace(mesh2d, 'CG', 1)
-    # elevation
+
     with timed_stage('initialising bathymetry'):
         chk = DumbCheckpoint(inputdir + "/bathymetry", mode=FILE_READ)
         bath = Function(V, name="bathymetry")
@@ -84,6 +91,7 @@ def gradient_interface_monitor(mesh, mod = mod, beta_mod = beta_mod, alpha=alpha
 
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
+    and the wet-dry interface
 
     NOTE: Defined on the *computational* mesh.
 
@@ -109,7 +117,6 @@ def gradient_interface_monitor(mesh, mod = mod, beta_mod = beta_mod, alpha=alpha
     bath_dx_l2_norm = Function(b.function_space()).interpolate(l2_bath_grad/max(l2_bath_grad.dat.data[:]))
 
     alpha_mod = alpha*mod
-    #beta_mod = 5
     elev_abs_norm = Function(eta.function_space()).interpolate(alpha_mod*pow(cosh(beta_mod*(eta+b)), -2))
 
     comp_int = conditional(alpha*beta*bath_dx_l2_norm > alpha*gamma*frob_bath_norm, alpha*beta*bath_dx_l2_norm, alpha*gamma*frob_bath_norm)
@@ -128,25 +135,15 @@ t2 = time.time()
 
 print(t2-t1)
 
-print(nx)
-print(alpha)
-print('mod')
-print(mod)
-print(beta)
-print(gamma)
-print('beta mod')
-print(beta_mod)
-
 new_mesh = RectangleMesh(600, 160, 30, 8)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-#export_final_state("adapt_output/bath_fixed_" + str(op.dt_per_export) + "_" +str(int(nx*30)) + "_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + '_' + str(mod), bath)
+# export and save bathymetry in readable format
+export_final_state("adapt_output/bath_fixed_" + str(op.dt_per_export) + "_" +str(int(nx*30)) + "_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + '_' + str(mod), bath)
 
 bath_real = initialise_fields(new_mesh, 'fixed_output/bath_fixed_600_160')
 
+# calculate error to true value
 print('L2')
 print(fire.errornorm(bath, bath_real))
-
-print('tolerance')
-print(r_tol)

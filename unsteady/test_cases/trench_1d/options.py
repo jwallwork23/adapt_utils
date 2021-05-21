@@ -2,8 +2,6 @@ from thetis import *
 from thetis.configuration import *
 import matplotlib
 
-matplotlib.rc('text', usetex=True)
-matplotlib.rc('font', family='serif')
 from thetis.options import ModelOptions2d
 
 import numpy as np
@@ -174,37 +172,3 @@ class TrenchSedimentOptions(CoupledOptions):
 
     def get_update_forcings(self, prob, i, adjoint):
         return None
-
-    def initialise_fields(self, inputdir, outputdir):
-        """
-        Initialise simulation with results from a previous simulation
-        """
-        from firedrake.petsc import PETSc
-        #try:
-        #    import firedrake.cython.dmplex as dmplex
-        #except:
-        #    import firedrake.dmplex as dmplex  # Older version
-        # mesh
-        with timed_stage('mesh'):
-            # Load
-            newplex = PETSc.DMPlex().create()
-            newplex.createFromFile(inputdir + '/myplex.h5')
-            mesh = Mesh(newplex)
-
-        DG_2d = FunctionSpace(mesh, "DG", 1)
-        # elevation
-        with timed_stage('initialising elevation'):
-            chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_READ)
-            elev_init = Function(DG_2d, name="elevation")
-            chk.load(elev_init)
-            File(outputdir + "/elevation_imported.pvd").write(elev_init)
-            chk.close()
-        # velocity
-        with timed_stage('initialising velocity'):
-            chk = DumbCheckpoint(inputdir + "/velocity", mode=FILE_READ)
-            V = VectorFunctionSpace(mesh, "DG", 1)
-            uv_init = Function(V, name="velocity")
-            chk.load(uv_init)
-            File(outputdir + "/velocity_imported.pvd").write(uv_init)
-            chk.close()
-        return elev_init, uv_init,

@@ -30,10 +30,9 @@ fac_y = 0.8
 # to create the input hydrodynamics directiory please run hydro_trench_slant.py
 # setting fac_x and fac_y to be the same values as above
 
-# We have included the hydrodynamics input dir for fac_x = 0.5 and fac_y = 0.5 as an example.
+# We have included the hydrodynamics input dir for fac_x = 0.8 and fac_y = 0.8 as an example.
 
 # Note for fac_x=fac_y=1 and fac_x=fac_y=1.6 self.dt should be changed to 0.125
-# and self.dt_per_mesh_movement should be changed to 80 in options.py
 
 inputdir = os.path.join(di, 'hydrodynamics_trench_slant_' + str(fac_x)) #  + str(fac_y))
 
@@ -68,13 +67,14 @@ new_mesh = RectangleMesh(16*5*4, 5*4, 16, 1.1)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-fpath = "hydrodynamics_trench_slant_bath_new_code_" + str(fac_x)
+# export final bathymetry in readable format
+fpath = "hydrodynamics_trench_slant_bath_new_" + str(fac_x)
 export_bathymetry(bath, fpath, op=op)
 
 print("total time: ")
 print(t2-t1)
-print(fac_x)
 bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
 
+# calculate error to true value
 print('L2')
 print(fire.errornorm(bath, bath_real))

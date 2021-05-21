@@ -15,9 +15,7 @@ class BeachOptions(CoupledOptions):
     """
     Parameters for test case adapted from [1].
 
-    [1] Roberts, W. et al. "Investigation using simple mathematical models of
-    the effect of tidal currents and waves on the profile shape of intertidal
-    mudflats." Continental Shelf Research 20.10-11 (2000): 1079-1097.
+    [1] Karna et al. "A fully implicit wetting–drying method for DG-FEM shallow water models, with an application to the Scheldt Estuary." Computer Methods in Applied Mechanics and Engineering 200.5-8 (2011): 509-524.
     """
 
     def __init__(self, dt_exp=72, friction='manning', nx=1, ny=1, mesh = None, input_dir = None, output_dir = None, **kwargs):
@@ -43,8 +41,6 @@ class BeachOptions(CoupledOptions):
 
         # Initial
         self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
-        #self.elev_init = Constant(0.0)
-        #self.uv_init = as_vector((10**(-7), 0.0))
 
         self.plot_pvd = True
         self.hessian_recovery = 'dL2'
@@ -241,14 +237,7 @@ class BeachOptions(CoupledOptions):
         return  elev_init, uv_init,
 
     def get_export_func(self, prob, i):
-        eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
-
-        def export_func():
-            eta_tilde.project(self.get_eta_tilde(prob, i))
-            #self.eta_tilde_file.write(eta_tilde)
-            u, eta = prob.fwd_solutions[i].split()
-
-        return export_func
+        return None
 
     def set_boundary_surface(self):
         """Set the initial displacement of the boundary elevation."""

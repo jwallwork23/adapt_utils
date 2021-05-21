@@ -20,14 +20,12 @@ __all__ = ["BeachOptions"]
 
 class BeachOptions(CoupledOptions):
     """
-    Parameters for test case adapted from [1].
-
-    [1] Roberts, W. et al. "Investigation using simple mathematical models of
-    the effect of tidal currents and waves on the profile shape of intertidal
-    mudflats." Continental Shelf Research 20.10-11 (2000): 1079-1097.
+    Parameters for tsunami bump test case adapted from test case in [1]
+    
+    [1] Kobayashi et al. "Cross-shore sediment transport under breaking solitary waves." Journal of Geophysical Research: Oceans 109 (2004).    
     """
 
-    def __init__(self, friction='quadratic', plot_timeseries=False, nx=1, ny=1, mesh = None, input_dir = None, output_dir = None, **kwargs):
+    def __init__(self, friction='quadratic', nx=1, ny=1, mesh = None, input_dir = None, output_dir = None, **kwargs):
 
         super(BeachOptions, self).__init__(**kwargs)
 
@@ -37,15 +35,11 @@ class BeachOptions(CoupledOptions):
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
 
-        #self.debug = True
-
         self.lx = 30
         self.ly = 8
 
         if output_dir is not None:
             self.di = output_dir
-
-        self.plot_timeseries = plot_timeseries
 
         self.default_mesh = RectangleMesh(np.int(self.lx*nx), np.int(self.ly*ny), self.lx, self.ly)
 
@@ -83,10 +77,6 @@ class BeachOptions(CoupledOptions):
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 
-        # Adaptivity
-        self.h_min = 1e-8
-        self.h_max = 10.
-
         # Goal-Oriented
         self.qoi_mode = 'inundation_volume'
 
@@ -123,9 +113,7 @@ class BeachOptions(CoupledOptions):
         self.P1DG = FunctionSpace(mesh, "DG", 1)
         self.P1_vec_dg = VectorFunctionSpace(mesh, "DG", 1)
 
-        #if uv_init is None:
         self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
-        #if elev_init is None:
         self.eta_d = Function(self.P1DG).project(self.elev_init)
 
         self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
@@ -225,58 +213,8 @@ class BeachOptions(CoupledOptions):
 
         return update_forcings
 
-    def initialise_fields(self, inputdir, outputdir):
-        """
-        Initialise simulation with results from a previous simulation
-        """
-        from firedrake.petsc import PETSc
-
-        # mesh
-        with timed_stage('mesh'):
-            # Load
-            newplex = PETSc.DMPlex().create()
-            newplex.createFromFile(inputdir + '/myplex.h5')
-            mesh = Mesh(newplex)
-
-        DG_2d = FunctionSpace(mesh, 'DG', 1)
-        vector_dg = VectorFunctionSpace(mesh, 'DG', 1)
-        # elevation
-        with timed_stage('initialising elevation'):
-            chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_READ)
-            elev_init = Function(DG_2d, name="elevation")
-            chk.load(elev_init)
-            #File(outputdir + "/elevation_imported.pvd").write(elev_init)
-            chk.close()
-        # velocity
-        with timed_stage('initialising velocity'):
-            chk = DumbCheckpoint(inputdir + "/velocity" , mode=FILE_READ)
-            uv_init = Function(vector_dg, name="velocity")
-            chk.load(uv_init)
-            #File(outputdir + "/velocity_imported.pvd").write(uv_init)
-            chk.close()
-
-        return  elev_init, uv_init, 
-
     def get_export_func(self, prob, i):
-        eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
-        #self.eta_tilde_file = File(self.di + "/eta_tilde.pvd").write(eta_tilde)
-        #self.eta_tilde_file._topology = None
-        if self.plot_timeseries:
-            u, eta = prob.fwd_solutions[i].split()
-            b = prob.bathymetry[i]
-            wd = Function(prob.P1DG[i], name="Heaviside approximation")
-
-        def export_func():
-            eta_tilde.project(self.get_eta_tilde(prob, i))
-            #self.eta_tilde_file.write(eta_tilde)
-            u, eta = prob.fwd_solutions[i].split()
-            #if self.plot_timeseries:
-
-                # Store modified bathymetry timeseries
-            #    wd.project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha))
-            #    self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
-
-        return export_func
+        return None
 
     def set_boundary_surface(self):
         """Set the initial displacement of the boundary elevation."""

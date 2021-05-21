@@ -36,7 +36,7 @@ def export_final_state(inputdir, uv, elev,):
     viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
     viewer(plex)
 
-res = 0.1
+res = 0.5
 
 # define mesh
 lx = 16

@@ -15,7 +15,7 @@ import time
 from adapt_utils.adapt import recovery
 from adapt_utils.io import initialise_bathymetry, export_bathymetry
 from adapt_utils.norms import local_frobenius_norm, local_norm
-from adapt_utils.unsteady.test_cases.trench_1d_der.options import TrenchSedimentOptions
+from adapt_utils.unsteady.test_cases.trench_1d.options import TrenchSedimentOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 ts = time.time()
@@ -28,7 +28,7 @@ beta = 1
 gamma = 1
 
 # to create the input hydrodynamics directiory please run hydro_trench_slant.py
-# setting fac_x and fac_y to be the same values as above
+# setting res to be the same values as above
 
 # --- Set parameters
 
@@ -67,7 +67,6 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
     """
     P1 = FunctionSpace(mesh, "CG", 1)
 
-    # eta = swp.solution.split()[1]
     b = swp.fwd_solutions_bathymetry[0]
     bath_gradient = recovery.construct_gradient(b)
     bath_hess = recovery.construct_hessian(b, op=op)
@@ -102,7 +101,7 @@ diff_thetis = []
 datathetis = np.linspace(0, 15.9, 160)
 bathymetrythetis1 = [-bath.at([i, 0.55]) for i in datathetis]
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
-#df.to_csv('adapt_output/bed_trench_output_uni_s_{:.4f}_{:.1f}_{:.1f}_{:.1f}.csv'.format(res, alpha, beta, gamma))
+df.to_csv('adapt_output/bed_trench_output_uni_s_{:.4f}_{:.1f}_{:.1f}_{:.1f}.csv'.format(res, alpha, beta, gamma))
 
 # Compute l2 error against experimental data
 datathetis = []
@@ -115,7 +114,7 @@ for i in range(len(data[0].dropna())):
     diff_thetis.append((data[1].dropna()[i] - bathymetrythetis1[-1])**2)
 
 df_exp = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
-#df_exp.to_csv('adapt_output/bed_trench_output_s_{:.4f}_{:.1f}_{:.1f}_{:1f}.csv'.format(res, alpha, beta, gamma))
+df_exp.to_csv('adapt_output/bed_trench_output_s_{:.4f}_{:.1f}_{:.1f}_{:1f}.csv'.format(res, alpha, beta, gamma))
 
 # Print to screen
 print("res = {:.4f}".format(res))

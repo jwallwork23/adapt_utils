@@ -1,3 +1,13 @@
+"""
+Tsunami Bump Test case
+=======================
+
+Solves the hydro-morphodynamic simulation of a tsunami-like wave with an obstacle in the profile 
+on a fixed uniform mesh
+
+"""
+
+
 from thetis import *
 import firedrake as fire
 from firedrake.petsc import PETSc
@@ -13,7 +23,7 @@ from adapt_utils.unsteady.solver import AdaptiveProblem
 
 def export_final_state(inputdir, bathymetry_2d):
     """
-    Export fields to be used in a subsequent simulation
+    Export bathymetry and mesh
     """
     if not os.path.exists(inputdir):
         os.makedirs(inputdir)
@@ -29,7 +39,7 @@ def export_final_state(inputdir, bathymetry_2d):
 
 def initialise_fields(mesh2d, inputdir):
     """
-    Initialise simulation with results from a previous simulation
+    Initialise true value bathymetry
     """
     V = FunctionSpace(mesh2d, 'CG', 1)
     # elevation
@@ -77,7 +87,9 @@ bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bath
 
 export_final_state("fixed_output/bath_fixed_"+str(int(nx*30)) + '_' + str(int(ny*8)), bath)
 
+# export and save bathymetry in readable format
 bath_real = initialise_fields(new_mesh, 'fixed_output/bath_fixed_600_160')
 
+# calculate error to true value
 print('L2')
 print(fire.errornorm(bath, bath_real))

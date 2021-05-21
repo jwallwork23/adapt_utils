@@ -38,13 +38,12 @@ outputdir = os.path.join(di, 'outputs' + st)
 # to create the input hydrodynamics directiory please run beach_tidal_hydro.py
 # setting fac_x and fac_y to be the same values as above
 
-# we have included the hydrodynamics input dir for fac_x = 0.5 and fac_y = 1 as an example
+# we have included the hydrodynamics input dir for fac_x = 0.2 and fac_y = 0.5 as an example
 
 # Note to recreate subdomain errors in options.py self.dt_per_mesh_movement = 72 and for whole
 # domain errors self.dt_per_mesh_movement = 648
 
 inputdir = os.path.join(di, 'hydrodynamics_beach_l_sep_nx_' + str(int(fac_x*220)) + '_' + str(int(fac_y*10)))
-print(inputdir)
 
 tol_value = 1e-3
 
@@ -116,15 +115,11 @@ t2 = time.time()
 
 print(t2-t1)
 
-print(fac_x)
-print(alpha)
-print(beta)
-print(gamma)
-
 new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
+# export final bathymetry to readable format
 fpath = "hydrodynamics_beach_bath_mov_{:d}_{:d}_{:d}_{:d}_{:d}"
 fpath = fpath.format(op.dt_per_export, int(fac_x*220), alpha, beta, gamma)
 export_bathymetry(bath, os.path.join("adapt_output", fpath), op=op)
@@ -133,7 +128,6 @@ bath_real = initialise_bathymetry(new_mesh, 'fixed_output/hydrodynamics_beach_ba
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
-print(kappa)
 
 V = FunctionSpace(new_mesh, 'CG', 1)
 
@@ -145,7 +139,3 @@ bath_real_mod = Function(V).interpolate(conditional(x > 70, bath_real, Constant(
 print('subdomain')
 
 print(fire.errornorm(bath_mod, bath_real_mod))
-
-print('tolerance value')
-
-print(tol_value)
