@@ -10,6 +10,9 @@ import thetis as th
 import hydro_fns as hydro
 
 import numpy as np
+import os
+
+plot = True
 
 from adapt_utils.io import export_hydrodynamics
 
@@ -56,9 +59,8 @@ def boundary_conditions_fn_balzano(bathymetry_2d, flag=None, morfac=1, t_new=0, 
 
         return inflow_constant, outflow_constant
 
-
-fac_x = 0.5
-fac_y = 1
+fac_x = 0.2
+fac_y = 0.5
 
 # define mesh
 lx = 220
@@ -98,4 +100,5 @@ solver_obj.iterate(update_forcings=update_forcings_hydrodynamics)
 uv, elev = solver_obj.fields.solution_2d.split()
 
 fpath = "hydrodynamics_beach_l_sep_nx_{:d}_{:d}".format(nx, ny)
+
 export_hydrodynamics(uv, elev, fpath)

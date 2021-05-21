@@ -19,14 +19,16 @@ from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.beach_slope.options import BeachOptions
 
-fac_x = 0.5
-fac_y = 1
+fac_x = 0.2
+fac_y = 0.5
+
+dt_exp = 72
 
 alpha = 5
-beta = 1
-gamma = 0
+beta = 0
+gamma = 1
 
-kappa = 80
+kappa = 200
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -36,18 +38,18 @@ outputdir = os.path.join(di, 'outputs' + st)
 # to create the input hydrodynamics directiory please run beach_tidal_hydro.py
 # setting fac_x and fac_y to be the same values as above
 
-# we have included the hydrodynamics input dir for fac_x = 0.5 and fac_y = 1 as an example
+# we have included the hydrodynamics input dir for fac_x = 0.2 and fac_y = 0.5 as an example
 
 # Note to recreate subdomain errors in options.py self.dt_per_mesh_movement = 72 and for whole
 # domain errors self.dt_per_mesh_movement = 648
 
 inputdir = os.path.join(di, 'hydrodynamics_beach_l_sep_nx_' + str(int(fac_x*220)) + '_' + str(int(fac_y*10)))
-print(inputdir)
 
 tol_value = 1e-3
 
 kwargs = {
     'approach': 'monge_ampere',
+    'dt_exp': dt_exp,
     'nx': fac_x,
     'ny': fac_y,
     'plot_pvd': True,
@@ -59,6 +61,7 @@ kwargs = {
     'family': 'dg-dg',
     'stabilisation': None,
     'stabilisation_sediment': None,
+    'use_automatic_sipg_parameter': True,
     'friction': 'manning'
 }
 
@@ -78,8 +81,8 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kapp
     P1 = FunctionSpace(mesh, "CG", 1)
 
     b = swp.fwd_solutions_bathymetry[0]
-    bath_gradient = recovery.recover_gradient(b)
-    bath_hess = recovery.recover_hessian(b, op=op)
+    bath_gradient = recovery.construct_gradient(b)
+    bath_hess = recovery.construct_hessian(b, op=op)
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
 
     if max(abs(frob_bath_hess.dat.data[:])) < 1e-10:
@@ -112,15 +115,11 @@ t2 = time.time()
 
 print(t2-t1)
 
-print(fac_x)
-print(alpha)
-print(beta)
-print(gamma)
-
 new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
+# export final bathymetry to readable format
 fpath = "hydrodynamics_beach_bath_mov_{:d}_{:d}_{:d}_{:d}_{:d}"
 fpath = fpath.format(op.dt_per_export, int(fac_x*220), alpha, beta, gamma)
 export_bathymetry(bath, os.path.join("adapt_output", fpath), op=op)
@@ -129,7 +128,6 @@ bath_real = initialise_bathymetry(new_mesh, 'fixed_output/hydrodynamics_beach_ba
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
-print(kappa)
 
 V = FunctionSpace(new_mesh, 'CG', 1)
 
@@ -141,7 +139,3 @@ bath_real_mod = Function(V).interpolate(conditional(x > 70, bath_real, Constant(
 print('subdomain')
 
 print(fire.errornorm(bath_mod, bath_real_mod))
-
-print('tolerance value')
-
-print(tol_value)

@@ -3,7 +3,6 @@ import time
 import datetime
 import numpy as np
 
-
 def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
                        elev_init, average_size, dt, t_end, wetting_and_drying=False,
                        wetting_alpha=0.1, friction='nikuradse', friction_coef=0,
@@ -127,7 +126,7 @@ def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
     str1 = '{'
     if len(left_string) > 0:
         for i in range(len(left_string)):
-            str1 += "'" + str(left_string[i]) + "': constant_in" + str(i) + ","
+            str1 += "'"+ str(left_string[i]) + "': constant_in" + str(i) + ","
         str1 = str1[0:len(str1)-1] + "}"
         exec('swe_bnd[left_bnd_id] = ' + str1)
 
