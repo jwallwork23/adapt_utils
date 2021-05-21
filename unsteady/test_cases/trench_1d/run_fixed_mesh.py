@@ -36,7 +36,12 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 di = os.path.dirname(__file__)
 outputdir = os.path.join(di, 'outputs' + st)
+<<<<<<< HEAD
 inputdir = os.path.join(di, 'hydrodynamics_trench_{:.4f}'.format(res))
+=======
+inputdir = os.path.join(di, 'hydrodynamics_trench_{:.1f}'.format(res))
+print(inputdir)
+>>>>>>> origin/master
 kwargs = {
     'approach': 'fixed_mesh',
     'nx': res,
@@ -49,7 +54,10 @@ kwargs = {
     'family': 'dg-dg',
     'stabilisation': None,
     'stabilisation_sediment': None,
+<<<<<<< HEAD
     'use_automatic_sipg_parameter': True,
+=======
+>>>>>>> origin/master
 }
 op = TrenchSedimentOptions(**kwargs)
 if os.getenv('REGRESSION_TEST') is not None:
@@ -82,12 +90,14 @@ datathetis = []
 bathymetrythetis1 = []
 diff_thetis = []
 data = pd.read_csv(os.path.join(di, 'experimental_data.csv'), header=None)
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/master
 for i in range(len(data[0].dropna())):
     datathetis.append(data[0].dropna()[i])
     bathymetrythetis1.append(-bath.at([np.round(data[0].dropna()[i], 3), 0.55]))
     diff_thetis.append((data[1].dropna()[i] - bathymetrythetis1[-1])**2)
-
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
 df.to_csv(os.path.join(di, 'fixed_output/bed_trench_output_c_{:.4f}.csv'.format(res)))
 

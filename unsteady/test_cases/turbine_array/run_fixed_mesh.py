@@ -1,5 +1,3 @@
-from thetis import create_directory, print_output, COMM_WORLD
-
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,7 +5,7 @@ import os
 import sys
 from time import perf_counter
 
-from adapt_utils.io import get_date, index_string
+from adapt_utils.io import *
 from adapt_utils.plotting import *
 from adapt_utils.swe.turbine.solver import AdaptiveTurbineProblem
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
@@ -59,12 +57,12 @@ if plot_pdf:
     extensions.append('pdf')
 if plot_png:
     extensions.append('png')
-base_viscosity = float(args.base_viscosity or 0.0)
+base_viscosity = Constant(args.base_viscosity or 0.0)
 kwargs = {
     'approach': approach,
     'level': level,
     'num_meshes': int(args.num_meshes or 1),
-    'target_viscosity': float(args.target_viscosity or base_viscosity),
+    'target_viscosity': Constant(args.target_viscosity or base_viscosity),
     'plot_pvd': plot_pvd,
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',

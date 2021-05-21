@@ -20,35 +20,31 @@ os.environ['REGRESSION_TEST'] = "1"
 examples = [
 
     # Fixed mesh
-    'balzano/run_fixed_mesh.py',              # Has been cut short
-    'beach_slope/run_fixed_mesh.py',          # Has been cut (very) short
-    'beach_wall/run_fixed_mesh.py',           # Has been cut (very) short
-    'bubble_shear/run_fixed_mesh.py',         # Has been cut short
-    'pulse_wave/run_fixed_mesh.py',           # Has been cut (very) short
-    'rossby_wave/run_fixed_mesh.py',          # Has been cut short
-    'solid_body_rotation/run_fixed_mesh.py',
-    # 'spaceship/run_fixed_mesh.py',          # Takes too long to run
-    'trench_1d/run_fixed_mesh.py',            # Has been cut (very) short
-    'trench_slant/run_fixed_mesh.py',         # Has been cut (very) short
-    # 'turbine_array/run_fixed_mesh.py',      # Takes too long to run
+    'unsteady/test_cases/balzano/run_fixed_mesh.py',                # Has been cut short
+    'unsteady/test_cases/beach_slope/run_fixed_mesh.py',            # Has been cut (very) short
+    'unsteady/test_cases/beach_wall/run_fixed_mesh.py',             # Has been cut (very) short
+    'unsteady/test_cases/idealised_desalination/run_fixed_mesh.py',
+    'unsteady/test_cases/bubble_shear/run_fixed_mesh.py',           # Has been cut short
+    'unsteady/test_cases/pulse_wave/run_fixed_mesh.py',             # Has been cut (very) short
+    'unsteady/test_cases/rossby_wave/run_fixed_mesh.py',            # Has been cut short
+    'unsteady/test_cases/solid_body_rotation/run_fixed_mesh.py',
+    # 'unsteady/test_cases/spaceship/run_fixed_mesh.py',            # Takes too long to run
+    'unsteady/test_cases/trench_1d/trench_hydro.py',
+    'unsteady/test_cases/trench_1d/run_fixed_mesh.py',              # Has been cut (very) short
+    'unsteady/test_cases/trench_slant/run_fixed_mesh.py',           # Has been cut (very) short
+    # 'unsteady/test_cases/turbine_array/run_fixed_mesh.py',        # Takes too long to run
+    'case_studies/tohoku/hazard/run_fixed_mesh.py',
 
     # Moving mesh
-    'balzano/run_moving_mesh.py',               # Has been cut short
-    # 'beach_slope/run_moving_mesh.py',         # TODO
-    # 'beach_wall/run_moving_mesh.py',          # TODO
-    # 'bubble_shear/run_lagrangian.py',         # TODO: xfail it
-    # 'bubble_shear/run_moving_mesh.py',        # TODO
-    # 'cosine_prescribed_velocity/compare.py',  # FIXME: Lagrangian coords do not match
-    # 'pulse_wave/run_moving_mesh.py',          # TODO
-    'rossby_wave/run_moving_mesh.py',           # Has been cut (very) short
-    'solid_body_rotation/run_lagrangian.py',
-    # 'trench_1d/run_moving_mesh.py',           # TODO
-    # 'trench_slant/run_moving_mesh.py',        # TODO
+    'unsteady/test_cases/balzano/run_moving_mesh.py',               # Has been cut short
+    'unsteady/test_cases/rossby_wave/run_moving_mesh.py',           # Has been cut (very) short
+    'unsteady/test_cases/solid_body_rotation/run_lagrangian.py',
 
-    # Metric-based  # TODO
+    # Metric-based
+    'case_studies/tohoku/hazard/run_adapt.py',
 ]
 cwd = os.path.abspath(os.path.dirname(__file__))
-unsteady_dir = os.path.abspath(os.path.join(cwd, '..', 'unsteady', 'test_cases'))
+unsteady_dir = os.path.abspath(os.path.join(cwd, '..'))
 examples = [os.path.join(unsteady_dir, f) for f in examples]
 
 

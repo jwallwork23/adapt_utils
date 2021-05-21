@@ -22,7 +22,7 @@ args = parser.parse_args()
 
 # Setup problem
 op = TurbineArrayOptions(1.0, debug=True)
-op.base_viscosity = float(args.base_viscosity or 1.0)
+op.base_viscosity = Constant(args.base_viscosity or 1.0)
 op.target_viscosity = float(args.target_viscosity or 0.01)
 op.max_reynolds_number = float(args.max_reynolds_number or 1000)
 swp = AdaptiveTurbineProblem(op, ramp_dir='data/ramp')
@@ -46,11 +46,11 @@ if isinstance(nu, Constant):
     print("Constant (kinematic) viscosity = {:.4e}".format(nu.values()[0]))
 else:
     fig, axes = plt.subplots(figsize=(12, 6))
-    levels = np.linspace(0.9*op.target_viscosity, 1.1*op.base_viscosity, 50)
+    levels = np.linspace(0.9*op.target_viscosity, 1.1*float(op.base_viscosity), 50)
     tc = tricontourf(nu, axes=axes, levels=levels, cmap='coolwarm')
     cbar = fig.colorbar(tc, ax=axes)
     cbar.set_label(r"(Kinematic) viscosity [$\mathrm m^2\,\mathrm s^{-1}$]")
-    cbar.set_ticks(np.linspace(0, op.base_viscosity, 5))
+    cbar.set_ticks(np.linspace(0, float(op.base_viscosity), 5))
 
 # Plot mesh Reynolds number
 fig, axes = plt.subplots(figsize=(12, 6))

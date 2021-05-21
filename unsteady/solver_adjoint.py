@@ -16,6 +16,7 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
     """
     def __init__(self, *args, **kwargs):
         super(AdaptiveDiscreteAdjointProblem, self).__init__(*args, **kwargs)
+        op = self.op
         self.tape = get_working_tape()
         if self.num_meshes > 1:
             raise NotImplementedError  # TODO: Allow multiple meshes
@@ -32,24 +33,53 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
             raise NotImplementedError("Haven't accounted for coupled model yet.")
 
     def clear_tape(self):
+        """
+        Strip all blocks from pyadjoint's tape, along with their associated data.
+        """
+        print_output("Clearing tape...")
         self.tape.clear_tape()
 
     def solve_adjoint(self, scaling=1.0):
-        """Solve the discrete adjoint problem for some quantity of interest."""
+        """
+        Solve the discrete adjoint problem for some quantity of interest.
+        """
         J = self.quantity_of_interest()
         return pyadjoint.solve_adjoint(J, adj_value=scaling)
 
     def compute_gradient(self, controls, scaling=1.0):
-        """Compute the gradient of the quantity of interest with respect to a list of controls."""
+        """
+        Compute the gradient of the quantity of interest with respect to a list of controls.
+        """
         J = self.quantity_of_interest()
         return compute_gradient(J, controls, adj_value=scaling)
 
+    def check_solve_block(self, block):
+        """
+        Check that `block` corresponds to a finite element/nonlinear/linear solve.
+        """
+        out = True
+        if not isinstance(block, GenericSolveBlock):
+            out = False
+        elif not hasattr(block, 'adj_sol'):
+            out = False
+        elif block.adj_sol is None:
+            out = False
+        return out
+
     def get_solve_blocks(self):
-        """Extract all tape blocks which are subclasses of :class:`GenericSolveBlock`."""
+        """
+        Extract all tape blocks which are subclasses of :class:`GenericSolveBlock`.
+        """
         blocks = self.tape.get_blocks()
         if len(blocks) == 0:
             raise ValueError("Tape is empty!")
-        self.solve_blocks = [block for block in blocks if isinstance(block, GenericSolveBlock) and block.adj_sol is not None]
+        self._solve_blocks = [block for block in blocks if self.check_solve_block(block)]
+
+    @property
+    def solve_blocks(self):
+        if not hasattr(self, '_solve_blocks'):
+            self.get_solve_blocks()
+        return self._solve_blocks
 
     def extract_adjoint_solution(self, solve_step):
         """
@@ -66,8 +96,6 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
             else:
                 msg = "{:2d} {:s}  ADJOINT EXTRACT mesh {:2d}/{:2d}  time {:8.2f}"
                 self.print(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, time))
-        if not hasattr(self, 'solve_blocks'):
-            self.get_solve_blocks()
         adj_sol = self.solve_blocks[solve_step].adj_sol
 
         # Extract adjoint solution and insert it into the appropriate solution field
@@ -81,8 +109,9 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
             self.adj_solutions_bathymetry[i].assign(adj_sol)
 
     def save_adjoint_trajectory(self):
-        """Save the entire adjoint solution trajectory to .vtu, backwards in time."""
-        self.get_solve_blocks()
+        """
+        Save the entire adjoint solution trajectory to .vtu, backwards in time.
+        """
         if self.op.solve_swe:
             self._save_adjoint_trajectory_shallow_water()
         elif self.op.solve_tracer:
@@ -100,7 +129,7 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
         proj_eta.rename("Projected discrete adjoint elevation")
         iterator = list(range(len(self.solve_blocks)-1, -1, -self.op.dt_per_export))
         if 0 not in iterator:
-            iterator.extend([0, ])
+            iterator.extend([0])
         for j in iterator:
             self.extract_adjoint_solution(j)
             if self.op.plot_pvd:
@@ -112,7 +141,7 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
         proj = Function(self.P1[i], name="Projected discrete adjoint tracer")
         iterator = list(range(len(self.solve_blocks)-1, -1, -self.op.dt_per_export))
         if 0 not in iterator:
-            iterator.extend([0, ])
+            iterator.extend([0])
         for j in iterator:
             self.extract_adjoint_solution(j)
             if self.op.plot_pvd:

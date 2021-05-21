@@ -16,10 +16,15 @@ parser.add_argument("-n", help="Resolution of initial mesh.")
 parser.add_argument("-dt", help="Timestep.")
 parser.add_argument("-end_time", help="Simulation end time.")
 
+<<<<<<< HEAD
 parser.add_argument("-conservative", help="Toggle conservative tracer equation")
 parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
 parser.add_argument("-stabilisation", help="Stabilisation method")
 parser.add_argument("-anisotropic_stabilisation", help="Toggle anisotropic stabilisation")
+=======
+parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
+parser.add_argument("-stabilisation", help="Stabilisation method")
+>>>>>>> origin/master
 parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 
 parser.add_argument("-approach", help="Mesh adaptation approach")
@@ -40,10 +45,14 @@ kwargs = {
     # Solver
     'tracer_family': args.family or 'cg',
     'stabilisation_tracer': args.stabilisation or 'supg',
+<<<<<<< HEAD
     'anisotropic_stabilisation': False if args.anisotropic_stabilisation == "0" else True,
     'use_automatic_sipg_parameter': False,  # We have an inviscid problem
     'use_limiter_for_tracers': bool(args.limiters or False),
     'use_tracer_conservative_form': bool(args.conservative or False),  # FIXME?
+=======
+    'use_limiter_for_tracers': bool(args.limiters or False),
+>>>>>>> origin/master
 
     # Mesh adaptation
     'approach': args.approach or 'hessian',
@@ -71,7 +80,11 @@ assert op.approach != 'fixed_mesh'
 for n in range(int(args.min_level or 0), int(args.max_level or 5)):
     op.target = 1000*2**n
     op.dt = 0.01*0.5**n
+<<<<<<< HEAD
     op.dt_per_export *= 2**n
+=======
+    op.dt_per_export = 2**n
+>>>>>>> origin/master
 
     # Run simulation
     tp = AdaptiveProblem(op)
@@ -95,6 +108,10 @@ for n in range(int(args.min_level or 0), int(args.max_level or 5)):
 
     # Save to HDF5
     with h5py.File(os.path.join(op.di, 'convergence_{:d}.h5'.format(n)), 'w') as outfile:
+<<<<<<< HEAD
+=======
+        outfile.create_dataset('iterations', data=[tp.outer_iteration])
+>>>>>>> origin/master
         outfile.create_dataset('elements', data=num_cells)
         outfile.create_dataset('dofs', data=dofs)
         outfile.create_dataset('time', data=times)

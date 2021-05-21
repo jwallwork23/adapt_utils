@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from thetis.utility import *
 from .equation import Equation
+from .params import flux_params
 
 
 class GOErrorEstimatorTerm(object):
@@ -15,6 +16,15 @@ class GOErrorEstimatorTerm(object):
         self.P0 = FunctionSpace(mesh, "DG", 0)
         self.p0test = TestFunction(self.P0)
         self.p0trial = TrialFunction(self.P0)
+
+    def restrict(self, arg):
+        """
+        Restrict a discontinuous object to an element.
+        """
+        try:
+            return jump(arg, self.p0test)
+        except Exception:
+            return arg('+')*self.p0test('+') + arg('-')*self.p0test('-')
 
     def element_residual(self, solution, solution_old, arg, arg_old, fields, fields_old):
         """
@@ -55,13 +65,17 @@ class GOErrorEstimator(Equation):
         self.p0test = TestFunction(self.P0)
         self.p0trial = TrialFunction(self.P0)
 
-    def mass_term(self, solution, arg):
+    def mass_term(self, solution, arg, vector=False, **kwargs):
         """
         Returns an UFL form of the solution weighted by the argument.
 
         :arg arg: argument :class:`.Function` to take inner product with.
         """
-        return self.p0test*inner(solution, arg)*dx
+        mass = self.p0test*inner(solution, arg)*dx
+        if vector:
+            import numpy as np
+            mass = np.array([mass])
+        return mass
 
     def _create_element_residual(self, label, *args):
         self.residual_terms = 0
@@ -107,8 +121,7 @@ class GOErrorEstimator(Equation):
             self.flux.assign(0.0)
         else:
             mass_term = self.p0test*self.p0trial*dx
-            params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-            solve(mass_term == self.inter_element_flux_terms, self.flux, solver_parameters=params)
+            solve(mass_term == self.inter_element_flux_terms, self.flux, solver_parameters=flux_params)
         return self.flux
 
     def boundary_flux(self):
@@ -122,8 +135,7 @@ class GOErrorEstimator(Equation):
             self.bnd.assign(0.0)
         else:
             mass_term = self.p0test*self.p0trial*dx
-            params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-            solve(mass_term == self.bnd_flux_terms, self.bnd, solver_parameters=params)
+            solve(mass_term == self.bnd_flux_terms, self.bnd, solver_parameters=flux_params)
         return self.bnd
 
     def weighted_residual(self):
@@ -139,6 +151,19 @@ class GOErrorEstimator(Equation):
         wr += self.inter_element_flux()
         wr += self.boundary_flux()
         return wr
+
+    def setup_strong_residual(self, *args, **kwargs):
+        raise NotImplementedError("Should be implemented in derived class.")
+
+    @property
+    def strong_residual(self):
+        """
+        Evaluate the strong residual.
+        """
+        import numpy as np
+        if not hasattr(self, '_strong_residual_terms'):
+            raise ValueError("Cannot evaluate strong residual. Need to set it up first.")
+        return np.array([assemble(sr) for sr in list(self._strong_residual_terms)])
 
     def residual(self):
         raise AttributeError("This method is inherited but unused.")

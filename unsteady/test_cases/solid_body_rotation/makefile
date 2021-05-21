@@ -1,4 +1,10 @@
-all: clean mesh
+all: dir clean mesh
+
+
+dir:
+	@echo "Creating directories..."
+	@mkdir -p plots
+	@mkdir -p outputs
 
 
 # --- Mesh

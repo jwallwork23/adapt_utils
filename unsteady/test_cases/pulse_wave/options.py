@@ -2,8 +2,6 @@ from thetis import *
 from thetis.configuration import *
 from thetis.options import ModelOptions2d
 
-import numpy as np
-
 from adapt_utils.options import CoupledOptions
 from adapt_utils.sediment.sediments_model import SedimentModel
 
@@ -20,6 +18,7 @@ class BeachOptions(CoupledOptions):
     mudflats." Continental Shelf Research 20.10-11 (2000): 1079-1097.
     """
     def __init__(self, plot_timeseries=False, nx=1, ny=1, input_dir=None, output_dir=None, **kwargs):
+        self.timestepper = 'CrankNicolson'
         super(BeachOptions, self).__init__(**kwargs)
         friction = kwargs.get('friction', 'manning')
         try:
@@ -27,7 +26,7 @@ class BeachOptions(CoupledOptions):
         except AssertionError:
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
-        self.friction_coeff = 0.02
+        self.friction_coeff = Constant(0.02)
 
         # Mesh
         self.lx = 220
@@ -47,9 +46,10 @@ class BeachOptions(CoupledOptions):
 
         # Models
         self.set_up_morph_model(self.default_mesh)
-        self.hessian_recovery = 'dL2'
+        self.hessian_recovery = 'L2'
         self.grad_depth_viscosity = True
         self.stabilisation = 'lax_friedrichs'
+        self.stabilisation_sediment = 'lax_friedrichs'
 
         # Boundary conditions
         h_amp = 0.25  # Ocean boundary forcing amplitude
@@ -65,7 +65,6 @@ class BeachOptions(CoupledOptions):
         self.end_time = float(self.num_hours*3600.0/self.morphological_acceleration_factor)
         self.dt_per_mesh_movement = kwargs.get('dt_per_mesh_movement', 54)
         self.dt_per_export = kwargs.get('dt_per_export', 54)
-        self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 
         # # Timeseries  # TODO: Remove?
@@ -77,15 +76,14 @@ class BeachOptions(CoupledOptions):
     def set_up_morph_model(self, mesh=None):
 
         # Physics
-        self.base_viscosity = 0.5
-        self.base_diffusivity = 100
+        self.base_viscosity = Constant(0.5)
+        self.base_diffusivity = Constant(100)
         self.gravity = Constant(9.81)
         self.porosity = Constant(0.4)
         self.ks = Constant(0.025)
-        self.average_size = 0.0002  # Average sediment size
+        self.average_size = Constant(0.0002)  # Average sediment size
 
         self.wetting_and_drying = True
-        self.depth_integrated = True
         self.use_tracer_conservative_form = True
         self.slope_eff = True
         self.angle_correction = False
@@ -178,30 +176,6 @@ class BeachOptions(CoupledOptions):
         u, eta = prob.fwd_solutions[0].split()
         u.project(self.uv_init)
         eta.project(self.elev_init)
-
-    def set_sediment_source(self, fs):
-        if self.suspended and not self.depth_integrated:
-            return self.sediment_model.ero_term
-        else:
-            return None
-
-    def set_sediment_sink(self, fs):
-        if self.suspended and not self.depth_integrated:
-            return self.sediment_model.depo_term
-        else:
-            return None
-
-    def set_sediment_depth_integ_sink(self, fs):
-        if self.suspended and self.depth_integrated:
-            return self.sediment_model.depo_term
-        else:
-            return None
-
-    def set_sediment_depth_integ_source(self, fs):
-        if self.suspended and self.depth_integrated:
-            return self.sediment_model.ero
-        else:
-            return None
 
     def set_advective_velocity_factor(self, fs):
         if self.convective_vel_flag:

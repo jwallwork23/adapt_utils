@@ -3,14 +3,25 @@ balzano/outputs/
 balzano/screenshots/
 balzano/videos/
 balzano/__pycache__/
+<<<<<<< HEAD
+=======
+beach_slope/archived/
+beach_slope/results/
+beach_wall/archived/
+beach_wall/results/
+bubble_shear/plots/
+>>>>>>> origin/master
 bubble_shear/outputs/
 bubble_shear/screenshots/
 bubble_shear/videos/
 bubble_shear/__pycache__/
 cosine_prescribed_velocity/outputs/
+<<<<<<< HEAD
 cosine_prescribed_velocity/screenshots/
 cosine_prescribed_velocity/videos/
 cosine_prescribed_velocity/__pycache__/
+=======
+>>>>>>> origin/master
 idealised_desalination/TODO
 idealised_desalination/data/
 idealised_desalination/outputs/
@@ -39,6 +50,7 @@ solid_body_rotation/outputs/
 solid_body_rotation/screenshots/
 solid_body_rotation/videos/
 solid_body_rotation/__pycache__/
+<<<<<<< HEAD
 trench/mesh.geo
 trench/outputs/
 trench/screenshots/
@@ -56,6 +68,13 @@ turbine_array/plots/
 trench_1d/adapt_output/
 trench_1d/outputs/
 trench_1d/plots/
+=======
+trench_1d/adapt_output/
+trench_1d/outputs*
+trench_1d/plots/
+trench_1d/results/
+trench_slant/results/
+>>>>>>> origin/master
 turbine_array/channel*.geo
 turbine_array/data/
 turbine_array/nic.py
@@ -66,3 +85,4 @@ turbine_array/resources/
 turbine_array/screenshots/
 turbine_array/videos/
 turbine_array/__pycache__/
+trench_1d_der/outputs*

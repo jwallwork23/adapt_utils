@@ -1,4 +1,6 @@
-# TODO: doc
+"""
+Extension of the goal-oriented error indicators in `tracer/error_estimation.py` to the 3D case.
+"""
 from __future__ import absolute_import
 from thetis.utility import *
 from .error_estimation import TracerGOErrorEstimatorTerm, TracerGOErrorEstimator
@@ -28,16 +30,8 @@ class TracerHorizontalAdvectionGOErrorEstimatorTerm3D(TracerGOErrorEstimatorTerm
         uv = self.corr_factor*fields_old['uv_3d']
 
         # Apply SUPG stabilisation
-        tau = fields.get('supg_stabilisation')
-        if tau is not None:
-            h = self.cellsize
-            unorm = sqrt(dot(uv, uv))
-            tau = 0.5*h/unorm
-            diffusivity_h = fields_old['diffusivity_h']
-            if diffusivity_h is not None:
-                Pe = 0.5*h*unorm/diffusivity_h
-                tau *= min_value(1, Pe/3)
-            arg = arg + tau*dot(uv, grad(arg))
+        if self.options.use_supg_tracer:
+            arg = arg + self.supg_stabilisation*dot(uv, grad(arg))
 
         return -self.p0test*arg*inner(uv, grad(solution))*self.dx
 
@@ -56,19 +50,11 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm3D(TracerGOErrorEstimatorTerm
                                  [0, 0, diffusivity_h, ]])
 
         # Apply SUPG stabilisation
-        tau = fields.get('supg_stabilisation')
-        if tau is not None:
+        uv = fields_old.get('uv_3d')
+        if self.options.use_supg_tracer and uv is not None:
             self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
-            uv = self.corr_factor*fields_old['uv_3d']
-            if uv is not None:
-                h = self.cellsize
-                unorm = sqrt(dot(uv, uv))
-                tau = 0.5*h/unorm
-                diffusivity_h = fields_old['diffusivity_h']
-                if diffusivity_h is not None:
-                    Pe = 0.5*h*unorm/diffusivity_h
-                    tau *= min_value(1, Pe/3)
-                arg = arg + tau*dot(uv, grad(arg))
+            uv = self.corr_factor*uv
+            arg = arg + self.supg_stabilisation*dot(uv, grad(arg))
 
         return self.p0test*arg*div(dot(diff_tensor, grad(solution)))*self.dx
 
@@ -141,19 +127,11 @@ class TracerSourceGOErrorEstimatorTerm3D(TracerGOErrorEstimatorTerm3D):
             return f
 
         # Apply SUPG stabilisation
-        tau = fields.get('supg_stabilisation')
-        if tau is not None:
-            if fields_old.get('uv_3d') is not None:
-                self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
-                uv = self.corr_factor*fields_old['uv_3d']
-                h = self.cellsize
-                unorm = sqrt(dot(uv, uv))
-                tau = 0.5*h/unorm
-                diffusivity_h = fields_old['diffusivity_h']
-                if diffusivity_h is not None:
-                    Pe = 0.5*h*unorm/diffusivity_h
-                    tau *= min_value(1, Pe/3)
-                arg = arg + tau*dot(uv, grad(arg))
+        uv = fields_old.get('uv_3d')
+        if self.options.use_supg_tracer and uv is not None:
+            self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
+            uv = self.corr_factor*uv
+            arg = arg + self.supg_stabilisation*dot(uv, grad(arg))
 
         f += self.p0test*inner(source, arg)*self.dx
         return f
@@ -163,14 +141,7 @@ class TracerGOErrorEstimator3D(TracerGOErrorEstimator):
     """
     :class:`GOErrorEstimator` for the 3D tracer model.
     """
-    def __init__(self, function_space,
-                 depth=None,
-                 use_lax_friedrichs=True,
-                 sipg_parameter=Constant(10.0),
-                 anisotropic=False):
-        super(TracerGOErrorEstimator, self).__init__(function_space, anisotropic=anisotropic)
-
-        args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
+    def add_terms(self, *args):
         self.add_term(TracerHorizontalAdvectionGOErrorEstimatorTerm3D(*args), 'explicit')
         self.add_term(TracerHorizontalDiffusionGOErrorEstimatorTerm3D(*args), 'explicit')
         self.add_term(TracerSourceGOErrorEstimatorTerm3D(*args), 'source')

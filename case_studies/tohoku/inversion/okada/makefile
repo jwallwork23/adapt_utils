@@ -1,0 +1,22 @@
+all: parameter_redundancy run plot plot_progress
+
+parameter_redundancy:
+	python3 invert_source.py
+
+run:
+	python3 invert_wave_eqn.py 2 southern_pressure -uniform_slip 1 -uniform_rake 90
+	python3 invert_wave_eqn.py 2 mid_field_pressure -uniform_slip 1 -uniform_rake 90
+	python3 invert_wave_eqn.py 2 far_field_pressure -uniform_slip 1 -uniform_rake 90
+	python3 invert_wave_eqn.py 2 all -uniform_slip 1 -uniform_rake 90 -normalise 1
+
+plot:
+	python3 view_wave_eqn.py 2 -categories southern_pressure
+	python3 view_wave_eqn.py 2 -categories mid_field_pressure
+	python3 view_wave_eqn.py 2 -categories far_field_pressure
+	python3 view_wave_eqn.py 2 -categories all
+
+plot_progress:
+	python3 plot_progress.py 2 -categories southern_pressure
+	python3 plot_progress.py 2 -categories mid_field_pressure
+	python3 plot_progress.py 2 -categories far_field_pressure
+	python3 plot_progress.py 2 -categories all

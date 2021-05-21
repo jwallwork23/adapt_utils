@@ -77,7 +77,10 @@ kwargs = {
     'family': 'dg-dg',
     'stabilisation': None,
     'stabilisation_sediment': None,
+<<<<<<< HEAD
     'use_automatic_sipg_parameter': True,
+=======
+>>>>>>> origin/master
     'friction': 'manning'
 }
 

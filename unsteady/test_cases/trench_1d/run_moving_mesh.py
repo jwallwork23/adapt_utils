@@ -8,7 +8,6 @@ from thetis import *
 
 import argparse
 import datetime
-import numpy as np
 import os
 import pandas as pd
 import time
@@ -44,7 +43,11 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 di = os.path.dirname(__file__)
 outputdir = os.path.join(di, 'outputs' + st)
+<<<<<<< HEAD
 inputdir = os.path.join(di, 'hydrodynamics_trench_{:.4f}'.format(res))
+=======
+inputdir = os.path.join(di, 'hydrodynamics_trench_' + str(res))
+>>>>>>> origin/master
 kwargs = {
     'approach': 'monge_ampere',
     'nx': res,
@@ -53,17 +56,22 @@ kwargs = {
     'input_dir': inputdir,
     'output_dir': outputdir,
     'nonlinear_method': 'relaxation',
+<<<<<<< HEAD
     'r_adapt_rtol': tol,
+=======
+    'r_adapt_rtol': rtol,
+
+>>>>>>> origin/master
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': 'lax_friedrichs',
-    'use_automatic_sipg_parameter': True,
+    'stabilisation_sediment': 'lax_friedrichs',
 }
-
-
 op = TrenchSedimentOptions(**kwargs)
+op.dt_per_mesh_movement = freq
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
+<<<<<<< HEAD
 # swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
@@ -74,9 +82,21 @@ def gradient_interface_monitor(mesh, alpha=alpha, gamma=0.0):
 
     NOTE: Defined on the *computational* mesh.
 
+=======
+
+
+def frobenius_monitor(mesh):
+    """
+    Frobenius norm taken component-wise.
+>>>>>>> origin/master
     """
     P1 = FunctionSpace(mesh, "CG", 1)
+    b = project(swp.fwd_solutions_bathymetry[0], P1)
+    H = recovery.recover_hessian(b, op=op)
+    frob = sqrt(H[0, 0]**2 + H[0, 1]**2 + H[1, 0]**2 + H[1, 1]**2)
+    return 1 + alpha_const*frob/interpolate(frob, P1).vector().gather().max()
 
+<<<<<<< HEAD
     # eta = swp.solution.split()[1]
     b = swp.fwd_solutions_bathymetry[0]
     # bath_gradient = recovery.construct_gradient(b)
@@ -90,9 +110,21 @@ def gradient_interface_monitor(mesh, alpha=alpha, gamma=0.0):
     n = FacetNormal(mesh)
 
     mon_init = project(Constant(1.0) + alpha * norm_two_proj, P1)
+=======
+>>>>>>> origin/master
 
-    return mon_init
+def frobenius_monitor(mesh, x=None):  # NOQA: Version above not smooth enough
+    """
+    Frobenius norm taken element-wise.
+    """
+    P1 = FunctionSpace(mesh, "CG", 1)
+    b = swp.fwd_solutions_bathymetry[0]
+    P0 = FunctionSpace(b.function_space().mesh(), "DG", 0)
+    H = recovery.recover_hessian(b, op=op)
+    frob = interpolate(local_frobenius_norm(H), P0)
+    return 1 + alpha_const*project(frob, P1)/frob.vector().gather().max()
 
+<<<<<<< HEAD
 swp.set_monitor_functions(gradient_interface_monitor)
 
 def frobenius_monitor(mesh):
@@ -122,6 +154,13 @@ def frobenius_monitor(mesh):  # NOQA: Version above not smooth enough
 
 # Solve forward problem
 
+=======
+
+# --- Simulation and analysis
+
+# Solve forward problem
+swp.set_monitor_functions(frobenius_monitor)
+>>>>>>> origin/master
 t1 = time.time()
 swp.solve_forward()
 t2 = time.time()
@@ -145,7 +184,6 @@ for i in range(len(data[0].dropna())):
     datathetis.append(data[0].dropna()[i])
     bathymetrythetis1.append(-bath.at([np.round(data[0].dropna()[i], 3), 0.55]))
     diff_thetis.append((data[1].dropna()[i] - bathymetrythetis1[-1])**2)
-
 df_exp = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
 df_exp.to_csv('adapt_output/bed_trench_output_s_{:.4f}_{:.1f}_{:.1e}_{:d}.csv'.format(res, alpha, rtol, freq))
 

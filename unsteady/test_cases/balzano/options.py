@@ -18,7 +18,12 @@ class BalzanoOptions(CoupledOptions):
     [1] A. Balzano, "Evaluation of methods for numerical simulation of wetting and drying in
         shallow water flow models." Coastal Engineering 34.1-2 (1998): 83-107.
     """
+<<<<<<< HEAD
     def __init__(self, fric_coeff, n=1, bathymetry_type=1, plot_timeseries=False, **kwargs):
+=======
+    def __init__(self, n=1, bathymetry_type=1, plot_timeseries=False, **kwargs):
+        self.timestepper = 'CrankNicolson'
+>>>>>>> origin/master
         super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.basin_x = 13800.0  # Length of wet region
@@ -35,7 +40,11 @@ class BalzanoOptions(CoupledOptions):
         self.di = os.path.join(self.di, 'bathymetry{:d}'.format(self.bathymetry_type))
 
         # Physical
+<<<<<<< HEAD
         self.base_viscosity = 1e-6
+=======
+        self.base_viscosity = Constant(1e-6)
+>>>>>>> origin/master
         self.wetting_and_drying = True
         self.wetting_and_drying_alpha = Constant(0.43)
         friction = kwargs.get('friction', 'manning')
@@ -44,8 +53,13 @@ class BalzanoOptions(CoupledOptions):
         except AssertionError:
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
+<<<<<<< HEAD
         self.average_size = 200e-6  # Average sediment size
         self.friction_coeff = fric_coeff
+=======
+        self.average_size = Constant(200e-6)  # Average sediment size
+        self.friction_coeff = Constant(0.025)
+>>>>>>> origin/master
         self.ksp = None
         # Stabilisation
         self.stabilisation = None
@@ -61,7 +75,6 @@ class BalzanoOptions(CoupledOptions):
         self.end_time = self.num_hours*3600.0
         # self.dt_per_export = 6
         self.dt_per_export = 1
-        self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 0.5
 
         # Timeseries

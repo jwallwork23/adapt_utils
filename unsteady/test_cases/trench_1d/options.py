@@ -12,6 +12,10 @@ from adapt_utils.io import initialise_hydrodynamics
 from adapt_utils.options import CoupledOptions
 from adapt_utils.sediment.sediments_model import SedimentModel
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/master
 __all__ = ["TrenchSedimentOptions"]
 
 
@@ -33,18 +37,17 @@ class TrenchSedimentOptions(CoupledOptions):
             self.di = output_dir
 
         # Physical
-        self.base_viscosity = 1e-6
+        self.base_viscosity = Constant(1e-6)
         self.wetting_and_drying = False
         self.solve_sediment = True
         self.solve_exner = True
-
         try:
             assert friction in ('nikuradse', 'manning', 'nik_solver')
         except AssertionError:
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
-        self.average_size = 160e-6  # Average sediment size
-        self.friction_coeff = 0.025
+        self.average_size = Constant(160e-6)  # Average sediment size
+        self.friction_coeff = Constant(0.025)
         self.ksp = Constant(3*self.average_size)
         self.norm_smoother = Constant(0.1)
 
@@ -68,7 +71,11 @@ class TrenchSedimentOptions(CoupledOptions):
         self.family = 'dg-dg'
 
     def set_up_morph_model(self, input_dir, mesh=None):
+<<<<<<< HEAD
         self.base_diffusivity = 0.18011042551606954
+=======
+        self.base_diffusivity = Constant(0.18011042551606954)
+>>>>>>> origin/master
         self.porosity = Constant(0.4)
         self.ks = Constant(0.025)
         self.wetting_and_drying = False
@@ -122,11 +129,6 @@ class TrenchSedimentOptions(CoupledOptions):
                         le(x, 11), -(1/1.5)*depth_diff*(x-11) + depth_riv, depth_riv))))
         return interpolate(-trench, fs)
 
-    def set_viscosity(self, fs):
-        self.viscosity = Function(fs)
-        self.viscosity.assign(self.base_viscosity)
-        return self.viscosity
-
     def set_boundary_conditions(self, prob, i):
         inflow_tag = 1
         outflow_tag = 2
@@ -146,18 +148,6 @@ class TrenchSedimentOptions(CoupledOptions):
         u.project(self.uv_init)
         eta.project(self.elev_init)
 
-    def set_sediment_source(self, fs):
-        if self.suspended:
-            return self.sediment_model.ero_term
-        else:
-            return None
-
-    def set_sediment_sink(self, fs):
-        if self.suspended:
-            return self.sediment_model.depo_term
-        else:
-            return None
-
     def set_advective_velocity_factor(self, fs):
         if self.convective_vel_flag:
             return self.sediment_model.corr_factor_model.corr_vel_factor
@@ -168,7 +158,9 @@ class TrenchSedimentOptions(CoupledOptions):
         prob.fwd_solutions_sediment[0].interpolate(Constant(0.0)) #self.sediment_model.equiltracer)
 
     def set_initial_condition_bathymetry(self, prob):
-        prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))
+        prob.fwd_solutions_bathymetry[0].interpolate(
+            self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space())
+        )
 
     def get_update_forcings(self, prob, i, adjoint):
         return None

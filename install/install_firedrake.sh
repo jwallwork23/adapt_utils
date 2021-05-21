@@ -17,12 +17,12 @@
 unset PYTHONPATH
 
 # Environment variables for MPI
-export MPICC=/usr/bin/mpicc
-export MPICXX=/usr/bin/mpicxx
-export MPIEXEC=/usr/bin/mpiexec
-export MPIF90=/usr/bin/mpif90
-for mpi in mpicc mpicxx mpiexec mpif90; do
-	if [ ! -f /usr/bin/$mpi ]; then
+export MPICC=/usr/bin/mpicc.mpich
+export MPICXX=/usr/bin/mpicxx.mpich
+export MPIEXEC=/usr/bin/mpiexec.mpich
+export MPIF90=/usr/bin/mpif90.mpich
+for mpi in $MPICC $MPICXX $MPIEXEC $MPIF90; do
+	if [ ! -f $mpi ]; then
 		echo "Cannot find $mpi in /usr/bin."
 		exit 1
 	fi
@@ -39,8 +39,8 @@ echo "MPIF90="$MPIF90
 echo "MPIEXEC="$MPIEXEC
 echo "PETSC_DIR="$PETSC_DIR
 if [ ! -e "$PETSC_DIR" ]; then
-    echo "$PETSC_DIR does not exist. Please run install_petsc.sh."
-    exit 1
+	echo "$PETSC_DIR does not exist. Please run install_petsc.sh."
+	exit 1
 fi
 echo "PETSC_ARCH="$PETSC_ARCH
 echo "FIREDRAKE_ENV="$FIREDRAKE_ENV
@@ -55,7 +55,6 @@ python3 firedrake-install --honour-petsc-dir --install thetis --venv-name $FIRED
 	--mpicc $MPICC --mpicxx $MPICXX --mpif90 $MPIF90 --mpiexec $MPIEXEC \
 	--package-branch petsc4py joe/dm-adapt-cell-tags \
 	--package-branch firedrake joe/meshadapt_patched
-        # --package-branch firedrake joe/meshadapt
 source $FIREDRAKE_DIR/bin/activate
 
 # Very basic test of installation
@@ -63,5 +62,4 @@ cd $FIREDRAKE_DIR/src/firedrake
 python3 tests/test_adapt_2d.py
 
 # Install pip dependencies for adapt_utils
-python3 -m pip install matplotlib netCDF4 numpy pandas pyvista scipy utide utm
-# python3 -m pip install jupyter qmesh
+./install_pip_dependencies

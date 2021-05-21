@@ -1,10 +1,17 @@
 from thetis import *
 from thetis.configuration import *
 
+<<<<<<< HEAD
 from adapt_utils.unsteady.options import CoupledOptions
 from adapt_utils.unsteady.swe.utils import heaviside_approx
 from thetis.options import ModelOptions2d
 from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
+=======
+from adapt_utils.options import CoupledOptions
+from adapt_utils.swe.utils import heaviside_approx
+from thetis.options import ModelOptions2d
+from adapt_utils.sediment.sediments_model import SedimentModel
+>>>>>>> origin/master
 
 import os
 import time
@@ -55,7 +62,10 @@ class BeachOptions(CoupledOptions):
         self.uv_init = as_vector((1e-10, 0.0))
 
         self.plot_pvd = True
+<<<<<<< HEAD
         self.hessian_recovery = 'dL2'
+=======
+>>>>>>> origin/master
 
         self.grad_depth_viscosity = True
 
@@ -93,17 +103,28 @@ class BeachOptions(CoupledOptions):
     def set_up_morph_model(self, mesh = None):
 
         # Physical
+<<<<<<< HEAD
         self.base_diffusivity = 1
         self.gravity = Constant(9.81)
         self.porosity = Constant(0.4)
         self.ks = Constant(0.00054)
         self.average_size = 1.8e-4  # Average sediment size
+=======
+        self.base_diffusivity = Constant(1)
+        self.gravity = Constant(9.81)
+        self.porosity = Constant(0.4)
+        self.ks = Constant(0.00054)
+        self.average_size = Constant(1.8e-4)  # Average sediment size
+>>>>>>> origin/master
         self.max_angle = 20
         self.meshgrid_size = 0.2
 
         self.wetting_and_drying = True
         self.sediment_slide = True
+<<<<<<< HEAD
         self.depth_integrated = True
+=======
+>>>>>>> origin/master
         self.use_tracer_conservative_form = True
         self.slope_eff = False
         self.angle_correction = False
@@ -181,6 +202,7 @@ class BeachOptions(CoupledOptions):
         u.project(self.uv_init)
         eta.project(self.elev_init)
 
+<<<<<<< HEAD
     def set_sediment_source(self, fs):
         if self.suspended and not self.depth_integrated:
             return self.sediment_model.ero_term
@@ -205,6 +227,8 @@ class BeachOptions(CoupledOptions):
         else:
             return None
 
+=======
+>>>>>>> origin/master
     def set_advective_velocity_factor(self, fs):
         if self.convective_vel_flag:
             return self.sediment_model.corr_factor_model.corr_vel_factor

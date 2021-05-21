@@ -35,7 +35,6 @@ kwargs = {
     # Spatial discretisation
     'family': 'dg-cg',
     'stabilisation': stabilisation,
-    'use_automatic_sipg_parameter': True,
 
     # Misc
     'plot_pvd': True,

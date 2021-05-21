@@ -1,8 +1,7 @@
 from thetis import *
 
-import os
-import numpy as np
 import argparse
+import os
 
 from adapt_utils.unsteady.test_cases.solid_body_rotation.options import LeVequeOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
@@ -37,8 +36,7 @@ kwargs = {
     # Spatial discretisation
     'level': i,
     'tracer_family': args.family or 'dg',
-    'stabilisation': args.stabilisation,
-    'use_automatic_sipg_parameter': False,  # We have an inviscid problem
+    'stabilisation_tracer': args.stabilisation,
     'use_limiter_for_tracers': bool(args.limiters or True),
     'use_tracer_conservative_form': bool(args.conservative or False),
 

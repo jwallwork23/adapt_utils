@@ -1,7 +1,22 @@
 from ufl import *
+import numpy as np
 
 
-__all__ = ["bessi0", "bessk0"]
+__all__ = ["monomials", "bessi0", "bessk0"]
+
+
+def monomials(x, order=1):
+    """
+    Return Vandermonde matrix. In 2D, with order p, :math:`V = [1, x, y]`.
+    """
+    assert len(x) in (2, 3)
+    if order == 1:
+        return np.array([1.0, *x])
+    elif order == 2:
+        if len(x) == 2:
+            return np.array([1.0, x[0], x[1], x[0]*x[0], x[0]*x[1], x[1]*x[1]])
+    else:
+        raise NotImplementedError
 
 
 def bessi0(x):

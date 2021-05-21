@@ -94,9 +94,9 @@ class MeshMover(object):
             self.σ_new = Function(self.V_ten)
         else:
             self.φσ = Function(self.W)
-            self.φ_new, self.σ_new = split(self.φσ)
+            self.φ_new, self.σ_new = self.φσ.split()
             self.φσ_temp = Function(self.W)
-            self.φ_old, self.σ_old = split(self.φσ_temp)
+            self.φ_old, self.σ_old = self.φσ_temp.split()
 
         # Normalisation parameter and monitor function
         self.θ = Constant(0.0)
@@ -226,7 +226,7 @@ class MeshMover(object):
                 self.mesh.coordinates.assign(self.ξ)
 
                 # Evaluate normalisation coefficient
-                self.θ.assign(assemble(self.θ_form)/self.total_volume)
+                self.θ.assign(assemble(self.θ_form)*(self.total_volume**(-1)))
 
             self.generate_m = generate_m
 
@@ -255,7 +255,7 @@ class MeshMover(object):
 
                 self.mesh.coordinates.assign(self.x)
                 assemble(self.L_p0, tensor=self.volume)  # For equidistribution measure
-                self.volume.assign(self.volume/self.original_volume)
+                self.volume.assign(self.volume*(self.original_volume**(-1)))
                 if self.op.debug and self.op.debug_mode == 'full':
                     self.monitor_file.write(self.monitor)
                     self.volume_file.write(self.volume)
@@ -299,7 +299,6 @@ class MeshMover(object):
             elif np.allclose(n[1], 0.0):
                 bcs.append(DirichletBC(self.P1_vec.sub(0), 0.0, i))
             else:
-                 import ipdb; ipdb.set_trace()
                  if self.bc is None:
                     # Enforce no mesh movement normal to boundaries
                     n = FacetNormal(self.mesh)
@@ -354,14 +353,14 @@ class MeshMover(object):
             self.mesh.coordinates.assign(self.x)
             self.update_monitor_function()
             assemble(self.L_p0, tensor=self.volume)  # For equidistribution measure
-            self.volume.assign(self.volume/self.original_volume)
+            self.volume.assign(self.volume*(self.original_volume**(-1)))
             if self.op.debug and self.op.debug_mode == 'full':
                 self.monitor_file.write(self.monitor)
                 self.volume_file.write(self.volume)
             self.mesh.coordinates.assign(self.ξ)
 
             # Evaluate normalisation coefficient
-            self.θ.assign(assemble(self.θ_form)/self.total_volume)
+            self.θ.assign(assemble(self.θ_form)*(self.total_volume**(-1)))
 
             # Convergence criteria
             minmax, residual_l2_norm, equi = self.get_diagnostics()

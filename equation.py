@@ -12,12 +12,17 @@ class Equation(thetis_eq.Equation):
     cell size measure.
     """
     def __init__(self, *args, anisotropic=False, **kwargs):
-        super(Equation, self).__init__(*args, **kwargs)
         self.anisotropic = anisotropic
+        super(Equation, self).__init__(*args, **kwargs)
         if anisotropic:
             self.cellsize = anisotropic_cell_size(self.mesh)
 
     def add_term(self, term, label):
+        """
+        Add :class:`term` to the equation as a :str:`label` type term.
+
+        Also, pass over the chosen cell size measure and any stabilisation parameters.
+        """
         super(Equation, self).add_term(term, label)
         key = term.__class__.__name__
         if self.anisotropic:

@@ -80,7 +80,11 @@ assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
+<<<<<<< HEAD
 def gradient_interface_monitor(mesh, mod = mod, beta_mod = beta_mod, alpha=alpha, beta=beta, gamma=gamma):
+=======
+def gradient_interface_monitor(mesh, mod = mod, beta_mod = beta_mod, alpha=alpha, beta=beta, gamma=gamma, x = None):
+>>>>>>> origin/master
 
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
@@ -93,8 +97,13 @@ def gradient_interface_monitor(mesh, mod = mod, beta_mod = beta_mod, alpha=alpha
     eta = swp.fwd_solutions[0].split()[1]
     b = swp.fwd_solutions_bathymetry[0]
 
+<<<<<<< HEAD
     bath_gradient = recovery.construct_gradient(b)
     bath_hess = recovery.construct_hessian(b, op=op)
+=======
+    bath_gradient = recovery.recover_gradient(b)
+    bath_hess = recovery.recover_hessian(b, op=op)
+>>>>>>> origin/master
 
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
 

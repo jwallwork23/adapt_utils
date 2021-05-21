@@ -3,7 +3,6 @@ import firedrake as fire
 
 import datetime
 import pandas as pd
-import numpy as np
 import sys
 import time
 
@@ -28,7 +27,7 @@ kwargs = {
     'ny': ny,
     'family': 'dg-dg',
     'stabilisation': None,
-    'use_automatic_sipg_parameter': True,
+    'stabilisation_sediment': None,
     'friction': 'manning',
 
     # I/O

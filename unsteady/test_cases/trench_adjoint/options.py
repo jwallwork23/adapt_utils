@@ -27,7 +27,7 @@ class TrenchSedimentOptions(CoupledOptions):
         self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
         self.plot_pvd = True
-        self.num_hours = 2.5 #15
+        self.num_hours = 15
 
         if output_dir is not None:
             self.di = output_dir
@@ -45,7 +45,7 @@ class TrenchSedimentOptions(CoupledOptions):
         self.friction = friction
         self.average_size = Constant(160e-6)  # Average sediment size
         self.friction_coeff = fric_coeff #0.025
-        self.ksp = fric_coeff #Constant(3*self.average_size)
+        self.ksp = Constant(3*self.average_size)
         self.norm_smoother = Constant(0.1)
 
         # Stabilisation
@@ -83,7 +83,7 @@ class TrenchSedimentOptions(CoupledOptions):
         self.slope_eff = True
         self.angle_correction = True
         self.suspended = True
-        self.convective_vel_flag = False #True
+        self.convective_vel_flag = True
         self.bedload = True
 
 
@@ -145,7 +145,7 @@ class TrenchSedimentOptions(CoupledOptions):
                 outflow_tag: {'elev': Constant(0.397)},
             },
 	   'sediment': {
-                #inflow_tag: {'value': self.sediment_model.equiltracer}
+                inflow_tag: {'value': self.sediment_model.equiltracer}
             }
         }
         return boundary_conditions

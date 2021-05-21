@@ -2,12 +2,12 @@ from thetis import *
 
 import argparse
 import matplotlib.pyplot as plt
-import numpy as np
 import os
 from time import perf_counter
 
 from adapt_utils.plotting import *
 from adapt_utils.swe.turbine.solver import AdaptiveTurbineProblem
+from adapt_utils.swe.utils import speed
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
 
 
@@ -50,11 +50,11 @@ if plot_pdf:
     extensions.append('pdf')
 if plot_png:
     extensions.append('png')
-base_viscosity = float(args.base_viscosity or 1.0)
+base_viscosity = Constant(args.base_viscosity or 1.0)
 kwargs = {
     'approach': approach,
     'level': level,
-    'target_viscosity': float(args.target_viscosity or base_viscosity),
+    'target_viscosity': Constant(args.target_viscosity or base_viscosity),
     'plot_pvd': plot_pvd,
 }
 op = TurbineArrayOptions(base_viscosity, **kwargs)
@@ -168,14 +168,15 @@ if plot_power_only:
 # --- Plot the spun-up hydrodynamics
 
 # Get fluid speed and elevation in P1 space
-u, eta = swp.fwd_solutions[0].split()
-speed = interpolate(sqrt(dot(u, u)), swp.P1[0])
+q = swp.fwd_solutions[0]
+u, eta = q.split()
+speed_proj = interpolate(speed(q), swp.P1[0])
 eta_proj = project(eta, swp.P1[0])
 
 # Plot fluid speed
 fig, axes = plt.subplots(figsize=(10, 5))
 levels = np.linspace(0.0, 1.25, 201)
-im = tricontourf(speed, axes=axes, levels=levels, cmap='coolwarm')
+im = tricontourf(speed_proj, axes=axes, levels=levels, cmap='coolwarm')
 cbar = fig.colorbar(im, ax=axes, orientation="horizontal", pad=0.04, aspect=40)
 cbar.set_label(r"Fluid speed [$\mathrm{m\,s}^{-1}$]", fontsize=24)
 cbar.set_ticks([0, 0.25, 0.5, 0.75, 1.0, 1.25])

@@ -44,7 +44,6 @@ kwargs = {
     # Spatial discretisation
     'family': 'dg-cg',
     'stabilisation': stabilisation,
-    'use_automatic_sipg_parameter': True,
 
     # Misc
     'plot_pvd': True,
@@ -56,14 +55,16 @@ if os.getenv('REGRESSION_TEST') is not None:
 op = BalzanoOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
-# swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
-swp.shallow_water_options[0]['mesh_velocity'] = None
 
 alpha = Constant(0.0)  # size of the dense region surrounding the coast
 beta = 10.0  # level of refinement at coast
 
 
+<<<<<<< HEAD
 def wet_dry_interface_monitor(mesh, alpha=alpha, x = None):
+=======
+def wet_dry_interface_monitor(mesh, **kwargs):
+>>>>>>> origin/master
     """
     Monitor function focused around the wet-dry interface.
 

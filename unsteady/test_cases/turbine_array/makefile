@@ -1,4 +1,8 @@
-all: clean mesh plot
+all: dir clean mesh plot
+
+dir:
+	@echo "Creating directories..."
+	@mkdir -p resources
 
 mesh:
 	@echo "Generating Delauney meshes of turbine array domain..."

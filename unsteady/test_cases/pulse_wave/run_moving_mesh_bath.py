@@ -2,7 +2,6 @@ import firedrake as fire
 from thetis import *
 
 import datetime
-import numpy as np
 import pandas as pd
 import os
 import time
@@ -41,15 +40,13 @@ kwargs = {
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
-    'use_automatic_sipg_parameter': True,
+    'stabilisation_sediment': None,
     'friction': 'manning'
 }
 
 op = BeachOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
-# swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
-swp.shallow_water_options[0]['mesh_velocity'] = None
 
 
 def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kappa):

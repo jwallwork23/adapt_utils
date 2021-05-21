@@ -16,12 +16,12 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-res = 0.1
-alpha = Constant(2)
-beta = 0.5
-gamma = 1
+res = 0.5
+alpha = Constant(1)
+beta = Constant(0.5)
+gamma = Constant(1)
 
-diff_coeff = Constant(0.15)
+diff_coeff = Constant(0.18011042551606954)
 fric_coeff = Constant(0.025)
 
 tol = 1e-3
@@ -62,8 +62,7 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, x = No
     """
     P1 = FunctionSpace(mesh, "CG", 1)
 
-    #b = swp.fwd_solutions_bathymetry[0]
-    b = swp.bathymetry[0]
+    b = swp.fwd_solutions_bathymetry[0]
     bath_gradient = recovery.construct_gradient(b)
     bath_hess = recovery.construct_hessian(b, op=op)
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
@@ -84,12 +83,12 @@ swp.set_monitor_functions(gradient_interface_monitor)
 t1 = time.time()
 swp.solve_forward()
 t2 = time.time()
-import ipdb; ipdb.set_trace()
-J = assemble(swp.fwd_solutions_bathymetry[0]*dx)
-rf = ReducedFunctional(J, Control(fric_coeff))
 
-print(J)
-print(rf(fric_coeff))
+#J = assemble(swp.fwd_solutions_bathymetry[0]*dx)
+#rf = ReducedFunctional(J, Control(fric_coeff))
+
+#print(J)
+#print(rf(fric_coeff))
 
 new_mesh = RectangleMesh(16*5*5, 5*1, 16, 1.1)
 

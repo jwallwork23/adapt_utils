@@ -15,7 +15,11 @@ code = "//" + 80*"*" + """
 // with refinement level {:d}.
 """.format(level) + "//" + 80*"*" + "\n\n"
 
+<<<<<<< HEAD:unsteady/test_cases/idealised_desalination/meshgen.py
 # Domain and turbine specification
+=======
+# Domain specification
+>>>>>>> origin/master:unsteady/test_cases/desalination/meshgen.py
 op = IdealisedDesalinationOutfallOptions()
 code += "// Domain specification\n"
 code += "L = {:.0f};\n".format(op.domain_length)

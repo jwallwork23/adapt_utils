@@ -2,7 +2,6 @@ from thetis import *
 from thetis.configuration import *
 
 from math import e
-import numpy as np
 import os
 
 from adapt_utils.swe.turbine.options import TurbineOptions
@@ -30,6 +29,8 @@ class SpaceshipOptions(TurbineOptions):
     resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
 
     def __init__(self, spun=False, **kwargs):
+        self.timestepper = 'CrankNicolson'
+        # self.timestepper = 'PressureProjectionPicard'
         super(SpaceshipOptions, self).__init__(**kwargs)
         self.array_ids = np.array([3, 2])
         self.farm_ids = tuple(self.array_ids)
@@ -41,7 +42,7 @@ class SpaceshipOptions(TurbineOptions):
             raise IOError("Need to make mesh before initialising SpaceshipOptions object.")
 
         # Physics
-        self.base_viscosity = 5.0
+        self.base_viscosity = Constant(5.0)
         self.viscosity_sponge_type = 'linear'
         # self.viscosity_sponge_type = 'exponential'
         self.max_viscosity = 1000.0
@@ -55,7 +56,6 @@ class SpaceshipOptions(TurbineOptions):
         self.spun = spun
 
         # Timestepping
-        self.timestepper = 'PressureProjectionPicard'
         self.implicitness_theta = 1.0
         self.use_semi_implicit_linearisation = True
         self.dt = 10.0
@@ -69,10 +69,9 @@ class SpaceshipOptions(TurbineOptions):
         D = self.turbine_diameter
         self.region_of_interest = [(6050, 0, D, D), (6450, 0, D, D)]
 
-        # Solver parameters and discretisation
+        # Discretisation
         self.stabilisation = None
         # self.stabilisation = 'lax_friedrichs'
-        self.use_automatic_sipg_parameter = True
         self.grad_div_viscosity = False
         self.grad_depth_viscosity = True
         self.family = 'dg-cg'
@@ -100,7 +99,7 @@ class SpaceshipOptions(TurbineOptions):
         r = sqrt(x**2 + y**2)/R
         base_viscosity = self.base_viscosity
         if self.viscosity_sponge_type is None:
-            return Constant(base_viscosity)
+            return base_viscosity
         if self.viscosity_sponge_type == 'linear':
             sponge = base_viscosity + r*(self.max_viscosity - base_viscosity)
         elif self.viscosity_sponge_type == 'exponential':

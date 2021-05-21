@@ -57,6 +57,7 @@ def zoom_effect01(ax1, ax2, xmin, xmax, **kwargs):
 
     bbox = Bbox.from_extents(xmin, 0, xmax, 1)
 
+<<<<<<< HEAD
     mybbox1 = TransformedBbox(bbox, trans1)
     mybbox2 = TransformedBbox(bbox, trans2)
 
@@ -77,6 +78,9 @@ def zoom_effect01(ax1, ax2, xmin, xmax, **kwargs):
 
 
 def zoom_effect02(ax1, ax2, **kwargs):
+=======
+def savefig(fname, fpath=None, extensions=['pdf', 'png'], tight=True, **kwargs):
+>>>>>>> origin/master
     """
     Save current matplotlib.pyplot figure to file.
 
@@ -85,6 +89,7 @@ def zoom_effect02(ax1, ax2, **kwargs):
 
     Copied from https://matplotlib.org/3.1.3/gallery/subplots_axes_and_figures/axes_zoom_effect.html
     """
+<<<<<<< HEAD
     tt = ax1.transScale + (ax1.transLimits + ax2.transAxes)
     trans = blended_transform_factory(ax2.transData, tt)
 
@@ -105,3 +110,13 @@ def zoom_effect02(ax1, ax2, **kwargs):
     ax2.add_patch(p)
 
     return c1, c2, bbox_patch1, bbox_patch2, p
+=======
+    if tight:
+        plt.tight_layout()
+    if fpath is not None:
+        fname = os.path.join(fpath, fname)
+    for extension in extensions:
+        plt.savefig('.'.join([fname, extension]), **kwargs)
+    if len(extensions) == 0:
+        plt.show()
+>>>>>>> origin/master

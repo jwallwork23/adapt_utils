@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 
-from firedrake_adjoint import *
 from thetis import *
 from thetis.limiter import VertexBasedP1DGLimiter
 
@@ -8,22 +7,19 @@ import numpy as np
 import os
 from time import perf_counter
 
-from ..adapt.adaptation import pragmatic_adapt
 from ..adapt.metric import *
 from .base import AdaptiveProblemBase
 from .callback import *
-from .swe.utils import *
+from ..io import *
+from ..mesh import anisotropic_cell_size
+from ..options import ReynoldsNumberArray
+from ..swe.utils import *
 
 
 __all__ = ["AdaptiveProblem"]
 
 
-# TODO:
-#  * Mesh movement ALE formulation
-#  * CG tracers (plus SU and SUPG stabilisation)
-#  * Multiple tracers
-#  * Checkpointing to disk
-#  * Allow mesh dependent Lax-Friedrichs parameter(s)
+# TODO: Mesh movement ALE formulation
 
 class AdaptiveProblem(AdaptiveProblemBase):
     """
@@ -50,59 +46,130 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'polynomial_degree': op.degree,
             'use_grad_div_viscosity_term': op.grad_div_viscosity,
             'use_grad_depth_viscosity_term': op.grad_depth_viscosity,
-            'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
             'use_lax_friedrichs_velocity': op.stabilisation == 'lax_friedrichs',
             'use_wetting_and_drying': op.wetting_and_drying,
             'wetting_and_drying_alpha': op.wetting_and_drying_alpha,
-            # 'check_volume_conservation_2d': True,  # TODO
             'norm_smoother': op.norm_smoother,
-            'sipg_parameter': None,
-            'mesh_velocity': None,
-            'tidal_turbine_farms': {},  # NOTE: This is only modified in AdaptiveTurbineProblem
+            'sipg_factor': Constant(1.0),
+            'lax_friedrichs_velocity_scaling_factor': op.lax_friedrichs_velocity_scaling_factor,
         }
         for i, swo in enumerate(self.shallow_water_options):
             swo.update(static_options)
-            if hasattr(op, 'sipg_parameter') and op.sipg_parameter is not None:
-                swo['sipg_parameter'] = op.sipg_parameter
+            swo.tidal_turbine_farms = {}
+            if hasattr(op, 'sipg_factor') and op.sipg_factor is not None:
+                swo['sipg_factor'] = op.sipg_factor
         if not nonlinear:
             for model in op.solver_parameters:
                 op.solver_parameters[model]['snes_type'] = 'ksponly'
                 op.adjoint_solver_parameters[model]['snes_type'] = 'ksponly'
+        if op.debug:
+            for model in op.solver_parameters:
+                op.solver_parameters[model]['ksp_converged_reason'] = None
+                op.solver_parameters[model]['snes_converged_reason'] = None
+                op.adjoint_solver_parameters[model]['ksp_converged_reason'] = None
+                op.adjoint_solver_parameters[model]['snes_converged_reason'] = None
+                if op.debug_mode == 'full':
+                    op.solver_parameters[model]['ksp_monitor'] = None
+                    op.solver_parameters[model]['snes_monitor'] = None
+                    op.adjoint_solver_parameters[model]['ksp_monitor'] = None
+                    op.adjoint_solver_parameters[model]['snes_monitor'] = None
         self.tracer_options = [AttrDict() for i in range(op.num_meshes)]
+        self.stabilisation_tracer = op.stabilisation_tracer
         self.sediment_options = [AttrDict() for i in range(op.num_meshes)]
+        self.stabilisation_sediment = op.stabilisation_sediment
         self.exner_options = [AttrDict() for i in range(op.num_meshes)]
         static_options = {
-            'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
-            # 'check_tracer_conservation': True,  # TODO
-            'use_lax_friedrichs_tracer': op.stabilisation == 'lax_friedrichs',
+            'use_lax_friedrichs_tracer': op.stabilisation_tracer == 'lax_friedrichs',
             'use_limiter_for_tracers': op.use_limiter_for_tracers and op.tracer_family == 'dg',
-            'sipg_parameter': None,
+            'use_supg_tracer': op.stabilisation_tracer == 'supg',
+            'sipg_factor_tracer': Constant(1.0),
             'use_tracer_conservative_form': op.use_tracer_conservative_form,
+            'horizontal_velocity_scale': op.characteristic_speed,
+            'horizontal_diffusivity_scale': op.characteristic_diffusion,
+            'lax_friedrichs_tracer_scaling_factor': op.lax_friedrichs_tracer_scaling_factor,
         }
-        if op.use_tracer_conservative_form and op.approach == 'lagrangian':
+        if not op.anisotropic_stabilisation:
+            raise NotImplementedError("Isotropic stabilisation not implemented in Thetis")
+        if op.use_tracer_conservative_form and op.approach in ('lagrangian', 'hybrid'):
             raise NotImplementedError  # TODO
         self.tracer_limiters = [None for i in range(op.num_meshes)]
         for i, to in enumerate(self.tracer_options):
             to.update(static_options)
-            if hasattr(op, 'sipg_parameter_tracer') and op.sipg_parameter_tracer is not None:
-                swo['sipg_parameter_tracer'] = op.sipg_parameter_tracer
-        for i, to in enumerate(self.sediment_options):
-            to.update(static_options)
-            if hasattr(op, 'sipg_parameter_sediment') and op.sipg_parameter_sediment is not None:
-                swo['sipg_parameter_sediment'] = op.sipg_parameter_sediment
+            if hasattr(op, 'sipg_factor_tracer') and op.sipg_factor_tracer is not None:
+                to['sipg_factor_tracer'] = op.sipg_factor_tracer
+            to['use_tracer_conservative_form'] = op.use_tracer_conservative_form
+        for i, so in enumerate(self.sediment_options):
+            so.update(static_options)
+            if hasattr(op, 'sipg_factor_sediment') and op.sipg_factor_sediment is not None:
+                so['sipg_factor_sediment'] = op.sipg_factor_sediment
+            so['use_sediment_conservative_form'] = op.use_tracer_conservative_form
+
+        # Lists to be populated
+        self.fwd_solutions = [None for i in range(op.num_meshes)]
+        self.adj_solutions = [None for i in range(op.num_meshes)]
+        self.fwd_solutions_tracer = [None for i in range(op.num_meshes)]
+        self.fwd_solutions_sediment = [None for i in range(op.num_meshes)]
+        self.fwd_solutions_bathymetry = [None for i in range(op.num_meshes)]
+        self.adj_solutions_tracer = [None for i in range(op.num_meshes)]
+        self.fields = [AttrDict() for i in range(op.num_meshes)]
+        self.depth = [None for i in range(op.num_meshes)]
+        self.bathymetry = [None for i in range(op.num_meshes)]
+        self.inflow = [None for i in range(op.num_meshes)]
+        self.minimum_angles = [None for i in range(op.num_meshes)]
+        self.kernels_tracer = [None for i in range(op.num_meshes)]
+
         super(AdaptiveProblem, self).__init__(op, nonlinear=nonlinear, **kwargs)
 
-    def create_outfiles(self):
+        # Custom arrays
+        self.reynolds_number = ReynoldsNumberArray(self.meshes, op)
+
+    @property
+    def mesh(self):
+        return self.meshes[0]
+
+    @property
+    def fwd_solution(self):
+        return self.fwd_solutions[0]
+
+    @property
+    def adj_solution(self):
+        return self.adj_solutions[0]
+
+    @property
+    def fwd_solution_tracer(self):
+        return self.fwd_solutions_tracer[0]
+
+    @property
+    def adj_solution_tracer(self):
+        return self.adj_solutions_tracer[0]
+
+    def create_outfiles(self, restarted=False):
+        if not self.op.plot_pvd:
+            return
         if self.op.solve_swe:
-            self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
-            self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
+            super(AdaptiveProblem, self).create_outfiles(restarted=restarted)
         if self.op.solve_tracer:
-            self.tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
-            self.adjoint_tracer_file = File(os.path.join(self.di, 'adjoint_tracer.pvd'))
+            if restarted:
+                self.tracer_file._topology = None
+                self.adjoint_tracer_file._topology = None
+            else:
+                self.tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
+                self.adjoint_tracer_file = File(os.path.join(self.di, 'adjoint_tracer.pvd'))
         if self.op.solve_sediment:
-            self.sediment_file = File(os.path.join(self.di, 'sediment.pvd'))
+            if restarted:
+                self.sediment_file._topology = None
+            else:
+                self.sediment_file = File(os.path.join(self.di, 'sediment.pvd'))
+        if self.op.recover_vorticity:
+            if restarted:
+                self.vorticity_file._topology = None
+            else:
+                self.vorticity_file = File(os.path.join(self.di, 'vorticity.pvd'))
         if self.op.plot_bathymetry or self.op.solve_exner:
-            self.exner_file = File(os.path.join(self.di, 'modified_bathymetry.pvd'))
+            if restarted:
+                self.exner_file._topology = None
+            else:
+                self.exner_file = File(os.path.join(self.di, 'modified_bathymetry.pvd'))
 
     def set_finite_elements(self):
         """
@@ -118,6 +185,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         For the sediment and Exner models, you are required to use DG and CG,
         respectively.
         """
+        self.op.print_debug("SETUP: Creating finite elements...")
         p = self.op.degree
         family = self.op.family
         if family == 'cg-cg':
@@ -128,7 +196,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             u_element = VectorElement("DG", triangle, p)
             eta_element = FiniteElement("DG", triangle, p, variant='equispaced')
         elif family == 'dg-cg':
-            assert p == 1
+            assert p in (1, 2)
             u_element = VectorElement("DG", triangle, p)
             eta_element = FiniteElement("Lagrange", triangle, p+1, variant='equispaced')
         else:
@@ -163,32 +231,49 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def create_function_spaces(self):
         """
-        Build finite element spaces `V` and `Q`, for the prognostic solutions of the shallow water
-        and tracer models, along with various other useful spaces.
+        Build finite element spaces for the prognostic solutions of each model, along with various
+        other useful spaces.
+
+        The shallow water space is denoted `V`, the tracer and sediment space is denoted `Q` and the
+        bathymetry space is denoted `W`.
         """
-        self.P0 = [FunctionSpace(mesh, "DG", 0) for mesh in self.meshes]
-        self.P1 = [FunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
-        self.P1_vec = [VectorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
-        self.P1_ten = [TensorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
-        self.P1DG = [FunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
-        self.P1DG_vec = [VectorFunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
+        super(AdaptiveProblem, self).create_function_spaces()
+        op = self.op
 
         # Shallow water space
         self.V = [FunctionSpace(mesh, self.finite_element) for mesh in self.meshes]
 
         # Tracer space(s)
-        if self.op.solve_tracer:
+        if op.solve_tracer:
+            assert not op.solve_sediment
             self.Q = [FunctionSpace(mesh, self.finite_element_tracer) for mesh in self.meshes]
-        if self.op.solve_sediment:
+        elif op.solve_sediment:
             self.Q = [FunctionSpace(mesh, self.finite_element_sediment) for mesh in self.meshes]
+        else:
+            self.Q = [None for mesh in self.meshes]
 
         # Bathymetry space
-        if self.op.solve_exner:
+        if op.solve_exner:
             self.W = [FunctionSpace(mesh, self.finite_element_bathymetry) for mesh in self.meshes]
+        else:
+            self.W = [None for mesh in self.meshes]
 
-    def create_intermediary_spaces(self):
+        # Diffusivity space
+        self.diffusivity_space = [FunctionSpace(mesh, op.diffusivity_space_family, op.diffusivity_space_degree) for mesh in self.meshes]
+
+        # Record DOFs
+        self.dofs = [[np.array(V.dof_count).sum() for V in self.V]]  # TODO: other function spaces
+
+    def get_function_space(self, field):
+        spaces = {'shallow_water': 'V', 'tracer': 'Q', 'sediment': 'Q', 'bathymetry': 'W'}
+        try:
+            return self.__getattribute__(spaces[field])
+        except KeyError:
+            return self.V
+
+    def create_intermediary_spaces(self, have_intermediaries=False):
         super(AdaptiveProblem, self).create_intermediary_spaces()
-        if self.op.approach != 'monge_ampere':
+        if have_intermediaries or self.op.approach not in ('monge_ampere', 'hybrid'):
             return
         mesh_copies = self.intermediary_meshes
         if self.op.solve_tracer:
@@ -216,233 +301,151 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if self.op.suspended:
                 if self.op.convective_vel_flag:
                     self.intermediary_corr_vel_factor = [Function(space) for space in spaces]
-                    self.intermediary_bconv = [Function(space) for space in spaces]
-                    self.intermediary_aconv = [Function(space) for space in spaces]
                 space_dg = [FunctionSpace(mesh, self.op.sediment_model.ceq.function_space().ufl_element()) for mesh in mesh_copies]
                 self.intermediary_ceq = [Function(space) for space in space_dg]
                 self.intermediary_equiltracer = [Function(space) for space in space_dg]
                 self.intermediary_ero = [Function(space) for space in space_dg]
-                self.intermediary_ero_term = [Function(space) for space in space_dg]
-                self.intermediary_depo_term = [Function(space) for space in space_dg]
+                self.intermediary_depo = [Function(space) for space in space_dg]
 
-    def create_solutions(self):
-        """
-        Set up `Function`s in the prognostic spaces to hold forward and adjoint solutions.
-        """
-        self.fwd_solutions = [None for mesh in self.meshes]
-        self.adj_solutions = [None for mesh in self.meshes]
-        self.fwd_solutions_tracer = [None for mesh in self.meshes]
-        self.fwd_solutions_sediment = [None for mesh in self.meshes]
-        self.fwd_solutions_bathymetry = [None for mesh in self.meshes]
-        self.adj_solutions_tracer = [None for mesh in self.meshes]
-        for i, V in enumerate(self.V):
-            self.fwd_solutions[i] = Function(V, name='Forward solution')
-            u, eta = self.fwd_solutions[i].split()
-            u.rename("Fluid velocity")
-            eta.rename("Elevation")
-            self.adj_solutions[i] = Function(V, name='Adjoint solution')
-            z, zeta = self.adj_solutions[i].split()
-            z.rename("Adjoint fluid velocity")
-            zeta.rename("Adjoint elevation")
+    def create_solutions_step(self, i):
+        super(AdaptiveProblem, self).create_solutions_step(i)
+        u, eta = self.fwd_solutions[i].split()
+        u.rename("Fluid velocity")
+        eta.rename("Elevation")
+        z, zeta = self.adj_solutions[i].split()
+        z.rename("Adjoint fluid velocity")
+        zeta.rename("Adjoint elevation")
         if self.op.solve_tracer:
-            self.fwd_solutions_tracer = [Function(Q, name="Forward tracer solution") for Q in self.Q]
-            self.adj_solutions_tracer = [Function(Q, name="Adjoint tracer solution") for Q in self.Q]
+            self.fwd_solutions_tracer[i] = Function(self.Q[i], name="Forward tracer solution")
+            self.adj_solutions_tracer[i] = Function(self.Q[i], name="Adjoint tracer solution")
         if self.op.solve_sediment:
-            self.fwd_solutions_sediment = [Function(Q, name="Forward sediment solution") for Q in self.Q]
-            # self.adj_solutions_sediment = [Function(Q, name="Adjoint sediment solution") for Q in self.Q]
+            self.fwd_solutions_sediment[i] = Function(self.Q[i], name="Forward sediment solution")
+            # self.adj_solutions_sediment[i] = Function(self.Q[i], name="Adjoint sediment solution")
         if self.op.solve_exner:
-            self.fwd_solutions_bathymetry = [Function(W, name="Forward bathymetry solution") for W in self.W]
-            # self.adj_solutions_bathymetry = [Function(W, name="Adjoint bathymetry solution") for W in self.W]
+            self.fwd_solutions_bathymetry[i] = Function(self.W[i], name="Forward bathymetry solution")
+            # self.adj_solutions_bathymetry[i] = Function(self.W[i], name="Adjoint bathymetry solution")
 
-    def set_fields(self, init=False):
-        """
-        Set various fields *on each mesh*, including:
+    def get_solutions(self, field, adjoint=False):
+        name = 'adj_solutions' if adjoint else 'fwd_solutions'
+        fields = ('tracer', 'sediment', 'bathymetry')
+        if field in fields:
+            name = '_'.join([name, field])
+        return self.__getattribute__(name)
 
-            * viscosity;
-            * diffusivity;
-            * the Coriolis parameter;
-            * drag coefficients;
-            * bed roughness.
+    def free_solutions_step(self, i):
+        super(AdaptiveProblem, self).free_solutions_step(i)
+        if self.op.solve_tracer:
+            self.fwd_solutions_tracer[i] = None
+            self.adj_solutions_tracer[i] = None
+        if self.op.solve_sediment:
+            self.fwd_solutions_sediment[i] = None
+            self.adj_solutions_sediment[i] = None
+        if self.op.solve_exner:
+            self.fwd_solutions_bathymetry[i] = None
+            self.adj_solutions_bathymetry[i] = None
 
-        The bathymetry is defined via a modified version of the `DepthExpression` found Thetis.
-        """
+    def set_fields_step(self, i, init=False, reinit = False):
+
         # Bathymetry
         if self.op.solve_exner:
-            if init==1:
+            if init:
+                self.fwd_solutions_bathymetry[i].project(self.op.set_bathymetry(self.P1[i]))
+                self.op.create_sediment_model(self.P1[i].mesh(), self.fwd_solutions_bathymetry[i])
+            elif reinit:
                 for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
                     bathymetry.project(self.op.set_bathymetry(self.P1[i]))
-                    self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
-                self.depth = [None for bathymetry in self.fwd_solutions_bathymetry]
-            elif init==2:
-                for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
-                    bathymetry.project(self.op.set_bathymetry(self.P1[i]))
-            for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
-                self.depth[i] = DepthExpression(
-                    bathymetry,
-                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
-                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
-                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
-                )
-        elif self.op.solve_sediment:
-            self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
-            for i, bathymetry in enumerate(self.bathymetry):
-                if init:
-                    self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
-                    self.depth = [None for bathymetry in self.bathymetry]
-            for i, bathymetry in enumerate(self.bathymetry):
-                self.depth[i] = DepthExpression(
-                    bathymetry,
-                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
-                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
-                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
+            self.depth[i] = DepthExpression(
+                self.fwd_solutions_bathymetry[i],
+                use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
+                use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
+                wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
                 )
         else:
-            self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
-            self.depth = [None for bathymetry in self.bathymetry]
-            for i, bathymetry in enumerate(self.bathymetry):
-                self.depth[i] = DepthExpression(
-                    bathymetry,
-                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
-                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
-                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
-                )
-
-        self.fields = [AttrDict() for P1 in self.P1]
-        for i, P1 in enumerate(self.P1):
-            if init == 1:
-                self.fields[i].update({
-                    'horizontal_viscosity': self.op.set_viscosity(P1),
-                    'horizontal_diffusivity': self.op.set_diffusivity(P1),
-                    'coriolis_frequency': self.op.set_coriolis(P1),
-                    'nikuradse_bed_roughness': self.op.ksp,
-                    'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
-                    'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
-                    'tracer_advective_velocity_factor': self.op.set_advective_velocity_factor(P1)
-                })
-            else:
-                self.fields[i].update({
-                    'horizontal_viscosity': self.op.set_viscosity(P1),
-                    'horizontal_diffusivity': self.op.set_diffusivity(P1),
-                    'coriolis_frequency': self.op.set_coriolis(P1),
-                    'nikuradse_bed_roughness': self.op.ksp,
-                    'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
-                    'tracer_advective_velocity_factor': self.op.set_advective_velocity_factor(P1)
-                })
+            self.bathymetry[i] = self.op.set_bathymetry(self.P1[i])
+            if self.op.solve_sediment and init:
+                self.op.create_sediment_model(self.P1[i].mesh(), self.bathymetry[i])
+            self.depth[i] = DepthExpression(
+                self.bathymetry[i],
+                use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
+                use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
+                wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
+            )
+        self.fields[i].update({
+            'horizontal_viscosity': self.op.set_viscosity(self.P1[i]),
+            'horizontal_diffusivity': self.op.set_diffusivity(self.diffusivity_space[i]),
+            'coriolis_frequency': self.op.set_coriolis(self.P1[i]),
+            'nikuradse_bed_roughness': self.op.ksp,
+            'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(self.P1[i]),
+            'manning_drag_coefficient': self.op.set_manning_drag_coefficient(self.P1[i]),
+            'tracer_advective_velocity_factor': self.op.set_advective_velocity_factor(self.P1[i]),
+        })
         if self.op.solve_tracer:
-            for i, P1DG in enumerate(self.P1DG):
-                self.fields[i].update({
-                    'tracer_source_2d': self.op.set_tracer_source(P1DG),
-                })
-        if self.op.solve_sediment or self.op.solve_exner:
-            for i, P1DG in enumerate(self.P1DG):
-                self.fields[i].update({
-                    'sediment_source_2d': self.op.set_sediment_source(P1DG),
-                    'sediment_depth_integ_source': self.op.set_sediment_depth_integ_source(P1DG),
-                    'sediment_sink_2d': self.op.set_sediment_sink(P1DG),
-                    'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(P1DG)
-                })
+            self.fields[i].update({
+                'tracer_source_2d': self.op.set_tracer_source(self.P1DG[i]),
+            })
         self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
 
-    # --- Stabilisation
-
-    def set_stabilisation_step(self, i):
-        """ Set stabilisation mode and corresponding parameter on the ith mesh."""
-        self.minimum_angles = [None for mesh in self.meshes]
-        if self.op.use_automatic_sipg_parameter:
-            for i, mesh in enumerate(self.meshes):
-                self.minimum_angles[i] = get_minimum_angles_2d(mesh)
-        if self.op.solve_swe:
-            self._set_shallow_water_stabilisation_step(i)
-        if self.op.solve_tracer:
-            self._set_tracer_stabilisation_step(i, sediment=False)
-        if self.op.solve_sediment:
-            self._set_tracer_stabilisation_step(i, sediment=True)
-
-    def _set_shallow_water_stabilisation_step(self, i):
-        op = self.op
-
-        # Symmetric Interior Penalty Galerkin (SIPG) method
-        sipg = None
-        if op.family != 'cg-cg':
-            if hasattr(op, 'sipg_parameter'):
-                sipg = op.sipg_parameter
-            if self.shallow_water_options[i].use_automatic_sipg_parameter:
-                for i, mesh in enumerate(self.meshes):
-                    cot_theta = 1.0/tan(self.minimum_angles[i])
-
-                    # Penalty parameter for shallow water
-                    nu = self.fields[i].horizontal_viscosity
-                    if nu is not None:
-                        p = self.V[i].sub(0).ufl_element().degree()
-                        alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
-                        alpha = alpha*get_sipg_ratio(nu)*cot_theta
-                        sipg = interpolate(alpha, self.P0[i])
-        self.shallow_water_options[i].sipg_parameter = sipg
-
-        # Stabilisation
-        if self.stabilisation is None:
-            return
-        elif self.stabilisation == 'lax_friedrichs':
-            assert op.family != 'cg-cg'
-            assert hasattr(op, 'lax_friedrichs_velocity_scaling_factor')
-            self.shallow_water_options[i]['lax_friedrichs_velocity_scaling_factor'] = op.lax_friedrichs_velocity_scaling_factor  # TODO: Allow mesh dependent
-        else:
-            msg = "Stabilisation method {:s} not recognised for {:s}"
-            raise ValueError(msg.format(self.stabilisation, self.__class__.__name__))
-
-    def _set_tracer_stabilisation_step(self, i, sediment=False):
-        op = self.op
-        eq_options = self.sediment_options if sediment else self.tracer_options
-
-        # Symmetric Interior Penalty Galerkin (SIPG) method
-        family = op.sediment_family if sediment else op.tracer_family
-        sipg = None
-        if family == 'dg':
-            if hasattr(op, 'sipg_parameter_tracer'):
-                sipg = op.sipg_parameter_tracer
-            if self.tracer_options[i].use_automatic_sipg_parameter:
-                for i, mesh in enumerate(self.meshes):
-                    cot_theta = 1.0/tan(self.minimum_angles[i])
-
-                    # Penalty parameter for shallow water
-                    nu = self.fields[i].horizontal_diffusivity
-                    if nu is not None:
-                        p = self.Q[i].ufl_element().degree()
-                        alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
-                        alpha = alpha*get_sipg_ratio(nu)*cot_theta
-                        sipg = interpolate(alpha, self.P0[i])
-        self.tracer_options[i].sipg_parameter = sipg
-        # Stabilisation
-        if self.stabilisation is None:
-            return
-        elif self.stabilisation == 'lax_friedrichs':
-            assert hasattr(op, 'lax_friedrichs_tracer_scaling_factor')
-            assert family == 'dg'
-            eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor  # TODO: Allow mesh dependent
-        elif self.stabilisation == 'su':
-            assert family == 'cg'
-            raise NotImplementedError  # TODO
-        elif self.stabilisation == 'supg':
-            assert family == 'cg'
-            raise NotImplementedError  # TODO
-        else:
-            msg = "Stabilisation method {:s} not recognised for {:s}"
-            raise ValueError(msg.format(self.stabilisation, self.__class__.__name__))
+    def free_fields_step(self, i):
+        super(AdaptiveProblem, self).free_fields_step(i)
+        self.bathymetry[i] = None
+        self.depth[i] = None
+        self.inflow[i] = None
 
     # --- Solution initialisation and transfer
 
     def set_initial_condition(self, **kwargs):
-        """Apply initial condition(s) for forward solution(s) on first mesh."""
+        """
+        Apply initial condition(s) for forward solution(s) on first mesh.
+        """
         self.op.set_initial_condition(self, **kwargs)
         if self.op.solve_tracer:
-            self.op.set_initial_condition_tracer(self)
+            self.op.set_initial_condition_tracer(self, **kwargs)
         if self.op.solve_sediment:
-            self.op.set_initial_condition_sediment(self)
+            self.op.set_initial_condition_sediment(self, **kwargs)
         if self.op.solve_exner:
-            self.op.set_initial_condition_bathymetry(self)
+            self.op.set_initial_condition_bathymetry(self, **kwargs)
+
+    def compute_mesh_reynolds_number(self, i):
+        # u, eta = self.fwd_solutions[i].split()
+        u = self.op.characteristic_velocity or self.fwd_solutions[i].split()[0]
+        nu = self.fields[i].horizontal_viscosity
+        if nu is None:
+            return
+        self.reynolds_number[i] = (u, nu)
+        if self.op.plot_pvd:
+            if not hasattr(self, 'reynolds_number_file'):
+                self.reynolds_number_file = File(os.path.join(self.di, 'reynolds_number.pvd'))
+            self.reynolds_number_file._topology = None
+            self.reynolds_number_file.write(self.reynolds_number[i])
+
+    def plot_mesh_reynolds_number(self, i, axes=None, **kwargs):
+        import matplotlib.pyplot as plt
+
+        if axes is None:
+            fig, axes = plt.subplots()
+        if self.reynolds_number[i] is None:
+            self.compute_mesh_reynolds_number(i)
+        Re = self.reynolds_number[i]
+        Re_vec = Re.vector().gather()
+        kwargs.setdefault('levels', np.linspace(0.99*Re_vec.min(), 1.01*Re_vec.max(), 50))
+        kwargs.setdefault('cmap', 'coolwarm')
+        return tricontourf(Re, axes=axes, **kwargs)
+
+    def transfer_forward_solution(self, i, **kwargs):
+        super(AdaptiveProblem, self).transfer_forward_solution(i, **kwargs)
+
+        # Check Reynolds and CFL numbers
+        if self.op.debug and self.op.solve_swe:
+            self.compute_mesh_reynolds_number(i)
+            if hasattr(self.op, 'check_cfl_criterion'):
+                self.op.check_cfl_criterion(self, i, error_factor=None)
+                # TODO: parameter for error_factor, defaulted by timestepper choice
+                # TODO: allow t-adaptation on subinterval
 
     def set_terminal_condition(self, **kwargs):
-        """Apply terminal condition(s) for adjoint solution(s) on terminal mesh."""
+        """
+        Apply terminal condition(s) for adjoint solution(s) on terminal mesh.
+        """
         self.op.set_terminal_condition(self, **kwargs)
         if self.op.solve_tracer:
             self.op.set_terminal_condition_tracer(self, **kwargs)
@@ -458,16 +461,22 @@ class AdaptiveProblem(AdaptiveProblemBase):
         If the shallow water equations are not solved then the fluid velocity
         and surface elevation are set via the initial condition.
         """
-        if self.op.solve_swe:
+        op = self.op
+        if op.solve_swe:
             self.project(self.fwd_solutions, i, j)
         else:
-            self.op.set_initial_condition(self, **kwargs)
-        if self.op.solve_tracer:
-            self.project(self.fwd_solutions_tracer, i, j)
-        if self.op.solve_sediment:
-            self.project(self.fwd_solutions_sediment, i, j)
-        if self.op.solve_exner:
-            self.project(self.fwd_solutions_bathymetry, i, j)
+            op.set_initial_condition(self, **kwargs)
+
+        # Project between spaces, constructing if necessary
+        for flg, name in zip(op.solve_flags[1:], op.solve_fields[1:]):
+            space = self.get_function_space(name)
+            if flg:
+                f = self.__getattribute__('fwd_solutions_{:s}'.format(name))
+                if f[i] is None:
+                    raise ValueError("Nothing to project.")
+                elif f[j] is None:
+                    f[j] = Function(space[j], name="Forward {:s} solution".format(name))
+                self.project(f, i, j)
 
     def project_adjoint_solution(self, i, j, **kwargs):
         """
@@ -476,19 +485,26 @@ class AdaptiveProblem(AdaptiveProblemBase):
         If the adjoint shallow water equations are not solved then the adjoint
         fluid velocity and surface elevation are set via the terminal condition.
         """
-        if self.op.solve_swe:
+        op = self.op
+        if op.solve_swe:
             self.project(self.adj_solutions, i, j)
         else:
-            self.op.set_terminal_condition(self, **kwargs)
-        if self.op.solve_tracer:
-            self.project(self.adj_solutions_tracer, i, j)
-        if self.op.solve_sediment:
-            self.project(self.adj_solutions_sediment, i, j)
-        if self.op.solve_exner:
-            self.project(self.adj_solutions_bathymetry, i, j)
+            op.set_terminal_condition(self, **kwargs)
+
+        # Project between spaces, constructing if necessary
+        for flg, name in zip(op.solve_flags[1:], op.solve_fields[1:]):
+            space = self.get_function_space(name)
+            if flg:
+                f = self.__getattribute__('adj_solutions_{:s}'.format(name))
+                if f[i] is None:
+                    raise ValueError("Nothing to project.")
+                elif f[j] is None:
+                    f[j] = Function(space[j], name="Adjoint {:s} solution".format(name))
+                self.project(f, i, j)
 
     def project_to_intermediary_mesh(self, i):
-        super(AdaptiveProblem, self).project_to_intermediary_mesh(i)
+        if self.op.solve_swe:
+            super(AdaptiveProblem, self).project_to_intermediary_mesh(i)
         if self.op.solve_tracer:
             self.intermediary_solutions_tracer[i].project(self.fwd_solutions_tracer[i])
         if self.op.solve_sediment:
@@ -510,136 +526,165 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if self.op.suspended:
                 if self.op.convective_vel_flag:
                     self.intermediary_corr_vel_factor[i].project(self.op.sediment_model.corr_factor_model.corr_vel_factor)
-                    self.intermediary_bconv[i].project(self.op.sediment_model.corr_factor_model.Bconv)
-                    self.intermediary_aconv[i].project(self.op.sediment_model.corr_factor_model.Aconv)
                 self.intermediary_ceq[i].project(self.op.sediment_model.ceq)
                 self.intermediary_equiltracer[i].project(self.op.sediment_model.equiltracer)
                 self.intermediary_ero[i].project(self.op.sediment_model.ero)
-                self.intermediary_ero_term[i].project(self.op.sediment_model.ero_term)
-                self.intermediary_depo_term[i].project(self.op.sediment_model.depo_term)
+                self.intermediary_depo[i].project(self.op.sediment_model.depo)
 
-
-        def debug(a, b, name):
-            if np.allclose(a, b):
-                print_output("WARNING: Is the intermediary {:s} solution just copied?".format(name))
+        def debug(a, b, name, idx=None):
+            msg = "WARNING: Is the intermediary {:s} solution just copied?".format(name)
+            if idx is not None:
+                if np.allclose(a.dat.data[idx], b.dat.data[idx]):
+                    self.warning(msg)
+            else:
+                if np.allclose(a.dat.data, b.dat.data):
+                    self.warning(msg)
 
         if self.op.debug:
-            debug(self.fwd_solutions[i].dat.data[0],
-                  self.intermediary_solutions[i].dat.data[0],
-                  "velocity")
-            debug(self.fwd_solutions[i].dat.data[1],
-                  self.intermediary_solutions[i].dat.data[1],
-                  "elevation")
+            debug(self.fwd_solutions[i], self.intermediary_solutions[i], "velocity", 0)
+            debug(self.fwd_solutions[i], self.intermediary_solutions[i], "elevation", 1)
             if self.op.solve_tracer:
-                debug(self.fwd_solutions_tracer[i].dat.data,
-                      self.intermediary_solutions_tracer[i].dat.data,
-                      "tracer")
+                debug(self.fwd_solutions_tracer[i],
+                      self.intermediary_solutions_tracer[i], "tracer")
             if self.op.solve_sediment:
-                debug(self.fwd_solutions_sediment[i].dat.data,
-                      self.intermediary_solutions_sediment[i].dat.data,
-                      "sediment")
+                debug(self.fwd_solutions_sediment[i],
+                      self.intermediary_solutions_sediment[i], "sediment")
             if self.op.solve_exner:
-                debug(self.fwd_solutions_bathymetry[i].dat.data,
-                      self.intermediary_solutions_bathymetry[i].dat.data,
-                      "bathymetry")
+                debug(self.fwd_solutions_bathymetry[i],
+                      self.intermediary_solutions_bathymetry[i], "bathymetry")
             if hasattr(self.op, 'sediment_model'):
-                debug(self.op.sediment_model.old_bathymetry_2d.dat.data,
-                      self.intermediary_solutions_old_bathymetry[i].dat.data,
-                      "old_bathymetry")
-                debug(self.op.sediment_model.uv_cg.dat.data,
-                      self.intermediary_solutions_uv_cg[i].dat.data,
-                      "uv_cg")
-                debug(self.op.sediment_model.bed_stress.dat.data,
-                      self.intermediary_solutions_bed_stress[i].dat.data,
-                      "bed_stress")
-                debug(self.op.sediment_model.depth.dat.data,
-                      self.intermediary_solutions_depth[i].dat.data,
-                      "depth")
+                debug(self.op.sediment_model.old_bathymetry_2d,
+                      self.intermediary_solutions_old_bathymetry[i], "old_bathymetry")
+                debug(self.op.sediment_model.uv_cg,
+                      self.intermediary_solutions_uv_cg[i], "uv_cg")
+                debug(self.op.sediment_model.bed_stress,
+                      self.intermediary_solutions_bed_stress[i], "bed_stress")
+                debug(self.op.sediment_model.depth,
+                      self.intermediary_solutions_depth[i], "depth")
                 if self.op.suspended:
                     if self.op.convective_vel_flag:
-                        debug(self.op.sediment_model.corr_factor_model.corr_vel_factor.dat.data,
-                              self.intermediary_corr_vel_factor[i].dat.data,
-                              "corr_vel_factor")
-                        debug(self.op.sediment_model.corr_factor_model.Bconv.dat.data,
-                              self.intermediary_bconv[i].dat.data,
-                              "Bconv")
-                        debug(self.op.sediment_model.corr_factor_model.Aconv.dat.data,
-                              self.intermediary_aconv[i].dat.data,
-                              "Aconv")
-                    debug(self.op.sediment_model.ceq.dat.data,
-                          self.intermediary_ceq[i].dat.data,
-                          "ceq")
-                    debug(self.op.sediment_model.equiltracer.dat.data,
-                          self.intermediary_equiltracer[i].dat.data,
-                          "equiltracer")
-                    debug(self.op.sediment_model.ero.dat.data,
-                          self.intermediary_ero[i].dat.data,
-                          "ero")
-                    debug(self.op.sediment_model.ero_term.dat.data,
-                          self.intermediary_ero_term[i].dat.data,
-                          "ero_term")
-                    debug(self.op.sediment_model.depo_term.dat.data,
-                          self.intermediary_depo_term[i].dat.data,
-                          "depo_term")
+                        debug(self.op.sediment_model.corr_factor_model.corr_vel_factor,
+                              self.intermediary_corr_vel_factor[i], "corr_vel_factor")
+                    debug(self.op.sediment_model.ceq,
+                          self.intermediary_ceq[i], "ceq")
+                    debug(self.op.sediment_model.equiltracer,
+                          self.intermediary_equiltracer[i], "equiltracer")
+                    debug(self.op.sediment_model.ero,
+                          self.intermediary_ero[i], "ero")
+                    debug(self.op.sediment_model.depo,
+                          self.intermediary_depo[i], "depo")
                 if self.op.bedload:
-                    debug(self.op.sediment_model.calfa.dat.data,
-                          self.intermediary_solutions_calfa[i].dat.data,
-                          "calfa")
-                    debug(self.op.sediment_model.salfa.dat.data,
-                          self.intermediary_solutions_salfa[i].dat.data,
-                          "salfa")
+                    debug(self.op.sediment_model.calfa,
+                          self.intermediary_solutions_calfa[i], "calfa")
+                    debug(self.op.sediment_model.salfa,
+                          self.intermediary_solutions_salfa[i], "salfa")
                     if self.op.angle_correction:
-                          debug(self.op.sediment_model.stress.dat.data,
-                                self.intermediary_solutions_stress[i].dat.data,
-                                "stress")
+                        debug(self.op.sediment_model.stress,
+                              self.intermediary_solutions_stress[i], "stress")
 
-
-    def copy_data_from_intermediary_mesh(self, i):
-        super(AdaptiveProblem, self).copy_data_from_intermediary_mesh(i)
+    def project_from_intermediary_mesh(self, i):
+        if self.op.solve_swe:
+            super(AdaptiveProblem, self).project_from_intermediary_mesh(i)
         if self.op.solve_tracer:
             self.fwd_solutions_tracer[i].project(self.intermediary_solutions_tracer[i])
         if self.op.solve_sediment:
             self.fwd_solutions_sediment[i].project(self.intermediary_solutions_sediment[i])
         if self.op.solve_exner:
             self.fwd_solutions_bathymetry[i].project(self.intermediary_solutions_bathymetry[i])
+        if hasattr(self.op, 'sediment_model'):
+            raise NotImplementedError
+
+    def copy_data_from_intermediary_mesh(self, i):
+        super(AdaptiveProblem, self).copy_data_from_intermediary_mesh(i)
+        if self.op.solve_tracer:
+            self.fwd_solutions_tracer[i].assign(self.intermediary_solutions_tracer[i])
+        if self.op.solve_sediment:
+            self.fwd_solutions_sediment[i].assign(self.intermediary_solutions_sediment[i])
+        if self.op.solve_exner:
+            self.fwd_solutions_bathymetry[i].assign(self.intermediary_solutions_bathymetry[i])
 
         if hasattr(self.op, 'sediment_model'):
             self.op.sediment_model.old_bathymetry_2d.project(self.intermediary_solutions_old_bathymetry[i])
-            self.op.sediment_model.uv_cg.project(self.intermediary_solutions_uv_cg[i])
+            self.op.sediment_model.uv_cg.assign(self.intermediary_solutions_uv_cg[i])
             self.op.sediment_model.bed_stress.project(self.intermediary_solutions_bed_stress[i])
             self.op.sediment_model.depth.project(self.intermediary_solutions_depth[i])
             if self.op.suspended:
                 if self.op.convective_vel_flag:
                     self.op.sediment_model.corr_factor_model.corr_vel_factor.project(self.intermediary_corr_vel_factor[i])
-                    self.op.sediment_model.corr_factor_model.Bconv.project(self.intermediary_bconv[i])
-                    self.op.sediment_model.corr_factor_model.Aconv.project(self.intermediary_aconv[i])
                 self.op.sediment_model.ceq.project(self.intermediary_ceq[i])
                 self.op.sediment_model.equiltracer.project(self.intermediary_equiltracer[i])
-                self.op.sediment_model.ero.project(self.intermediary_ero[i])
-                self.op.sediment_model.ero_term.project(self.intermediary_ero_term[i])
-                self.op.sediment_model.depo_term.project(self.intermediary_depo_term[i])
+                self.op.sediment_model.ero.assign(self.intermediary_ero[i])
+                self.op.sediment_model.depo.assign(self.intermediary_depo[i])
             if self.op.bedload:
                 self.op.sediment_model.calfa.project(self.intermediary_solutions_calfa[i])
                 self.op.sediment_model.salfa.project(self.intermediary_solutions_salfa[i])
                 if self.op.angle_correction:
                     self.op.sediment_model.stress.project(self.intermediary_solutions_stress[i])
+
+    # --- I/O
+
+    def export_state(self, i, fpath, plexname=None, **kwargs):
+        op = self.op
+        kwargs['plexname'] = plexname
+        kwargs['op'] = op
+        if op.solve_swe:
+            op.print_debug("I/O: Exporting hydrodynamics to {:s}...".format(fpath))
+            export_hydrodynamics(*self.fwd_solutions[i].split(), fpath, **kwargs)
+        if op.solve_tracer:
+            name = 'tracer'
+            op.print_debug("I/O: Exporting {:s} to {:s}...".format(name, fpath))
+            export_field(self.fwd_solutions_tracer[i], name, name, fpath, **kwargs)
+        if op.solve_sediment:
+            name = 'sediment'
+            op.print_debug("I/O: Exporting {:s} to {:s}...".format(name, fpath))
+            export_field(self.fwd_solutions_sediment[i], name, name, fpath, **kwargs)
+        if op.solve_exner:
+            name = 'bathymetry'
+            op.print_debug("I/O: Exporting {:s} to {:s}...".format(name, fpath))
+            export_field(self.fwd_solutions_bathymetry[i], name, name, fpath, **kwargs)
+
+    def load_state(self, i, fpath, plexname=None, **kwargs):
+        op = self.op
+        kwargs['outputdir'] = self.di
+        kwargs['op'] = op
+        if op.solve_exner:
+            name = 'bathymetry'
+            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
+            args = (self.W[i], name, name, fpath)
+            self.fwd_solutions_bathymetry[i].project(initialise_field(*args, **kwargs))
+        if op.solve_sediment:
+            name = 'sediment'
+            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
+            args = (self.Q[i], name, name, fpath)
+            self.fwd_solutions_sediment[i].project(initialise_field(*args, **kwargs))
+        if op.solve_tracer:
+            name = 'tracer'
+            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
+            args = (self.Q[i], name, name, fpath)
+            self.fwd_solutions_tracer[i].project(initialise_field(*args, **kwargs))
+        if op.solve_swe:
+            kwargs['plexname'] = plexname
+            op.print_debug("I/O: Loading hydrodynamics from {:s}...".format(fpath))
+            u_init, eta_init = initialise_hydrodynamics(fpath, **kwargs)
+            u, eta = self.fwd_solutions[i].split()
+            u.project(u_init)
+            eta.project(eta_init)
+
     # --- Equations
 
-    def create_forward_equations(self, i):
+    def create_forward_equations_step(self, i):
         if self.op.solve_swe:
-            self._create_forward_shallow_water_equations(i)
+            self.create_forward_shallow_water_equations_step(i)
         if self.op.solve_tracer:
-            self._create_forward_tracer_equation(i)
+            self.create_forward_tracer_equation_step(i)
         if self.op.solve_sediment:
-            self._create_forward_sediment_equation(i)
+            self.create_forward_sediment_equation_step(i)
         if self.op.solve_exner:
-            self._create_forward_exner_equation(i)
+            self.create_forward_exner_equation_step(i)
 
-    def _create_forward_shallow_water_equations(self, i):
-        from .swe.equation import ShallowWaterEquations
+    def create_forward_shallow_water_equations_step(self, i):
+        from ..swe.equation import ShallowWaterEquations
 
-        if self.mesh_velocities[i] is not None:
-            self.shallow_water_options[i]['mesh_velocity'] = self.mesh_velocities[i]
         self.equations[i].shallow_water = ShallowWaterEquations(
             self.V[i],
             self.depth[i],
@@ -647,62 +692,72 @@ class AdaptiveProblem(AdaptiveProblemBase):
         )
         self.equations[i].shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
-    def _create_forward_tracer_equation(self, i):
-        from .tracer.equation import TracerEquation2D, ConservativeTracerEquation2D
-
-        op = self.tracer_options[i]
-        conservative = op.use_tracer_conservative_form
-        model = ConservativeTracerEquation2D if conservative else TracerEquation2D
+    def create_forward_tracer_equation_step(self, i):
+        if self.tracer_options[i].use_tracer_conservative_form:
+            from thetis.conservative_tracer_eq_2d import ConservativeTracerEquation2D
+            model = ConservativeTracerEquation2D
+        else:
+            from thetis.tracer_eq_2d import TracerEquation2D
+            model = TracerEquation2D
         self.equations[i].tracer = model(
             self.Q[i],
             self.depth[i],
-            use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
-            sipg_parameter=self.tracer_options[i].sipg_parameter,
+            self.tracer_options[i],
+            self.fwd_solutions[i].split()[0],
         )
-        if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
+        if self.tracer_options[i].use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
         self.equations[i].tracer.bnd_functions = self.boundary_conditions[i]['tracer']
 
-    def _create_forward_sediment_equation(self, i):
-        from .sediment.equation import SedimentEquation2D
+    def create_forward_sediment_equation_step(self, i):
+        from ..sediment.equation import SedimentEquation2D
 
         op = self.sediment_options[i]
         model = SedimentEquation2D
         self.equations[i].sediment = model(
             self.Q[i],
-            # self.op.sediment_model.depth_expr,
             self.depth[i],
-            use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
-            sipg_parameter=self.tracer_options[i].sipg_parameter,
+            op,
+            self.op.sediment_model,
             conservative=self.op.use_tracer_conservative_form,
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
         self.equations[i].sediment.bnd_functions = self.boundary_conditions[i]['sediment']
 
-    def _create_forward_exner_equation(self, i):
-        from .sediment.exner_eq import ExnerEquation
+    def create_forward_exner_equation_step(self, i):
+        from ..sediment.exner_eq import ExnerEquation
 
         model = ExnerEquation
         self.equations[i].exner = model(
             self.W[i],
             self.depth[i],
-            conservative=self.op.use_tracer_conservative_form,
-            sed_model=self.op.sediment_model,
+            depth_integrated_sediment=self.op.use_tracer_conservative_form,
+            sediment_model=self.op.sediment_model,
         )
 
-    def create_adjoint_equations(self, i):
+    def free_forward_equations_step(self, i):
         if self.op.solve_swe:
-            self._create_adjoint_shallow_water_equations(i)
+            delattr(self.equations[i], 'shallow_water')
         if self.op.solve_tracer:
-            self._create_adjoint_tracer_equation(i)
+            delattr(self.equations[i], 'tracer')
         if self.op.solve_sediment:
-            self._create_adjoint_sediment_equation(i)
+            delattr(self.equations[i], 'sediment')
         if self.op.solve_exner:
-            self._create_adjoint_exner_equation(i)
+            delattr(self.equations[i], 'exner')
 
-    def _create_adjoint_shallow_water_equations(self, i):
-        from .swe.adjoint import AdjointShallowWaterEquations
+    def create_adjoint_equations_step(self, i):
+        if self.op.solve_swe:
+            self.create_adjoint_shallow_water_equations_step(i)
+        if self.op.solve_tracer:
+            self.create_adjoint_tracer_equation_step(i)
+        if self.op.solve_sediment:
+            self.create_adjoint_sediment_equation_step(i)
+        if self.op.solve_exner:
+            self.create_adjoint_exner_equation_step(i)
+
+    def create_adjoint_shallow_water_equations_step(self, i):
+        from ..swe.adjoint import AdjointShallowWaterEquations
 
         self.equations[i].adjoint_shallow_water = AdjointShallowWaterEquations(
             self.V[i],
@@ -711,42 +766,83 @@ class AdaptiveProblem(AdaptiveProblemBase):
         )
         self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
-    def _create_adjoint_tracer_equation(self, i):
-        from .tracer.adjoint import AdjointTracerEquation2D, AdjointConservativeTracerEquation2D
-
-        op = self.tracer_options[i]
-        conservative = op.use_tracer_conservative_form
-        model = AdjointConservativeTracerEquation2D if conservative else AdjointTracerEquation2D
+    def create_adjoint_tracer_equation_step(self, i):
+        if self.tracer_options[i].use_tracer_conservative_form:
+            from thetis.conservative_tracer_eq_2d import ConservativeTracerEquation2D
+            model = ConservativeTracerEquation2D
+        else:
+            from thetis.tracer_eq_2d import TracerEquation2D
+            model = TracerEquation2D
         self.equations[i].adjoint_tracer = model(
             self.Q[i],
             self.depth[i],
-            use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
-            sipg_parameter=self.tracer_options[i].sipg_parameter,
+            self.tracer_options[i],
+            self.fwd_solutions[i].split()[0],
         )
-        if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
+        if self.tracer_options[i].use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
-        self.equations[i].adjoint_tracer.bnd_functions = self.boundary_conditions[i]['tracer']
+        adjoint_boundary_conditions = {}
+        zero = Constant(0.0)
+        for segment in self.boundary_conditions[i]['tracer']:
+            adjoint_boundary_conditions[segment] = {}
+            if 'diff_flux' not in self.boundary_conditions[i]['tracer'][segment]:
+                adjoint_boundary_conditions[segment]['value'] = zero
+            if 'value' not in self.boundary_conditions[i]['tracer'][segment]:
+                adjoint_boundary_conditions[segment]['diff_flux'] = 'adjoint'
+        self.equations[i].adjoint_tracer.bnd_functions = adjoint_boundary_conditions
 
-    def _create_adjoint_sediment_equation(self, i):
+    def create_adjoint_sediment_equation_step(self, i):
         raise NotImplementedError("Continuous adjoint sediment equation not implemented")
 
-    def _create_adjoint_exner_equation(self, i):
+    def create_adjoint_exner_equation_step(self, i):
         raise NotImplementedError("Continuous adjoint Exner equation not implemented")
+
+    def free_adjoint_equations_step(self, i):
+        if self.op.solve_swe:
+            delattr(self.equations[i], 'adjoint_shallow_water')
+        if self.op.solve_tracer:
+            delattr(self.equations[i], 'adjoint_tracer')
+        if self.op.solve_sediment:
+            delattr(self.equations[i], 'adjoint_sediment')
+        if self.op.solve_exner:
+            delattr(self.equations[i], 'adjoint_exner')
+
+    def get_boundary_conditions(self, i):
+        field = self.op.adapt_field
+        if field not in ('tracer', 'sediment', 'bathymetry'):
+            field = 'shallow_water'
+        return self.boundary_conditions[i][field]
 
     # --- Error estimators
 
-    def create_error_estimators(self, i):
-        if self.op.solve_swe:
-            self._create_shallow_water_error_estimator(i)
-        if self.op.solve_tracer:
-            self._create_tracer_error_estimator(i)
-        if self.op.solve_sediment:
-            self._create_sediment_error_estimator(i)
-        if self.op.solve_exner:
-            self._create_exner_error_estimator(i)
+    def create_error_estimators_step(self, i, adjoint=False):
+        if adjoint:
+            self.create_adjoint_error_estimators_step(i)
+        else:
+            self.create_forward_error_estimators_step(i)
 
-    def _create_shallow_water_error_estimator(self, i):
-        from .swe.error_estimation import ShallowWaterGOErrorEstimator
+    def create_forward_error_estimators_step(self, i):
+        if self.op.solve_swe:
+            self.create_forward_shallow_water_error_estimator_step(i)
+        if self.op.solve_tracer:
+            self.create_forward_tracer_error_estimator_step(i)
+        if self.op.solve_sediment:
+            self.create_forward_sediment_error_estimator_step(i)
+        if self.op.solve_exner:
+            self.create_forward_exner_error_estimator_step(i)
+
+    def create_adjoint_error_estimators_step(self, i):
+        if self.op.solve_swe:
+            self.create_adjoint_shallow_water_error_estimator_step(i)
+        if self.op.solve_tracer:
+            self.create_adjoint_tracer_error_estimator_step(i)
+        if self.op.solve_sediment:
+            self.create_adjoint_sediment_error_estimator_step(i)
+        if self.op.solve_exner:
+            self.create_adjoint_exner_error_estimator_step(i)
+
+    def create_forward_shallow_water_error_estimator_step(self, i):
+        from ..swe.error_estimation import ShallowWaterGOErrorEstimator
 
         self.error_estimators[i].shallow_water = ShallowWaterGOErrorEstimator(
             self.V[i],
@@ -754,39 +850,56 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.shallow_water_options[i],
         )
 
-    def _create_tracer_error_estimator(self, i):
-        from .tracer.error_estimation import TracerGOErrorEstimator
+    def create_forward_tracer_error_estimator_step(self, i):
+        from ..tracer.error_estimation import TracerGOErrorEstimator
 
-        if self.tracer_options[i].use_tracer_conservative_form:
-            raise NotImplementedError("Error estimation for conservative tracers not implemented.")
-        else:
-            estimator = TracerGOErrorEstimator
-        self.error_estimators[i].tracer = estimator(
+        op = self.tracer_options[i]
+        self.error_estimators[i].tracer = TracerGOErrorEstimator(
             self.Q[i],
             self.depth[i],
-            use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
-            sipg_parameter=self.tracer_options[i].sipg_parameter,
+            self.tracer_options[i],
+            adjoint=False,
         )
 
-    def _create_sediment_error_estimator(self, i):
+    def create_forward_sediment_error_estimator_step(self, i):
         raise NotImplementedError("Error estimators for sediment not implemented.")
 
-    def _create_exner_error_estimator(self, i):
+    def create_forward_exner_error_estimator_step(self, i):
         raise NotImplementedError("Error estimators for Exner not implemented.")
+
+    def create_adjoint_shallow_water_error_estimator_step(self, i):
+        raise NotImplementedError("Error estimators for adjoint shallow water not implemented.")
+
+    def create_adjoint_tracer_error_estimator_step(self, i):
+        from ..tracer.error_estimation import TracerGOErrorEstimator
+
+        op = self.tracer_options[i]
+        self.error_estimators[i].adjoint_tracer = TracerGOErrorEstimator(
+            self.Q[i],
+            self.depth[i],
+            self.tracer_options[i],
+            adjoint=True,
+        )
+
+    def create_adjoint_sediment_error_estimator_step(self, i):
+        raise NotImplementedError("Error estimators for adjoint sediment not implemented.")
+
+    def create_adjoint_exner_error_estimator_step(self, i):
+        raise NotImplementedError("Error estimators for adjoint Exner not implemented.")
 
     # --- Timestepping
 
-    def create_forward_timesteppers(self, i):
-        if i == 0:
+    def create_forward_timesteppers_step(self, i, restarted=False):
+        if i == 0 and not restarted:
             self.simulation_time = 0.0
         if self.op.solve_swe:
-            self._create_forward_shallow_water_timestepper(i, self.integrator)
+            self.create_forward_shallow_water_timestepper_step(i, self.integrator)
         if self.op.solve_tracer:
-            self._create_forward_tracer_timestepper(i, self.integrator)
+            self.create_forward_tracer_timestepper_step(i, self.integrator)
         if self.op.solve_sediment:
-            self._create_forward_sediment_timestepper(i, self.integrator)
+            self.create_forward_sediment_timestepper_step(i, self.integrator)
         if self.op.solve_exner:
-            self._create_forward_exner_timestepper(i, self.integrator)
+            self.create_forward_exner_timestepper_step(i, self.integrator)
 
     def _get_fields_for_shallow_water_timestepper(self, i):
         fields = AttrDict({
@@ -801,29 +914,32 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'momentum_source': None,
             'volume_source': None,
         })
-        if self.op.approach == 'lagrangian':
+        if self.op.approach in ('lagrangian', 'hybrid'):
             raise NotImplementedError  # TODO
         if self.stabilisation == 'lax_friedrichs':
             fields['lax_friedrichs_velocity_scaling_factor'] = self.shallow_water_options[i].lax_friedrichs_velocity_scaling_factor
         return fields
 
     def _get_fields_for_tracer_timestepper(self, i):
-        u, eta = self.fwd_solutions[i].split()
+        if self.op.timestepper == 'SteadyState':
+            if self.op.solve_swe:
+                u, eta = split(self.fwd_solutions[i])  # FIXME: Not fully annotated
+            else:
+                u = interpolate(as_vector(self.op.base_velocity), self.P1_vec[i])
+                eta = Constant(0.0)
+        else:
+            u, eta = self.fwd_solutions[i].split()  # FIXME: Not fully annotated
         fields = AttrDict({
-            'elev_2d': eta,
-            'uv_2d': u,
+            'elev_{:d}d'.format(self.dim): eta,
+            'uv_{:d}d'.format(self.dim): u,
             'diffusivity_h': self.fields[i].horizontal_diffusivity,
             'source': self.fields[i].tracer_source_2d,
             'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,
             'lax_friedrichs_tracer_scaling_factor': self.tracer_options[i].lax_friedrichs_tracer_scaling_factor,
-            'mesh_velocity': None,
         })
-        if self.mesh_velocities[i] is not None:
-            fields['mesh_velocity'] = self.mesh_velocities[i]
-        if self.op.approach == 'lagrangian':
-            self.mesh_velocities[i] = u
-            fields['uv_2d'] = Constant(as_vector([0.0, 0.0]))
-        if self.stabilisation == 'lax_friedrichs':
+        if self.op.approach in ('lagrangian', 'hybrid'):
+            fields['uv_{:d}d'.format(self.dim)] = Constant(as_vector(np.zeros(self.dim)))
+        if self.stabilisation_tracer == 'lax_friedrichs':
             fields['lax_friedrichs_tracer_scaling_factor'] = self.tracer_options[i].lax_friedrichs_tracer_scaling_factor
         return fields
 
@@ -833,20 +949,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'elev_2d': eta,
             'uv_2d': u,
             'diffusivity_h': self.fields[i].horizontal_diffusivity,
-            'source': self.fields[i].sediment_source_2d,
-            'depth_integrated_source': self.fields[i].sediment_depth_integ_source,
-            'sink': self.fields[i].sediment_sink_2d,
-            'depth_integrated_sink': self.fields[i].sediment_depth_integ_sink,
             'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,
             'lax_friedrichs_tracer_scaling_factor': self.sediment_options[i].lax_friedrichs_tracer_scaling_factor,
-            'mesh_velocity': None,
         })
-        if self.mesh_velocities[i] is not None:
-            fields['mesh_velocity'] = self.mesh_velocities[i]
-        if self.op.approach == 'lagrangian':
-            self.mesh_velocities[i] = u
+        if self.op.approach in ('lagrangian', 'hybrid'):
             fields['uv_2d'] = Constant(as_vector([0.0, 0.0]))
-        if self.stabilisation == 'lax_friedrichs':
+        if self.stabilisation_sediment == 'lax_friedrichs':
             fields['lax_friedrichs_tracer_scaling_factor'] = self.sediment_options[i].lax_friedrichs_tracer_scaling_factor
         return fields
 
@@ -854,26 +962,20 @@ class AdaptiveProblem(AdaptiveProblemBase):
         u, eta = self.fwd_solutions[i].split()
         fields = AttrDict({
             'elev_2d': eta,
-            'source': self.fields[i].sediment_source_2d,
-            'depth_integrated_source': self.fields[i].sediment_depth_integ_source,
-            'sink': self.fields[i].sediment_sink_2d,
-            'depth_integrated_sink': self.fields[i].sediment_depth_integ_sink,
             'sediment': self.fwd_solutions_sediment[i],
             'morfac': self.op.morphological_acceleration_factor,
             'porosity': self.op.porosity,
         })
-        if self.mesh_velocities[i] is not None:
-            fields['mesh_velocity'] = self.mesh_velocities[i]
-        if self.op.approach == 'lagrangian':
-            self.mesh_velocities[i] = u
+        if self.op.approach in ('lagrangian', 'hybrid'):
             fields['uv_2d'] = Constant(as_vector([0.0, 0.0]))
         return fields
 
-    def _create_forward_shallow_water_timestepper(self, i, integrator):
+    def create_forward_shallow_water_timestepper_step(self, i, integrator):
         fields = self._get_fields_for_shallow_water_timestepper(i)
+        bcs = self.boundary_conditions[i]['shallow_water']
         args = (self.equations[i].shallow_water, self.fwd_solutions[i], fields, self.op.dt, )
         kwargs = {
-            'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
+            'bnd_conditions': bcs,
             'solver_parameters': self.op.solver_parameters['shallow_water'],
         }
         if self.op.timestepper == 'CrankNicolson':
@@ -883,7 +985,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             kwargs['error_estimator'] = self.error_estimators[i].shallow_water
         self.timesteppers[i].shallow_water = integrator(*args, **kwargs)
 
-    def _create_forward_tracer_timestepper(self, i, integrator):
+    def create_forward_tracer_timestepper_step(self, i, integrator):
         fields = self._get_fields_for_tracer_timestepper(i)
         args = (self.equations[i].tracer, self.fwd_solutions_tracer[i], fields, self.op.dt, )
         kwargs = {
@@ -897,7 +999,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             kwargs['error_estimator'] = self.error_estimators[i].tracer
         self.timesteppers[i].tracer = integrator(*args, **kwargs)
 
-    def _create_forward_sediment_timestepper(self, i, integrator):
+    def create_forward_sediment_timestepper_step(self, i, integrator):
         fields = self._get_fields_for_sediment_timestepper(i)
         dt = self.op.dt
         args = (self.equations[i].sediment, self.fwd_solutions_sediment[i], fields, dt, )
@@ -912,11 +1014,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
             kwargs['error_estimator'] = self.error_estimators[i].sediment
         self.timesteppers[i].sediment = integrator(*args, **kwargs)
 
-    def _create_forward_exner_timestepper(self, i, integrator):
+    def create_forward_exner_timestepper_step(self, i, integrator):
         fields = self._get_fields_for_exner_timestepper(i)
         dt = self.op.dt
         args = (self.equations[i].exner, self.fwd_solutions_bathymetry[i], fields, dt, )
         kwargs = {
+            'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
             'solver_parameters': self.op.solver_parameters['exner'],
         }
         if self.op.timestepper == 'CrankNicolson':
@@ -926,21 +1029,33 @@ class AdaptiveProblem(AdaptiveProblemBase):
             raise NotImplementedError
         self.timesteppers[i].exner = integrator(*args, **kwargs)
 
-    def create_adjoint_timesteppers(self, i):
+    def free_forward_timesteppers_step(self, i):
+        if self.op.solve_swe:
+            delattr(self.timesteppers[i], 'shallow_water')
+        if self.op.solve_tracer:
+            delattr(self.timesteppers[i], 'tracer')
+        if self.op.solve_sediment:
+            delattr(self.timesteppers[i], 'sediment')
+        if self.op.solve_exner:
+            delattr(self.timesteppers[i], 'exner')
+
+    def create_adjoint_timesteppers_step(self, i):
         if i == self.num_meshes-1:
             self.simulation_time = self.op.end_time
         if self.op.solve_swe:
-            self._create_adjoint_shallow_water_timestepper(i, self.integrator)
+            self.create_adjoint_shallow_water_timestepper_step(i, self.integrator)
         if self.op.solve_tracer:
-            self._create_adjoint_tracer_timestepper(i, self.integrator)
+            self.create_adjoint_tracer_timestepper_step(i, self.integrator)
         if self.op.solve_sediment:
-            self._create_adjoint_sediment_timestepper(i, self.integrator)
+            self.create_adjoint_sediment_timestepper_step(i, self.integrator)
         if self.op.solve_exner:
-            self._create_adjoint_exner_timestepper(i, self.integrator)
+            self.create_adjoint_exner_timestepper_step(i, self.integrator)
 
-    def _create_adjoint_shallow_water_timestepper(self, i, integrator):
+    def create_adjoint_shallow_water_timestepper_step(self, i, integrator):
         fields = self._get_fields_for_shallow_water_timestepper(i)
-        fields['uv_2d'], fields['elev_2d'] = self.fwd_solutions[i].split()
+        uv_str = 'uv_{:d}d'.format(self.dim)
+        elev_str = 'elev_{:d}d'.format(self.dim)
+        fields[uv_str], fields[elev_str] = self.fwd_solutions[i].split()
 
         # Account for dJdq
         self.op.set_qoi_kernel(self, i)
@@ -959,17 +1074,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
             kwargs['theta'] = self.op.implicitness_theta
+        if 'adjoint_shallow_water' in self.error_estimators[i]:
+            kwargs['error_estimator'] = self.error_estimators[i].adjoint_shallow_water
         self.timesteppers[i].adjoint_shallow_water = integrator(*args, **kwargs)
 
-    def _create_adjoint_tracer_timestepper(self, i, integrator):
+    def create_adjoint_tracer_timestepper_step(self, i, integrator):
         fields = self._get_fields_for_tracer_timestepper(i)
 
-        # fields.uv_2d = - fields.uv_2d
-
         # Account for dJdc
-        dJdc = self.op.set_qoi_kernel_tracer(self, i)  # TODO: Store this kernel somewhere
+        self.kernels_tracer[i] = self.op.set_qoi_kernel_tracer(self, i)
         self.time_kernel = Constant(1.0 if self.simulation_time >= self.op.start_time else 0.0)
-        fields['source'] = self.time_kernel*dJdc
+        fields['source'] = self.time_kernel*self.kernels_tracer[i]
 
         # Construct time integrator
         args = (self.equations[i].adjoint_tracer, self.adj_solutions_tracer[i], fields, self.op.dt, )
@@ -981,40 +1096,79 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
             kwargs['theta'] = self.op.implicitness_theta
+        if 'adjoint_tracer' in self.error_estimators[i]:
+            kwargs['error_estimator'] = self.error_estimators[i].adjoint_tracer
         self.timesteppers[i].adjoint_tracer = integrator(*args, **kwargs)
 
-    def _create_adjoint_sediment_timestepper(self, i, integrator):
+    def create_adjoint_sediment_timestepper_step(self, i, integrator):
         raise NotImplementedError("Continuous adjoint sediment timestepping not implemented")
 
-    def _create_adjoint_exner_timestepper(self, i, integrator):
+    def create_adjoint_exner_timestepper_step(self, i, integrator):
         raise NotImplementedError("Continuous adjoint Exner timestepping not implemented")
+
+    def free_adjoint_timesteppers_step(self, i):
+        if self.op.solve_swe:
+            delattr(self.timesteppers[i], 'adjoint_shallow_water')
+        if self.op.solve_tracer:
+            delattr(self.timesteppers[i], 'adjoint_tracer')
+        if self.op.solve_sediment:
+            delattr(self.timesteppers[i], 'adjoint_sediment')
+        if self.op.solve_exner:
+            delattr(self.timesteppers[i], 'adjoint_exner')
+
+    def get_timestepper(self, i, field, adjoint=False):
+        if field not in ('tracer', 'sediment', 'bathymetry'):
+            field = 'shallow_water'
+        if adjoint:
+            field = '_'.join(['adjoint', field])
+        return self.timesteppers[i][field]
 
     # --- Solvers
 
-    def add_callbacks(self, i):
-        if self.op.solve_swe:
-            self.callbacks[i].add(VelocityNormCallback(self, i), 'export')
-            self.callbacks[i].add(ElevationNormCallback(self, i), 'export')
-        if self.op.solve_tracer:
-            self.callbacks[i].add(TracerNormCallback(self, i), 'export')
-        if self.op.solve_sediment:
-            self.callbacks[i].add(SedimentNormCallback(self, i), 'export')
-        if self.op.solve_exner:
-            self.callbacks[i].add(ExnerNormCallback(self, i), 'export')
+    def add_callbacks(self, i, **kwargs):
+        from thetis.callback import CallbackManager
 
-    def setup_solver_forward(self, i):
-        """Setup forward solver on mesh `i`."""
+        # Create a new CallbackManager object on every mesh
+        #   NOTE: This overwrites any pre-existing CallbackManagers
+        self.op.print_debug("SETUP: Creating CallbackManagers...")
+        self.callbacks[i] = CallbackManager()
+
+        # Get label
+        mode = 'export'
+        adjoint = kwargs.get('adjoint', False)
+        if adjoint:
+            mode += '_adjoint'
+
+        # Add default callbacks
+        if self.op.solve_swe:
+            self.callbacks[i].add(VelocityNormCallback(self, i, **kwargs), mode)
+            self.callbacks[i].add(ElevationNormCallback(self, i, **kwargs), mode)
+        if self.op.solve_tracer:
+            self.callbacks[i].add(TracerNormCallback(self, i, **kwargs), mode)
+        if self.op.solve_sediment:
+            self.callbacks[i].add(SedimentNormCallback(self, i, **kwargs), mode)
+        if self.op.solve_exner:
+            self.callbacks[i].add(ExnerNormCallback(self, i, **kwargs), mode)
+        if self.op.recover_vorticity and not adjoint:
+            if not hasattr(self, 'vorticity'):
+                self.vorticity = [None for mesh in self.meshes]
+            self.callbacks[i].add(VorticityNormCallback(self, i, **kwargs), mode)
+
+    def setup_solver_forward_step(self, i, restarted=False):
+        """
+        Setup forward solver on mesh `i`.
+        """
         op = self.op
-        op.print_debug(op.indent + "SETUP: Creating forward equations on mesh {:d}...".format(i))
-        self.create_forward_equations(i)
-        op.print_debug(op.indent + "SETUP: Creating forward timesteppers on mesh {:d}...".format(i))
-        self.create_timesteppers(i)
+        op.print_debug("SETUP: Creating forward equations on mesh {:d}...".format(i))
+        self.create_forward_equations_step(i)
+        op.print_debug("SETUP: Creating forward timesteppers on mesh {:d}...".format(i))
+        self.create_forward_timesteppers_step(i, restarted=restarted)
         bcs = self.boundary_conditions[i]
         if op.solve_swe:
             ts = self.timesteppers[i]['shallow_water']
             dbcs = []
             if op.family == 'cg-cg':
-                op.print_debug(op.indent + "SETUP: Applying DirichletBCs on mesh {:d}...".format(i))
+                op.print_debug("SETUP: Applying DirichletBCs on mesh {:d}...".format(i))
                 for j in bcs['shallow_water']:
                     if 'elev' in bcs['shallow_water'][j]:
                         dbcs.append(DirichletBC(self.V[i].sub(1), bcs['shallow_water'][j]['elev'], j))
@@ -1024,66 +1178,72 @@ class AdaptiveProblem(AdaptiveProblemBase):
             ts = self.timesteppers[i]['tracer']
             dbcs = []
             if op.tracer_family == 'cg':
-                op.print_debug(op.indent + "SETUP: Applying tracer DirichletBCs on mesh {:d}...".format(i))
+                op.print_debug("SETUP: Applying tracer DirichletBCs on mesh {:d}...".format(i))
                 for j in bcs['tracer']:
                     if 'value' in bcs['tracer'][j]:
                         dbcs.append(DirichletBC(self.Q[i], bcs['tracer'][j]['value'], j))
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward_tracer")
-            op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
         if op.solve_sediment:
             ts = self.timesteppers[i]['sediment']
             dbcs = []
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward_sediment")
-            op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
         if op.solve_exner:
             ts = self.timesteppers[i]['exner']
             dbcs = []
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward_exner")
-            op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
-        self.add_callbacks(i)
+        op.print_debug("SETUP: Adding callbacks on mesh {:d}...".format(i))
+        self.add_callbacks(i, adjoint=False)
 
-    def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
+    def solve_forward_step(self, i, update_forcings=None, export_func=None, restarted=False, **kwargs):
         """
         Solve forward PDE on mesh `i`.
 
         :kwarg update_forcings: a function which takes simulation time as an argument and is
             evaluated at the start of every timestep.
         :kwarg export_func: a function with no arguments which is evaluated at every export step.
+        :kwarg checkpointing_mode: choose between 'memory' and 'disk'.
         """
         op = self.op
-        plot_pvd &= op.plot_pvd
+        plot_pvd = op.plot_pvd and kwargs.get('plot_pvd', True)
 
         # Initialise counters
         t_epsilon = 1.0e-05
-        self.iteration = 0
+        if not restarted:
+            self.iteration = 0
         start_time = i*op.dt*self.dt_per_mesh
         end_time = (i+1)*op.dt*self.dt_per_mesh
-        try:
-            assert np.allclose(self.simulation_time, start_time)
-        except AssertionError:
-            msg = "Mismatching start time: {:.2f} vs {:.2f}"
-            raise ValueError(msg.format(self.simulation_time, start_time))
-        # update_forcings(self.simulation_time)
-        print_output(80*'=')
-        op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
-        if self.num_meshes == 1:
-            msg = "FORWARD SOLVE  time {:8.2f}  ({:6.2f} seconds)"
-            print_output(msg.format(self.simulation_time, 0.0))
-        else:
-            msg = "{:2d} {:s} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f} seconds)"
-            print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, 0.0))
-        cpu_timestamp = perf_counter()
+        if not restarted:
+            try:
+                assert np.allclose(self.simulation_time, start_time)
+            except AssertionError:
+                msg = "Mismatching start time: {:.2f} vs {:.2f}"
+                raise ValueError(msg.format(self.simulation_time, start_time))
 
-        # Callbacks
+        # Exports and callbacks
+        self.print(80*'=')
         update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=False)
         export_func = export_func or self.op.get_export_func(self, i)
-        # if i == 0:
-        if export_func is not None:
-            export_func()
-        self.callbacks[i].evaluate(mode='export')
+        export_initial = kwargs.get('export_initial', False)
+        if export_initial:
+            update_forcings(self.simulation_time)  # TODO: CHECK
+            if export_func is not None:
+                export_func()
+            self.callbacks[i].evaluate(mode='export')
+            self.callbacks[i].evaluate(mode='timestep')
+
+        # Print time to screen
+        op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
+        if self.num_meshes == 1:
+            msg = "FORWARD SOLVE  time {:8.2f}  ({:6.2f}) seconds"
+            self.print(msg.format(self.simulation_time, 0.0))
+        else:
+            msg = "{:2d} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f}) seconds"
+            self.print(msg.format(self.outer_iteration, i+1, self.num_meshes,
+                                  self.simulation_time, 0.0))
+        cpu_timestamp = perf_counter()
 
         # We need to project to P1 for vtk outputs
         if op.solve_swe and plot_pvd:
@@ -1118,14 +1278,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Time integrate
         ts = self.timesteppers[i]
         while self.simulation_time <= end_time - t_epsilon:
+
             # Mesh movement
             if self.iteration % op.dt_per_mesh_movement == 0:
-                if self.iteration == 0:
-                    self.move_mesh(i, init = 2)
-                else:
-                    self.move_mesh(i)
-
-            # TODO: Update mesh velocity
+                inverted = self.move_mesh(i, reinit=(self.iteration==0 and op.reinitialise))
+                if inverted and op.approach in ('lagrangian', 'hybrid'):
+                    self.simulation_time += op.dt
+                    self.iteration += 1
+                    self.add_callbacks(i)  # TODO: Only normed ones will work
+                    self.setup_solver_forward_step(i, restarted=True)
+                    self.solve_forward_step(i, update_forcings=update_forcings, export_func=export_func, plot_pvd=plot_pvd, export_initial=True, restarted=True)
+                    return
 
             # Solve PDE(s)
             if op.solve_swe:
@@ -1149,27 +1312,37 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Save to checkpoint
             if self.checkpointing:
+                mode = kwargs.get('checkpointing_mode', 'memory')
                 if op.solve_swe:
-                    self.save_to_checkpoint(self.fwd_solutions[i])
+                    self.save_to_checkpoint(i, self.fwd_solutions[i], mode=mode)
                 if op.solve_tracer:
-                    self.save_to_checkpoint(self.fwd_solutions_tracer[i])
+                    self.save_to_checkpoint(i, self.fwd_solutions_tracer[i], mode=mode)
                 if op.solve_sediment:
-                    self.save_to_checkpoint(self.fwd_solutions_sediment[i])
+                    self.save_to_checkpoint(i, self.fwd_solutions_sediment[i], mode=mode)
                 if op.solve_exner:
-                    self.save_to_checkpoint(self.fwd_solutions_bathymetry[i])
+                    self.save_to_checkpoint(i, self.fwd_solutions_bathymetry[i], mode=mode)
                 # TODO: Checkpoint mesh if moving
 
-            # Export
             self.iteration += 1
             self.simulation_time += op.dt
             self.callbacks[i].evaluate(mode='timestep')
             if self.iteration % op.dt_per_export == 0:
+
+                # Exports and callbacks
+                if export_func is not None:
+                    export_func()
+                self.callbacks[i].evaluate(mode='export')
+
+                # Print time to screen
                 cpu_time = perf_counter() - cpu_timestamp
                 if self.num_meshes == 1:
-                    print_output(msg.format(self.simulation_time, cpu_time))
+                    self.print(msg.format(self.simulation_time, cpu_time))
                 else:
-                    print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, cpu_time))
+                    self.print(msg.format(self.outer_iteration, i+1, self.num_meshes,
+                                          self.simulation_time, cpu_time))
                 cpu_timestamp = perf_counter()
+
+                # Plot to .pvd
                 if op.solve_swe and plot_pvd:
                     u, eta = self.fwd_solutions[i].split()
                     proj_u.project(u)
@@ -1185,27 +1358,25 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     b = self.fwd_solutions_bathymetry[i] if op.solve_exner else self.bathymetry[i]
                     proj_bath.project(b)
                     self.exner_file.write(proj_bath)
-                if export_func is not None:
-                    export_func()
-                self.callbacks[i].evaluate(mode='export')
-        if update_forcings is not None:
+        if kwargs.get('final_update', True) and update_forcings is not None:
             update_forcings(self.simulation_time + op.dt)
-        op.print_debug("Done!")
-        print_output(80*'=')
+        self.print(80*'=')
 
-    def setup_solver_adjoint(self, i):
-        """Setup forward solver on mesh `i`."""
+    def setup_solver_adjoint_step(self, i):
+        """
+        Setup forward solver on mesh `i`.
+        """
         op = self.op
-        op.print_debug(op.indent + "SETUP: Creating adjoint equations on mesh {:d}...".format(i))
-        self.create_adjoint_equations(i)
-        op.print_debug(op.indent + "SETUP: Creating adjoint timesteppers on mesh {:d}...".format(i))
-        self.create_adjoint_timesteppers(i)
+        op.print_debug("SETUP: Creating adjoint equations on mesh {:d}...".format(i))
+        self.create_adjoint_equations_step(i)
+        op.print_debug("SETUP: Creating adjoint timesteppers on mesh {:d}...".format(i))
+        self.create_adjoint_timesteppers_step(i)
         bcs = self.boundary_conditions[i]
         if op.solve_swe:
             dbcs = []
             ts = self.timesteppers[i]['adjoint_shallow_water']
-            if op.family in ('cg-cg', 'dg-cg'):  # NOTE: This is inconsistent with forward
-                op.print_debug(op.indent + "SETUP: Applying adjoint DirichletBCs on mesh {:d}...".format(i))
+            if op.family == 'cg-cg':
+                op.print_debug("SETUP: Applying adjoint DirichletBCs on mesh {:d}...".format(i))
                 for j in bcs['shallow_water']:
                     if 'un' not in bcs['shallow_water'][j]:
                         dbcs.append(DirichletBC(self.V[i].sub(1), 0, j))
@@ -1214,22 +1385,30 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if op.solve_tracer:
             ts = self.timesteppers[i]['adjoint_tracer']
             dbcs = []
-            if op.family == 'cg':
-                op.print_debug(op.indent + "SETUP: Applying adjoint tracer DirichletBCs on mesh {:d}...".format(i))
-                raise NotImplementedError  # TODO
+            if op.tracer_family == 'cg':
+                op.print_debug("SETUP: Applying adjoint tracer DirichletBCs on mesh {:d}...".format(i))
+                for j in bcs['tracer']:
+                    if 'diff_flux' not in bcs['tracer'][j]:
+                        dbcs.append(DirichletBC(self.Q[i], 0, j))
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="adjoint_tracer")
+        if op.solve_sediment:
+            raise NotImplementedError
+        if op.solve_exner:
+            raise NotImplementedError
+        self.add_callbacks(i, adjoint=True)
 
-    def solve_adjoint_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
+    def solve_adjoint_step(self, i, update_forcings=None, export_func=None, **kwargs):
         """
         Solve adjoint PDE on mesh `i` *backwards in time*.
 
         :kwarg update_forcings: a function which takes simulation time as an argument and is
             evaluated at the start of every timestep.
         :kwarg export_func: a function with no arguments which is evaluated at every export step.
+        :kwarg checkpointing_mode: choose between 'memory' and 'disk'.
         """
         op = self.op
-        plot_pvd &= op.plot_pvd
+        plot_pvd = op.plot_pvd and kwargs.get('plot_pvd', True)
 
         # Initialise counters
         t_epsilon = 1.0e-05
@@ -1241,22 +1420,27 @@ class AdaptiveProblem(AdaptiveProblemBase):
         except AssertionError:
             msg = "Mismatching start time: {:f} vs {:f}"
             raise ValueError(msg.format(self.simulation_time, start_time))
-        # update_forcings(self.simulation_time)
-        print_output(80*'=')
-        op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
-        if self.num_meshes == 1:
-            msg = "ADJOINT SOLVE  time {:8.2f}  ({:6.2f} seconds)"
-            print_output(msg.format(self.simulation_time, 0.0))
-        else:
-            msg = "{:2d} {:s}  ADJOINT SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f} seconds)"
-            print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, 0.0))
-        cpu_timestamp = perf_counter()
 
-        # Callbacks
+        # Exports and callbacks
+        self.print(80*'=')
         update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=True)
         export_func = export_func or self.op.get_export_func(self, i)
-        if export_func is not None:
+        export_initial = kwargs.get('export_initial', False)
+        if export_initial:
+            update_forcings(self.simulation_time)
             export_func()
+        self.callbacks[i].evaluate(mode='export_adjoint')
+
+        # Print time to screen
+        op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
+        if self.num_meshes == 1:
+            msg = "ADJOINT SOLVE time {:8.2f}  ({:6.2f} seconds)"
+            self.print(msg.format(self.simulation_time, 0.0))
+        else:
+            msg = "{:2d}  ADJOINT SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f} seconds)"
+            self.print(msg.format(self.outer_iteration, i+1, self.num_meshes,
+                                  self.simulation_time, 0.0))
+        cpu_timestamp = perf_counter()
 
         # We need to project to P1 for vtk outputs
         if op.solve_swe and plot_pvd:
@@ -1281,16 +1465,19 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.time_kernel.assign(1.0 if self.simulation_time >= self.op.start_time else 0.0)
 
             # Collect forward solution from checkpoint and free associated memory
-            #   NOTE: We need collect the checkpoints from the stack in reverse order
             if self.checkpointing:
-                if op.solve_exner:
-                    self.fwd_solutions_bathymetry[i].assign(self.collect_from_checkpoint())
-                if op.solve_sediment:
-                    self.fwd_solutions_sediment[i].assign(self.collect_from_checkpoint())
-                if op.solve_tracer:
-                    self.fwd_solutions_tracer[i].assign(self.collect_from_checkpoint())
-                if op.solve_swe:
-                    self.fwd_solutions[i].assign(self.collect_from_checkpoint())
+                mode = kwargs.get('checkpointing_mode', 'memory')
+                if mode == 'disk':
+                    self.collect_from_checkpoint(i, mode=mode)
+                else:
+                    if op.solve_exner:
+                        self.fwd_solutions_bathymetry[i].assign(self.collect_from_checkpoint(i, mode=mode))
+                    if op.solve_sediment:
+                        self.fwd_solutions_sediment[i].assign(self.collect_from_checkpoint(i, mode=mode))
+                    if op.solve_tracer:
+                        self.fwd_solutions_tracer[i].assign(self.collect_from_checkpoint(i, mode=mode))
+                    if op.solve_swe:
+                        self.fwd_solutions[i].assign(self.collect_from_checkpoint(i, mode=mode))
 
             # Solve adjoint PDE(s)
             if op.solve_swe:
@@ -1300,19 +1487,25 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if self.tracer_options[i].use_limiter_for_tracers:
                     self.tracer_limiters[i].apply(self.adj_solutions_tracer[i])
 
-            # Increment counters
             self.iteration -= 1
             self.simulation_time -= op.dt
-            self.callbacks[i].evaluate(mode='timestep')
-
-            # Export
             if self.iteration % op.dt_per_export == 0:
+
+                # Exports and callbacks
+                if export_func is not None:
+                    export_func()
+                self.callbacks[i].evaluate(mode='export_adjoint')
+
+                # Print time to screen
                 cpu_time = perf_counter() - cpu_timestamp
-                cpu_timestamp = perf_counter()
                 if self.num_meshes == 1:
-                    print_output(msg.format(self.simulation_time, cpu_time))
+                    self.print(msg.format(self.simulation_time, cpu_time))
                 else:
-                    print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, cpu_time))
+                    self.print(msg.format(self.outer_iteration, i+1, self.num_meshes,
+                                          self.simulation_time, cpu_time))
+                cpu_timestamp = perf_counter()
+
+                # Plot to .pvd
                 if op.solve_swe and plot_pvd:
                     z, zeta = self.adj_solutions[i].split()
                     proj_z.project(z)
@@ -1321,215 +1514,128 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if op.solve_tracer and plot_pvd:
                     proj_tracer.project(self.adj_solutions_tracer[i])
                     self.adjoint_tracer_file.write(proj_tracer)
-                if export_func is not None:
-                    export_func()
-        self.time_kernel.assign(1.0 if self.simulation_time >= self.op.start_time else 0.0)
-        update_forcings(self.simulation_time - op.dt)
-        op.print_debug("Done!")
-        print_output(80*'=')
+            self.time_kernel.assign(1.0 if self.simulation_time >= self.op.start_time else 0.0)
+        if update_forcings is not None:
+            update_forcings(self.simulation_time - op.dt)
+        self.print(80*'=')
 
     # --- Metric
 
-    # TODO: Allow Hessian metric for tracer / sediment / Exner
-    def get_hessian_metric(self, adjoint=False, **kwargs):
+    def recover_hessian_metrics(self, i, adjoint=False, **kwargs):  # TODO: USEME more
+        op = self.op
         kwargs.setdefault('normalise', True)
-        kwargs['op'] = self.op
-        self.metrics = []
-        solutions = self.adj_solutions if adjoint else self.fwd_solutions
-        for i, sol in enumerate(solutions):
+        kwargs['op'] = op
+        sol = self.get_solutions(op.adapt_field, adjoint=adjoint)[i]
+        if op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
+
+            # Account for SUPG stabilisation in weighted Hessian metric
+            if op.adapt_field in ('tracer', 'sediment') and op.stabilisation_tracer == 'supg':
+                if self.approach == 'weighted_hessian':
+                    eq_options = self.__getattribute__('{:s}_options'.format(op.adapt_field))
+                    u = op.get_velocity(self.simulation_time)
+                    sol = sol + eq_options[i].supg_stabilisation*dot(u, grad(sol))
+
+            return [steady_metric(sol, mesh=self.meshes[i], **kwargs)]
+        else:
             fields = {'bathymetry': self.bathymetry[i], 'inflow': self.inflow[i]}
-            self.metrics.append(get_hessian_metric(sol, fields=fields, **kwargs))
+            return [
+                recover_hessian_metric(sol, adapt_field='velocity_x', fields=fields, **kwargs),
+                recover_hessian_metric(sol, adapt_field='velocity_y', fields=fields, **kwargs),
+                recover_hessian_metric(sol, adapt_field='elevation', fields=fields, **kwargs),
+            ]
+
+    def get_static_hessian_metric(self, adapt_field, i=0, adjoint=False, elementwise=False):
+        """
+        Compute an appropriate Hessian for the problem at hand. This is inherently
+        problem-dependent, since the choice of field for adaptation is not universal.
+        """
+        hessian_kwargs = dict(normalise=False, enforce_constraints=False, op=self.op)
+        if elementwise:
+            sol = self.get_solutions(adapt_field, adjoint=adjoint)[i]
+            hessian_kwargs['V'] = self.P0_ten[i]
+            gradient_kwargs = dict(mesh=self.mesh, op=self.op)
+            if adapt_field == 'shallow_water':
+                u, eta = sol.split()
+                fields = [u[0], u[1], eta]
+                gradients = [recover_gradient(f, **gradient_kwargs) for f in fields]
+                hessians = [steady_metric(H=grad(g), **hessian_kwargs) for g in gradients]
+                return combine_metrics(*hessians, average='avg' in self.op.adapt_field)
+            else:
+                return steady_metric(H=grad(recover_gradient(sol, op=self.op)), **hessian_kwargs)
+        else:
+            hessians = self.recover_hessian_metrics(0, adjoint=adjoint, **hessian_kwargs)
+            if self.op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
+                return hessians[0]
+            else:
+                return combine_metrics(*hessians, average='avg' in self.op.adapt_field)
+
+    def get_recovery(self, i, **kwargs):
+        """
+        Create an :class:`L2Projector` object which can repeatedly project fields specified in
+        :attr:`op.adapt_field`.
+        """
+        op = self.op
+        if op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
+            fs = self.get_function_space(op.adapt_field)[i]
+            return HessianMetricRecoverer(fs, op=op)
+        elif op.approach == 'vorticity':  # TODO: Use recoverer stashed in callback
+            return L2ProjectorVorticity(self.V[i], op=op)
+        else:
+            return ShallowWaterHessianRecoverer(
+                self.V[i], op=op,
+                constant_fields={'bathymetry': self.bathymetry[i]}, **kwargs,
+            )
 
     # --- Run scripts
 
-    # TODO: Allow adaptation to tracer / sediment / Exner
-    def run_hessian_based(self, **kwargs):
+    def run(self, **kwargs):
         """
-        Adaptation loop for Hessian based approach.
+        Run simulation using mesh adaptation approach specified by `self.approach`.
 
-        Field for adaptation is specified by `op.adapt_field`.
-
-        Multiple fields can be combined using double-understrokes and either 'avg' for metric
-        average or 'int' for metric intersection. We assume distributivity of intersection over
-        averaging.
-
-        For example, `adapt_field = 'elevation__avg__velocity_x__int__bathymetry'` would imply
-        first intersecting the Hessians recovered from the x-component of velocity and bathymetry
-        and then averaging the result with the Hessian recovered from the elevation.
-
-        Stopping criteria:
-          * iteration count > self.op.num_adapt;
-          * relative change in element count < self.op.element_rtol;
-          * relative change in quantity of interest < self.op.qoi_rtol.
+        For metric-based approaches, a fixed point iteration loop is used.
         """
-        op = self.op
-        if op.adapt_field in ('all_avg', 'all_int'):
-            c = op.adapt_field[-3:]
-            op.adapt_field = "velocity_x__{:s}__velocity_y__{:s}__elevation".format(c, c)
-        adapt_fields = ('__int__'.join(op.adapt_field.split('__avg__'))).split('__int__')
-        if op.hessian_time_combination not in ('integrate', 'intersect'):
-            msg = "Hessian time combination method '{:s}' not recognised."
-            raise ValueError(msg.format(op.hessian_time_combination))
+        run_scripts = {
 
-        for n in range(op.num_adapt):
-            self.outer_iteration = n
+            # Non-adaptive
+            'fixed_mesh': self.solve_forward,
 
-            # Arrays to hold Hessians for each field on each window
-            H_windows = [[Function(P1_ten) for P1_ten in self.P1_ten] for f in adapt_fields]
+            # Metric-based using forward solution fields
+            'hessian': self.run_hessian_based,
+            'vorticity': self.run_hessian_based,  # TODO: Change name and update docs
 
-            if hasattr(self, 'hessian_func'):
-                delattr(self, 'hessian_func')
-            update_forcings = None
-            export_func = None
-            for i in range(self.num_meshes):
+            # Metric-based using forward *and* adjoint solution fields
+            'dwp': self.run_dwp,
 
-                # Transfer the solution from the previous mesh / apply initial condition
-                self.transfer_forward_solution(i)
+            # Metric-based goal-oriented using DWR
+            'dwr': self.run_dwr,
+            'dwr_adjoint': self.run_dwr,
+            'dwr_avg': self.run_dwr,
+            'dwr_int': self.run_dwr,
+            'dwr_both': self.run_dwr,
+            'isotropic_dwr': self.run_dwr,                 # TODO: Unsteady case
+            'isotropic_dwr_adjoint': self.run_dwr,         # TODO: Unsteady case
+            'isotropic_dwr_avg': self.run_dwr,             # TODO: Unsteady case
+            'isotropic_dwr_int': self.run_dwr,             # TODO: Unsteady case
+            'anisotropic_dwr': self.run_dwr,               # TODO: Unsteady case
+            'anisotropic_dwr_adjoint': self.run_dwr,       # TODO: Unsteady case
+            'anisotropic_dwr_avg': self.run_dwr,           # TODO: Unsteady case
+            'anisotropic_dwr_int': self.run_dwr,           # TODO: Unsteady case
 
-                if n < op.num_adapt-1:
+            # Metric-based goal-oriented *not* using DWR
+            'weighted_hessian': self.run_no_dwr,
+            'weighted_hessian_adjoint': self.run_no_dwr,   # TODO: Unsteady case
+            'weighted_hessian_avg': self.run_no_dwr,       # TODO: Unsteady case
+            'weighted_hessian_int': self.run_no_dwr,       # TODO: Unsteady case
+            'weighted_gradient': self.run_no_dwr,          # TODO: Unsteady case
+            'weighted_gradient_adjoint': self.run_no_dwr,  # TODO: Unsteady case
+            'weighted_gradient_avg': self.run_no_dwr,      # TODO: Unsteady case
+            'weighted_gradient_int': self.run_no_dwr,      # TODO: Unsteady case
+        }
+        if self.approach not in run_scripts:
+            raise ValueError("Approach '{:s}' not recognised".format(self.approach))
+        run_scripts[self.approach](**kwargs)
 
-                    # Create double L2 projection operator which will be repeatedly used
-                    kwargs = {
-                        'enforce_constraints': False,
-                        'normalise': False,
-                        'noscale': True,
-                    }
-                    recoverer = ShallowWaterHessianRecoverer(
-                        self.V[i], op=op,
-                        constant_fields={'bathymetry': self.bathymetry[i]}, **kwargs,
-                    )
-
-                    def hessian(sol, adapt_field):
-                        fields = {'adapt_field': adapt_field, 'fields': self.fields[i]}
-                        return recoverer.get_hessian_metric(sol, **fields, **kwargs)
-
-                    # Array to hold time-integrated Hessian UFL expression
-                    H_window = [0 for f in adapt_fields]
-
-                    def update_forcings(t):  # TODO: Other timesteppers
-                        """Time-integrate Hessian using Trapezium Rule."""
-                        iteration = int(self.simulation_time/op.dt)
-                        if iteration % op.hessian_timestep_lag != 0:
-                            iteration += 1
-                            return
-                        first_ts = iteration == i*self.dt_per_mesh
-                        final_ts = iteration == (i+1)*self.dt_per_mesh
-                        dt = op.dt*op.hessian_timestep_lag
-                        for j, f in enumerate(adapt_fields):
-                            H = hessian(self.fwd_solutions[i], f)
-                            if f == 'bathymetry':
-                                H_window[j] = H
-                            elif op.hessian_time_combination == 'integrate':
-                                H_window[j] += (0.5 if first_ts or final_ts else 1.0)*dt*H
-                            else:
-                                H_window[j] = H if first_ts else metric_intersection(H, H_window[j])
-
-                    def export_func():
-                        """
-                        Extract time-averaged Hessian.
-
-                        NOTE: We only care about the final export in each mesh iteration
-                        """
-                        if np.allclose(self.simulation_time, (i+1)*op.dt*self.dt_per_mesh):
-                            for j, H in enumerate(H_window):
-                                if op.hessian_time_combination == 'intersect':
-                                    H_window[j] *= op.dt*self.dt_per_mesh
-                                H_windows[j][i].interpolate(H_window[j])
-
-                # Solve step for current mesh iteration
-
-                self.setup_solver_forward(i)
-                self.solve_forward_step(i, export_func=export_func, update_forcings=update_forcings, plot_pvd=op.plot_pvd)
-
-                # Delete objects to free memory
-                if n < op.num_adapt-1:
-                    del H_window
-                    del recoverer
-
-            # --- Convergence criteria
-
-            # Check QoI convergence
-            qoi = self.quantity_of_interest()
-            print_output("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
-            self.qois.append(qoi)
-            if len(self.qois) > 1:
-                if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
-                    print_output("Converged quantity of interest!")
-                    break
-
-            # Check maximum number of iterations
-            if n == op.num_adapt - 1:
-                break
-
-            # --- Time normalise metrics
-
-            for j in range(len(adapt_fields)):
-                space_time_normalise(H_windows[j], op=op)
-
-            # Combine metrics (if appropriate)
-            metrics = [Function(P1_ten, name="Hessian metric") for P1_ten in self.P1_ten]
-            for i in range(self.num_meshes):
-                H_window = [H_windows[j][i] for j in range(len(adapt_fields))]
-                if 'int' in op.adapt_field:
-                    if 'avg' in op.adapt_field:
-                        raise NotImplementedError  # TODO: mixed case
-                    metrics[i].assign(metric_intersection(*H_window))
-                elif 'avg' in op.adapt_field:
-                    metrics[i].assign(metric_average(*H_window))
-                else:
-                    try:
-                        assert len(adapt_fields) == 1
-                    except AssertionError:
-                        msg = "Field for adaptation '{:s}' not recognised"
-                        raise ValueError(msg.format(op.adapt_field))
-                    metrics[i].assign(H_window[0])
-            del H_windows
-
-            # metric_file = File(os.path.join(self.di, 'metric.pvd'))
-            complexities = []
-            for i, M in enumerate(metrics):
-                # metric_file.write(M)
-                complexities.append(metric_complexity(M))
-            self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
-
-            # --- Adapt meshes
-
-            print_output("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
-            for i, M in enumerate(metrics):
-                print_output("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
-                self.meshes[i] = pragmatic_adapt(self.meshes[i], M, op=op)
-            del metrics
-            self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
-            self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
-            print_output("Done!")
-
-            # ---  Setup for next run / logging
-
-            self.setup_all(self.meshes)
-            self.dofs.append([np.array(V.dof_count).sum() for V in self.V])
-
-            print_output("\nResulting meshes")
-            msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
-            for i, c in enumerate(complexities):
-                print_output(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
-            msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
-            print_output(msg.format(
-                self.st_complexities[-1],
-                sum(self.num_vertices[n+1])*self.dt_per_mesh,
-                sum(self.num_cells[n+1])*self.dt_per_mesh,
-            ))
-
-            # Check convergence of *all* element counts
-            converged = True
-            for i, num_cells_ in enumerate(self.num_cells[n-1]):
-                if np.abs(self.num_cells[n][i] - num_cells_) > op.element_rtol*num_cells_:
-                    converged = False
-            if converged:
-                print_output("Converged number of mesh elements!")
-                break
-
-    # TODO: Modify indicator for time interval
-    def run_dwp(self, **kwargs):
+    def run_dwp(self, plot_pvd=None, **kwargs):
         r"""
         The "dual weighted primal" approach, first used (not under this name) in [1]. For shallow
         water tsunami propagation problems with a quantity of interest of the form
@@ -1549,41 +1655,36 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         This motivates using error indicators of the form :math:`|q \cdot \hat q|`.
 
+        Convergence criteria:
+          * Convergence of quantity of interest (relative tolerance `op.qoi_rtol`);
+          * Convergence of mesh element count (relative tolerance `op.element_rtol`);
+          * Maximum number of iterations reached (`op.max_adapt`).
+
         [1] B. Davis & R. LeVeque, "Adjoint Methods for Guiding Adaptive Mesh Refinement in
             Tsunami Modelling", Pure and Applied Geophysics, 173, Springer International
             Publishing (2016), p.4055--4074, DOI 10.1007/s00024-016-1412-y.
         """
         op = self.op
-        self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
-        for n in range(op.num_adapt):
+        wq = Constant(1.0)  # Quadrature weight
+        plot_pvd = plot_pvd or op.plot_pvd
+
+        # Loop until we hit the maximum number of iterations, max_adapt
+        assert op.min_adapt < op.max_adapt
+        num_steps = int((op.end_time - op.start_time)/op.dt)+1
+        for n in range(op.max_adapt):
             self.outer_iteration = n
 
-            # --- Solve forward to get checkpoints
-
-            # self.get_checkpoints()
+            # Solve forward to get checkpoints
             self.solve_forward()
 
-            # --- Convergence criteria
-
-            # Check QoI convergence
-            qoi = self.quantity_of_interest()
-            print_output("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
-            self.qois.append(qoi)
-            if len(self.qois) > 1:
-                if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
-                    print_output("Converged quantity of interest!")
-                    break
-
-            # Check maximum number of iterations
-            if n == op.num_adapt - 1:
+            # Check convergence
+            if (self.qoi_converged or self.maximum_adaptations_met) and self.minimum_adaptations_met:
                 break
 
-            # --- Loop over mesh windows *in reverse*
-
-            for i, P1 in enumerate(self.P1):
-                self.indicators[i]['dwp'] = Function(P1, name="DWP indicator")
-            metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
-            for i in range(self.num_meshes-1, -1, -1):
+            # Loop over mesh windows *in reverse*
+            self.metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
+            adj_solutions_all_steps = []
+            for i in reversed(range(self.num_meshes)):
                 fwd_solutions_step = []
                 adj_solutions_step = []
 
@@ -1594,8 +1695,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 self.simulation_time = i*op.dt*self.dt_per_mesh
                 self.transfer_forward_solution(i)
-                self.setup_solver_forward(i)
-                self.solve_forward_step(i, export_func=export_func, plot_pvd=False)
+                self.setup_solver_forward_step(i)
+                self.solve_forward_step(i, export_func=export_func, plot_pvd=False, export_initial=True)
 
                 # --- Solve adjoint on current window
 
@@ -1603,201 +1704,228 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     adj_solutions_step.append(self.adj_solutions[i].copy(deepcopy=True))
 
                 self.transfer_adjoint_solution(i)
-                self.setup_solver_adjoint(i)
-                self.solve_adjoint_step(i, export_func=export_func, plot_pvd=False)
+                self.setup_solver_adjoint_step(i)
+                self.solve_adjoint_step(i, export_func=export_func, plot_pvd=plot_pvd, export_initial=True)
 
-                # --- Assemble indicators and metrics
-
+                # Assemble indicator
                 n_fwd = len(fwd_solutions_step)
                 n_adj = len(adj_solutions_step)
                 if n_fwd != n_adj:
                     msg = "Mismatching number of indicators ({:d} vs {:d})"
                     raise ValueError(msg.format(n_fwd, n_adj))
-                I = 0
+                self.indicators[i]['dwp'] = Function(self.P1[i], name="DWP indicator")
                 op.print_debug("DWP indicators on mesh {:2d}".format(i))
-                for j, solutions in enumerate(zip(fwd_solutions_step, reversed(adj_solutions_step))):
-                    scaling = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule  # TODO: Other integrators
-                    fwd_dot_adj = abs(inner(*solutions))
-                    op.print_debug("    ||<q, q*>||_L2 = {:.4e}".format(assemble(fwd_dot_adj*fwd_dot_adj*dx)))
-                    I += op.dt*self.dt_per_mesh*scaling*fwd_dot_adj
-                self.indicators[i]['dwp'].interpolate(I)
-                metrics[i].assign(isotropic_metric(self.indicators[i]['dwp'], normalise=False))
 
-            # --- Normalise metrics
+                # Account for time range on future meshes
+                adj_projected = []
+                adj_solutions_all_steps = adj_solutions_all_steps[-num_steps:]
+                at_limit = len(adj_solutions_all_steps) == num_steps
+                for adj in adj_solutions_all_steps:
+                    adj_u, adj_eta = adj.split()
+                    adj_proj = Function(self.V[i])
+                    adj_proj_u, adj_proj_eta = adj_proj.split()
+                    adj_proj_u.project(adj_u)
+                    adj_proj_eta.project(adj_eta)
+                    adj_projected.append(adj_proj)
+                for adj in adj_solutions_step:
+                    adj_solutions_all_steps.append(adj)
+                for j, fwd in enumerate(fwd_solutions_step):
+                    if op.timestepper == 'CrankNicolson':
+                        w = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule
+                    else:
+                        raise NotImplementedError  # TODO: Other integrators
+                    wq.assign(w*op.dt*self.dt_per_mesh)
 
-            space_time_normalise(metrics, op=op)
+                    # Account for time range
+                    qqstar = 0
+                    if at_limit:
+                        adj_projected = adj_projected[1:]
+                    for adj_proj in adj_projected:
+                        qqstar = max_value(abs(inner(fwd, adj)), qqstar)
+                    for adj in adj_solutions_step[:j+1]:
+                        qqstar = max_value(abs(inner(fwd, adj)), qqstar)
+                    self.indicators[i]['dwp'] = interpolate(max_value(self.indicators[i]['dwp'], wq*qqstar), self.P1[i])
+                adj_projected = []
+                at_limit = False
 
-            # Output to .pvd and .vtu
-            # metric_file = File(os.path.join(self.di, 'metric.pvd'))
-            complexities = []
-            for i, M in enumerate(metrics):
-                self.indicator_file._topology = None
-                self.indicator_file.write(self.indicators[i]['dwp'])
-                # metric_file._topology = None
-                # metric_file.write(M)
-                complexities.append(metric_complexity(M))
-            self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
+                # Construct isotropic metric
+                self.metrics[i].assign(isotropic_metric(self.indicators[i]['dwp'], normalise=False))
 
-            # --- Adapt meshes
+            # Normalise metrics
+            self.space_time_normalise()
 
-            print_output("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
-            for i, M in enumerate(metrics):
-                print_output("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
-                self.meshes[i] = pragmatic_adapt(self.meshes[i], M, op=op)
-            del metrics
-            self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
-            self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
-            print_output("Done!")
+            # Adapt meshes
+            self.adapt_meshes()
 
-            # ---  Setup for next run / logging
-
-            self.setup_all(self.meshes)
-            self.dofs.append([np.array(V.dof_count).sum() for V in self.V])
-
-            print_output("\nResulting meshes")
-            msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
-            for i, c in enumerate(complexities):
-                print_output(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
-            msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
-            print_output(msg.format(
-                self.st_complexities[-1],
-                sum(self.num_vertices[n+1])*self.dt_per_mesh,
-                sum(self.num_cells[n+1])*self.dt_per_mesh,
-            ))
-
-            # Check convergence of *all* element counts
-            converged = True
-            for i, num_cells_ in enumerate(self.num_cells[n-1]):
-                if np.abs(self.num_cells[n][i] - num_cells_) > op.element_rtol*num_cells_:
-                    converged = False
-            if converged:
-                print_output("Converged number of mesh elements!")
+            # Check convergence
+            if not self.minimum_adaptations_met:
+                continue
+            if self.elements_converged:
                 break
 
-    # TODO: Allow adaptation to tracer / sediment / Exner
-    # TODO: Enable move to base class
     def run_dwr(self, **kwargs):
-        # TODO: doc
+        """
+        Main script for goal-oriented mesh adaptation routines.
+
+        Both isotropic and anisotropic metrics are considered, as described in
+        [Wallwork et al. 2021].
+
+        Convergence criteria:
+          * Convergence of quantity of interest (relative tolerance `op.qoi_rtol`);
+          * Convergence of mesh element count (relative tolerance `op.element_rtol`);
+          * Convergence of error estimator (relative tolerance `op.estimator_rtol`);
+          * Maximum number of iterations reached (`op.max_adapt`).
+
+        [Wallwork et al. 2021] J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, "Goal-Oriented
+            Error Estimation and Mesh Adaptation for Tracer Transport Problems", submitted to
+            Computer Aided Design.
+        """
         op = self.op
-        self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
-        for n in range(op.num_adapt):
+        wq = Constant(1.0)  # Quadrature weight
+        assert self.approach in ('dwr', 'anisotropic_dwr')
+        if op.dt_per_export > 1:
+            raise NotImplementedError  # TODO
+
+        # Loop until we hit the maximum number of iterations, max_adapt
+        assert op.min_adapt < op.max_adapt
+        self.estimators['dwr'] = []
+        for n in range(op.max_adapt):
             self.outer_iteration = n
 
-            # --- Solve forward to get checkpoints
-
-            # self.get_checkpoints()
+            # Solve forward to get checkpoints
             self.solve_forward()
 
-            # --- Convergence criteria
-
-            # Check QoI convergence
-            qoi = self.quantity_of_interest()
-            print_output("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
-            self.qois.append(qoi)
-            if len(self.qois) > 1:
-                if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
-                    print_output("Converged quantity of interest!")
-                    break
-
-            # Check maximum number of iterations
-            if n == op.num_adapt - 1:
+            # Check convergence
+            if (self.qoi_converged or self.maximum_adaptations_met) and self.minimum_adaptations_met:
                 break
 
-            # --- Setup problem on enriched space
-
+            # Setup problem on enriched space
             same_mesh = True
             for mesh in self.meshes:
                 if mesh != self.meshes[0]:
                     same_mesh = False
                     break
             if same_mesh:
-                print_output("All meshes are identical so we use an identical hierarchy.")
+                self.print("All meshes are identical so we use an identical hierarchy.")
                 hierarchy = MeshHierarchy(self.meshes[0], 1)
                 refined_meshes = [hierarchy[1] for mesh in self.meshes]
             else:
-                print_output("Meshes differ so we create separate hierarchies.")
-                hierarchies = [MeshHierarchy(mesh, 1) for mesh in self.meshes]
-                refined_meshes = [hierarchy[1] for hierarchy in hierarchies]
+                self.print("Meshes differ so we create separate hierarchies.")
+                hierarchy = [MeshHierarchy(mesh, 1) for mesh in self.meshes]
+                refined_meshes = [h[1] for h in hierarchy]
             ep = type(self)(
                 op,
                 meshes=refined_meshes,
                 nonlinear=self.nonlinear,
             )
             ep.outer_iteration = n
+            enriched_space = ep.get_function_space(op.adapt_field)
 
-            # --- Loop over mesh windows *in reverse*
-
+            # Loop over mesh windows *in reverse*
             for i, P1 in enumerate(self.P1):
                 self.indicators[i]['dwr'] = Function(P1, name="DWR indicator")
-            metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
-            for i in range(self.num_meshes-1, -1, -1):
+            self.metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
+            self.estimators['dwr'].append(0.0)
+            for i in reversed(range(self.num_meshes)):
                 fwd_solutions_step = []
                 fwd_solutions_step_old = []
                 adj_solutions_step = []
                 enriched_adj_solutions_step = []
-                tm = dmhooks.get_transfer_manager(self.meshes[i]._plex)
+                tm = dmhooks.get_transfer_manager(self.plexes[i])
 
                 # --- Setup forward solver for enriched problem
 
-                # TODO: Need to transfer fwd sol in nonlinear case
-                ep.create_error_estimators(i)  # These get passed to the timesteppers under the hood
-                ep.setup_solver_forward(i)
-                ets = ep.timesteppers[i]['shallow_water']  # TODO: Tracer option
+                ep.create_error_estimators_step(i)  # Passed to the timesteppers under the hood
+                ep.setup_solver_forward_step(i)
+                if self.nonlinear:
+                    ep.solve_forward_step(i)
+                    # TODO: Option to prolong forward solution
+                ets = ep.get_timestepper(i, op.adapt_field)
 
                 # --- Solve forward on current window
 
-                ts = self.timesteppers[i]['shallow_water']  # TODO: Tracer option
+                self.simulation_time = i*op.dt*self.dt_per_mesh
+                self.transfer_forward_solution(i)
+                self.setup_solver_forward_step(i)
+                ts = self.get_timestepper(i, op.adapt_field)
 
                 def export_func():
                     fwd_solutions_step.append(ts.solution.copy(deepcopy=True))
                     fwd_solutions_step_old.append(ts.solution_old.copy(deepcopy=True))
                     # TODO: Also need store fields at each export (in general case)
 
-                self.simulation_time = i*op.dt*self.dt_per_mesh
-                self.transfer_forward_solution(i)
-                self.setup_solver_forward(i)
-                self.solve_forward_step(i, export_func=export_func, plot_pvd=False)
+                self.solve_forward_step(i, export_func=export_func, plot_pvd=False, export_initial=False)
 
                 # --- Solve adjoint on current window
 
                 def export_func():
-                    adj_solutions_step.append(self.adj_solutions[i].copy(deepcopy=True))
+                    adj = self.get_solutions(op.adapt_field, adjoint=True)[i].copy(deepcopy=True)
+                    adj_solutions_step.append(adj)
+
+                if self.nonlinear:
+                    raise NotImplementedError  # TODO: update_forcings fwd sol in base adjoint solve
 
                 self.transfer_adjoint_solution(i)
-                self.setup_solver_adjoint(i)
-                self.solve_adjoint_step(i, export_func=export_func, plot_pvd=False)
+                self.setup_solver_adjoint_step(i)
+                self.solve_adjoint_step(i, export_func=export_func, plot_pvd=False, export_initial=True)
 
                 # --- Solve adjoint on current window in enriched space
 
                 def export_func():
-                    enriched_adj_solutions_step.append(ep.adj_solutions[i].copy(deepcopy=True))
+                    adj = ep.get_solutions(op.adapt_field, adjoint=True)[i].copy(deepcopy=True)
+                    enriched_adj_solutions_step.append(adj)
+
+                if self.nonlinear:
+                    raise NotImplementedError  # TODO: update_forcings fwd sol in enriched adjoint solve
 
                 ep.simulation_time = (i+1)*op.dt*self.dt_per_mesh  # TODO: Shouldn't be needed
                 ep.transfer_adjoint_solution(i)
-                ep.setup_solver_adjoint(i)
-                ep.solve_adjoint_step(i, export_func=export_func, plot_pvd=False)
+                ep.setup_solver_adjoint_step(i)
+                ep.solve_adjoint_step(i, export_func=export_func, plot_pvd=False, export_initial=True)
 
                 # --- Assemble indicators and metrics
 
+                # Reverse adjoint solution arrays and take pairwise averages
+                adj_solutions_step = list(reversed(adj_solutions_step))
+                enriched_adj_solutions_step = list(reversed(enriched_adj_solutions_step))
+                for j in range(len(adj_solutions_step)):
+                    adj_solutions_step[j] *= 0.5
+                    enriched_adj_solutions_step[j] *= 0.5
+                for j in range(len(adj_solutions_step)-1):
+                    for adj1, adj2 in zip(adj_solutions_step[j].split(), adj_solutions_step[j+1].split()):
+                        adj1 += adj2
+                    for adj1, adj2 in zip(enriched_adj_solutions_step[j].split(), enriched_adj_solutions_step[j+1].split()):
+                        adj1 += adj2
+                adj_solutions_step = adj_solutions_step[:-1]
+                enriched_adj_solutions_step = enriched_adj_solutions_step[:-1]
+
+                # Checks
                 n_fwd = len(fwd_solutions_step)
                 n_adj = len(adj_solutions_step)
                 if n_fwd != n_adj:
                     msg = "Mismatching number of indicators ({:d} vs {:d})"
                     raise ValueError(msg.format(n_fwd, n_adj))
-                adj_solutions_step = list(reversed(adj_solutions_step))
-                enriched_adj_solutions_step = list(reversed(enriched_adj_solutions_step))
-                I = 0
-                op.print_debug("DWR indicators on mesh {:2d}".format(i))
+                op.print_debug("GO: Computing DWR indicators on mesh {:2d}".format(i))
+
+                # Various work fields
                 indicator_enriched = Function(ep.P0[i])
-                fwd_proj = Function(ep.V[i])
-                fwd_old_proj = Function(ep.V[i])
-                adj_error = Function(ep.V[i])
-                bcs = self.boundary_conditions[i]['shallow_water']  # TODO: Tracer option
+                indicator_enriched_cts = Function(ep.P1[i])
+                tmp = Function(ep.P1[i])
+                fwd_proj = Function(enriched_space[i])
+                fwd_old_proj = Function(enriched_space[i])
+                adj_error = Function(enriched_space[i])
+
+                # Setup error estimator
+                bcs = self.get_boundary_conditions(i)
                 ets.setup_error_estimator(fwd_proj, fwd_old_proj, adj_error, bcs)
 
                 # Loop over exported timesteps
                 for j in range(len(fwd_solutions_step)):
-                    scaling = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule  # TODO: Other integrators
+                    if op.timestepper == 'CrankNicolson':
+                        w = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule
+                    else:
+                        raise NotImplementedError  # TODO: Other integrators
+                    wq.assign(w*op.dt*op.dt_per_export)
 
                     # Prolong forward solution at current and previous timestep
                     tm.prolong(fwd_solutions_step[j], fwd_proj)
@@ -1812,69 +1940,234 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     indicator_enriched.interpolate(abs(ets.error_estimator.weighted_residual()))
 
                     # Time-integrate
-                    I += op.dt*self.dt_per_mesh*scaling*indicator_enriched
-                indicator_enriched_cts = interpolate(I, ep.P1[i])
-                tm.inject(indicator_enriched_cts, self.indicators[i]['dwr'])
-                metrics[i].assign(isotropic_metric(self.indicators[i]['dwr'], normalise=False))
+                    tmp.project(indicator_enriched)
+                    indicator_enriched_cts += wq*tmp
 
-            del indicator_enriched_cts
+                # Inject into the base space and construct an isotropic metric
+                tm.inject(indicator_enriched_cts, self.indicators[i]['dwr'])
+                self.indicators[i]['dwr'].interpolate(abs(self.indicators[i]['dwr']))  # Ensure +ve
+                self.estimators['dwr'][-1] += self.indicators[i]['dwr'].vector().gather().sum()
+                if self.approach == 'dwr':
+                    self.metrics[i].assign(isotropic_metric(self.indicators[i]['dwr'], normalise=False))
+                else:
+                    raise NotImplementedError  # TODO: anisotropic_dwr
+
             del adj_error
             del indicator_enriched
             del ep
             del refined_meshes
-            if same_mesh:
-                del hierarchy
-            else:
-                del hierarchies
+            del hierarchy
 
-            # --- Normalise metrics
-
-            space_time_normalise(metrics, op=op)
-
-            # Output to .pvd and .vtu
-            # metric_file = File(os.path.join(self.di, 'metric.pvd'))
-            complexities = []
-            for i, M in enumerate(metrics):
-                self.indicator_file._topology = None
-                self.indicator_file.write(self.indicators[i]['dwr'])
-                # metric_file._topology = None
-                # metric_file.write(M)
-                complexities.append(metric_complexity(M))
-            self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
-
-            # --- Adapt meshes
-
-            print_output("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
-            for i, M in enumerate(metrics):
-                print_output("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
-                self.meshes[i] = pragmatic_adapt(self.meshes[i], M, op=op)
-            del metrics
-            self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
-            self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
-            print_output("Done!")
-
-            # ---  Setup for next run / logging
-
-            self.setup_all(self.meshes)
-            self.dofs.append([np.array(V.dof_count).sum() for V in self.V])
-
-            print_output("\nResulting meshes")
-            msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
-            for i, c in enumerate(complexities):
-                print_output(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
-            msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
-            print_output(msg.format(
-                self.st_complexities[-1],
-                sum(self.num_vertices[n+1])*self.dt_per_mesh,
-                sum(self.num_cells[n+1])*self.dt_per_mesh,
-            ))
-
-            # Check convergence of *all* element counts
-            converged = True
-            for i, num_cells_ in enumerate(self.num_cells[n-1]):
-                if np.abs(self.num_cells[n][i] - num_cells_) > op.element_rtol*num_cells_:
-                    converged = False
-            if converged:
-                print_output("Converged number of mesh elements!")
+            # Check convergence of error estimator
+            if self.estimator_converged:
                 break
 
+            # Normalise metrics
+            self.space_time_normalise()
+
+            # Adapt meshes
+            self.adapt_meshes()
+
+            # Check convergence
+            if not self.minimum_adaptations_met:
+                continue
+            if self.elements_converged:
+                break
+
+    def run_no_dwr(self, **kwargs):
+        """
+        Main script for goal-oriented mesh adaptation routines which do not use the dual-weighted
+        residual.
+
+        'Weighted Hessian' and 'weighted gradient' metrics are considered, as described in
+        [Wallwork et al. 2021].
+
+        Convergence criteria:
+          * Convergence of quantity of interest (relative tolerance `op.qoi_rtol`);
+          * Convergence of mesh element count (relative tolerance `op.element_rtol`);
+          * Maximum number of iterations reached (`op.max_adapt`).
+
+        [Wallwork et al. 2021] J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, "Goal-Oriented
+            Error Estimation and Mesh Adaptation for Tracer Transport Problems", submitted to
+            Computer Aided Design.
+        """
+        if self.approach == 'weighted_hessian':
+            self._run_weighted_hessian()
+        else:
+            raise NotImplementedError  # TODO
+
+    def _run_weighted_hessian(self, **kwargs):
+        op = self.op
+        N = self.export_per_mesh
+        assert self.approach == 'weighted_hessian'
+        w = op.dt*op.dt_per_export
+        if op.hessian_time_combination == 'integrate':
+            w *= N-1
+
+        # Process parameters
+        if op.adapt_field not in ('tracer', 'sediment', 'bathymetry'):
+            if op.adapt_field not in ('all_avg', 'all_int'):
+                op.adapt_field = 'all_{:s}'.format('int' if 'int' in op.adapt_field else 'avg')
+        if op.adapt_field in ('all_avg', 'all_int'):
+            c = op.adapt_field[-3:]
+            op.adapt_field = "velocity_x__{:s}__velocity_y__{:s}__elevation".format(c, c)
+        adapt_fields = ('__int__'.join(op.adapt_field.split('__avg__'))).split('__int__')
+        if op.dt_per_export > 1 or op.hessian_timestep_lag > 1:
+            raise NotImplementedError  # TODO
+
+        # Loop until we hit the maximum number of iterations, max_adapt
+        assert op.min_adapt < op.max_adapt
+        hessian_kwargs = dict(normalise=False, enforce_constraints=False)
+        for n in range(op.max_adapt):
+            self.outer_iteration = n
+            export_func_wrapper = None
+
+            # Arrays to hold Hessians for each field on each window
+            self._H_windows = [[[
+                self.maximum_metric(i) for j in range(N)]
+                for i in range(self.num_meshes)]
+                for f in adapt_fields
+            ]
+
+            # Solve forward to get checkpoints
+            for i in range(self.num_meshes):
+                self.create_error_estimators_step(i)  # Passed to the timesteppers under the hood
+                self.transfer_forward_solution(i)
+                self.setup_solver_forward_step(i)
+                self.solve_forward_step(i)
+
+            # Check convergence
+            if (self.qoi_converged or self.maximum_adaptations_met) and self.minimum_adaptations_met:
+                break
+
+            # --- Loop over mesh windows *in reverse*
+
+            for i, P1 in enumerate(self.P1):
+                self.indicators[i]['dwr'] = Function(P1, name="DWR indicator")
+            self.metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
+            for i in reversed(range(self.num_meshes)):
+                strong_residuals_step = []
+                adj_solutions = self.get_solutions(op.adapt_field, adjoint=True)
+                update_forcings = op.get_update_forcings(self, i, adjoint=False)
+                export_func = op.get_export_func(self, i)
+
+                # --- Solve forward on current window
+
+                self.simulation_time = i*op.dt*self.dt_per_mesh
+                self.transfer_forward_solution(i)
+                self.setup_solver_forward_step(i)
+
+                # Setup Hessian recovery
+                if op.adapt_field == 'tracer' and op.stabilisation_tracer == 'SUPG':
+
+                    def hessian(sol, adapt_field):
+                        """
+                        Cannot repeatedly project because we are not projecting a Function.
+                        """
+                        assert adapt_field == 'tracer'
+                        return self.recover_hessian_metrics(i, adjoint=True, **hessian_kwargs)[0]
+
+                else:
+                    recoverer = self.get_recovery(i, **hessian_kwargs)
+
+                    def hessian(sol, adapt_field):
+                        fields = {'adapt_field': adapt_field, 'fields': self.fields[i]}
+                        return recoverer.construct_metric(sol, **fields, **hessian_kwargs)
+
+                def export_func_wrapper():
+                    export_func()
+                    strong_residuals_step.append(self.get_strong_residual(i))
+
+                # Solve step for current mesh iteration
+                solve_kwargs = {
+                    'export_func': export_func_wrapper,
+                    'update_forcings': update_forcings,
+                    'plot_pvd': False,
+                    'export_initial': False,
+                }
+                self.solve_forward_step(i, **solve_kwargs)
+                if len(strong_residuals_step) != N-1:
+                    msg = "Mismatching number of exports ({:d} vs {:d})"
+                    raise ValueError(msg.format(len(strong_residuals_step), N-1))
+                assert len(strong_residuals_step[0]) == len(adapt_fields)
+
+                # --- Solve adjoint on current window
+
+                self.transfer_adjoint_solution(i)
+                self.setup_solver_adjoint_step(i)
+                self.counter = 0
+
+                def export_func():
+                    """
+                    Extract Hessians at each export time.
+                    """
+                    if self.counter < N:
+                        for f, field in enumerate(adapt_fields):
+                            self._H_windows[f][i][self.counter] = hessian(adj_solutions[i], field)
+                    self.counter += 1
+
+                # Solve step for current mesh iteration
+                solve_kwargs = {
+                    'export_func': export_func,
+                    'update_forcings': None,
+                    'plot_pvd': op.plot_pvd,
+                    'export_initial': True,
+                }
+                if self.nonlinear:
+                    raise NotImplementedError  # TODO: update_forcings fwd sol adjoint solve
+                self.solve_adjoint_step(i, **solve_kwargs)
+
+                # Reverse order of Hessians and take pairwise averages
+                for f in range(len(adapt_fields)):
+                    self._H_windows[f][i] = list(reversed(self._H_windows[f][i]))
+                    for j in range(N-1):
+                        self._H_windows[f][i][j] = metric_average(*self._H_windows[f][i][j:j+2])
+                    self._H_windows[f][i][-1] = None
+
+                # --- Assemble indicators and metrics
+
+                # Weight Hessians
+                for j in range(N-1):
+                    for f in range(len(adapt_fields)):
+                        self._H_windows[f][i][j].interpolate(
+                            abs(strong_residuals_step[j][f])*self._H_windows[f][i][j]
+                        )
+
+                # Combine metrics over exports for each field
+                kwargs = {
+                    'average': op.hessian_time_combination == 'integrate',
+                    'weights': np.ones(N-1),
+                }
+                for f in range(len(adapt_fields)):
+                    for j in range(N-2):
+                        self._H_windows[f][i][j] *= w
+                    if op.hessian_time_combination == 'integrate':
+                        if op.timestepper == 'CrankNicolson':
+                            self._H_windows[f][i][0] *= 0.5
+                            self._H_windows[f][i][-2] *= 0.5
+                        else:
+                            raise NotImplementedError  # TODO: Other timesteppers
+                    self._H_windows[f][i] = combine_metrics(*self._H_windows[f][i][:-1], **kwargs)
+
+                # Delete objects to free memory
+                self.free_solver_forward_step(i)
+                self.free_solver_adjoint_step(i)
+
+            # Normalise metrics
+            self.plot_metrics(normalised=False, hessians=True)
+            for H_window in self._H_windows:
+                space_time_normalise(H_window, op=op)
+
+            # Combine metrics
+            self.combine_over_windows(adapt_fields)
+            self.plot_metrics(normalised=True)
+            self.log_complexities()
+
+            # Adapt meshes
+            self.adapt_meshes()
+
+            # Check convergence
+            if not self.minimum_adaptations_met:
+                continue
+            if self.elements_converged:
+                break

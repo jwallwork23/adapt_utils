@@ -45,14 +45,13 @@ kwargs = {
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
-    'use_automatic_sipg_parameter': True,
+    'stabilisation_sediment': None,
     'friction': 'manning'
 }
 
 op = BeachOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
-swp.shallow_water_options[0]['mesh_velocity'] = None
 
 
 def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kappa):

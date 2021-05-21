@@ -7,10 +7,17 @@ import os
 from adapt_utils.unsteady.options import CoupledOptions
 
 
+<<<<<<< HEAD
 __all__ = ["save_mesh", "load_mesh", "initialise_field", "export_field",
            "initialise_bathymetry", "export_bathymetry",
            "initialise_hydrodynamics", "export_hydrodynamics",
            "OuterLoopLogger", "TimeDependentAdaptationLogger", "readfile", "index_string"]
+=======
+__all__ = ["save_mesh", "load_mesh", "initialise_field", "export_field", "initialise_bathymetry",
+           "export_bathymetry", "initialise_hydrodynamics", "export_hydrodynamics",
+           "OuterLoopLogger", "TimeDependentAdaptationLogger", "readfile", "index_string",
+           "get_date", "create_directory", "print_output", "COMM_WORLD", "File"]
+>>>>>>> origin/master
 
 
 def get_filename(fname, index_str):
@@ -175,9 +182,9 @@ def save_mesh(mesh, fname, fpath='.'):
     if COMM_WORLD.size > 1:
         raise IOError("Saving a mesh to HDF5 only works in serial.")
     try:
-        plex = mesh._topology_dm
+        plex = mesh.topology_dm
     except AttributeError:
-        plex = mesh._plex  # Backwards compatability
+        plex = mesh._topology_dm  # Backwards compatability
     viewer = PETSc.Viewer().createHDF5(os.path.join(fpath, fname + '.h5'), 'w')
     viewer(plex)
 
@@ -354,9 +361,9 @@ class OuterLoopLogger(object):
 
         # Log element count and QoI from each outer iteration
         self.logstr += self.divider + 35*' ' + 'SUMMARY\n' + self.divider
-        self.logstr += "{:8s}    {:7s}\n".format('Elements', 'QoI')
-        for num_cells, qoi in zip(self.prob.num_cells, self.prob.qois):
-            self.logstr += "{:8d}    {:7.4e}\n".format(num_cells, qoi)
+        self.logstr += "{:8s}    {:8s}    {:7s}    {:8s}\n".format('Elements', 'Vertices', 'QoI', 'Time')
+        for num_cells, num_vertices, qoi, time in zip(self.prob.num_cells, self.prob.num_vertices, self.prob.qois, self.prob.times):
+            self.logstr += "{:8d}    {:8d}    {:7.4e}    {:.2f}\n".format(num_cells, num_vertices, qoi, time)
         if self.verbose:
             print_output(self.logstr)
 
@@ -386,16 +393,16 @@ class TimeDependentAdaptationLogger(OuterLoopLogger):
         # Log mesh and metric stats from each outer iteration
         self.logstr += self.divider + 35*' ' + 'SUMMARY\n' + self.divider
         for n, (qoi, complexity) in enumerate(zip(self.prob.qois, self.prob.st_complexities)):
-            self.logstr += "Mesh iteration {:2d}: qoi {:.4e}".format(n+1, qoi)
+            self.logstr += "Mesh iteration {:2d}: qoi {:.8e}".format(n+1, qoi)
             if n > 0:
-                self.logstr += " space-time complexity {:.4e}".format(complexity)
+                self.logstr += " space-time complexity {:.8e}".format(complexity)
             self.logstr += "\n"
 
         # Log stats from last outer iteration
-        self.logstr += self.divider + 30*' ' + 'FINAL ELEMENT COUNTS\n' + self.divider
+        self.logstr += self.divider + 30*' ' + 'FINAL ELEMENT & VERTEX COUNTS\n' + self.divider
         l = self.prob.op.end_time/self.prob.op.num_meshes
-        for i, num_cells in enumerate(self.prob.num_cells[-1]):
-            self.logstr += "Time window ({:7.1f},{:7.1f}]: {:7d}\n".format(i*l, (i+1)*l, num_cells)
+        for i, (num_cells, num_vertices) in enumerate(zip(self.prob.num_cells[-1], self.prob.num_vertices[-1])):
+            self.logstr += "Time window ({:7.1f},{:7.1f}]: {:7d} {:7d}\n".format(i*l, (i+1)*l, num_cells, num_vertices)
         self.logstr += self.divider
         if self.verbose:
             print_output(self.logstr)
@@ -424,3 +431,14 @@ def index_string(index, n=5):
     :return: n-digit string form of index.
     """
     return (n - len(str(index)))*'0' + str(index)
+<<<<<<< HEAD
+=======
+
+
+def get_date():
+    """
+    Get the date in year-month-day format.
+    """
+    today = datetime.date.today()
+    return '{:d}-{:d}-{:d}'.format(today.year, today.month, today.day)
+>>>>>>> origin/master
