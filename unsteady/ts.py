@@ -1,12 +1,18 @@
+"""
+Extend some of Thetis' time integration schemes to incorporate goal-oriented error estimation
+functionality.
+
+**********************************************************************************************
+*  NOTE: This file is based on the Thetis project (https://thetisproject.org) and contains   *
+*        some copied code.                                                                   *
+**********************************************************************************************
+"""
 from thetis.utility import *
 import thetis.timeintegrator as thetis_ts
 
 CFL_UNCONDITIONALLY_STABLE = np.inf
 
-<<<<<<< HEAD
-=======
 
->>>>>>> origin/master
 __all__ = ["SteadyState", "CrankNicolson"]
 
 
@@ -17,18 +23,23 @@ class SteadyState(thetis_ts.SteadyState):
     See `thetis/timeintegrator.py` for original version.
     """
     def __init__(self, equation, solution, fields, dt, error_estimator=None, **kwargs):
+        if 'adjoint' in kwargs:
+            try:
+                fields.uv_2d = -fields.uv_2d
+            except AttributeError:
+                fields.uv_3d = -fields.uv_3d
+            kwargs.pop('adjoint')  # Unused in steady-state case
         super(SteadyState, self).__init__(equation, solution, fields, dt, **kwargs)
         self.error_estimator = error_estimator
         if self.error_estimator is not None:
             if hasattr(self.error_estimator, 'setup_strong_residual'):
                 self.error_estimator.setup_strong_residual('all', solution, solution, fields, fields)
 
-    def setup_error_estimator(self, solution, adjoint, bnd_conditions):
+    def setup_error_estimator(self, solution, solution_old, adjoint, bnd_conditions):
         assert self.error_estimator is not None
-        u = solution
-        f = self.fields
-        bnd = bnd_conditions
-        self.error_estimator.setup_components('all', u, u, z, z, f, f, bnd)
+        self.error_estimator.setup_components(
+            'all', solution, solution, adjoint, adjoint, self.fields, self.fields, bnd_conditions
+        )
 
 
 class CrankNicolson(thetis_ts.CrankNicolson):
@@ -49,13 +60,9 @@ class CrankNicolson(thetis_ts.CrankNicolson):
         self.theta_const = Constant(theta)
         self.adjoint = adjoint
         self.error_estimator = error_estimator
-<<<<<<< HEAD
-        print_output("#### TODO: Setup strong residual for Crank-Nicolson")  # TODO
-=======
         if self.error_estimator is not None:
             if hasattr(self.error_estimator, 'setup_strong_residual'):
                 self.setup_strong_residual(self.solution, self.solution_old)
->>>>>>> origin/master
 
     def advance(self, t, update_forcings=None):
         """
@@ -109,8 +116,6 @@ class CrankNicolson(thetis_ts.CrankNicolson):
         ee.residual_terms = residual_terms
         ee.inter_element_flux_terms = inter_element_flux_terms
         ee.bnd_flux_terms = bnd_flux_terms
-<<<<<<< HEAD
-=======
 
     def setup_strong_residual(self, solution, solution_old):
         ee = self.error_estimator
@@ -139,4 +144,3 @@ class CrankNicolson(thetis_ts.CrankNicolson):
 
         # Pass forms back to error estimator
         ee._strong_residual_terms = residual
->>>>>>> origin/master

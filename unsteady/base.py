@@ -3,15 +3,12 @@ from __future__ import absolute_import
 from thetis import *
 from thetis.callback import CallbackManager
 
-import os
 import numpy as np
+import os
 
-<<<<<<< HEAD
-=======
 from ..adapt.metric import *
 from ..io import load_mesh, save_mesh
 from ..mesh import aspect_ratio, quality, remesh
->>>>>>> origin/master
 from .ts import *  # NOTE: Overrides some of the Thetis time integrators
 
 
@@ -31,21 +28,27 @@ class AdaptiveProblemBase(object):
     Whilst this is the case for metric-based mesh adaptation using Pragmatic, mesh movement is
     performed on-the-fly on each mesh in the sequence.
     """
-    def __init__(self, op, meshes=None, nonlinear=True, checkpointing=False):
-        op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
+    def __init__(self, op, meshes=None, nonlinear=True, **kwargs):
+        """
+        :arg op: :class:`Options` parameter object.
+        :kwarg meshes: optionally pass a list of meshes to the constructor.
+        :kwarg nonlinear: should the PDE(s) be linearised?
+        :kwarg checkpointing: should checkpointing be used for continuous adjoint solves?
+        :kwarg print_progress: verbose solver output if set to `True`.
+        :kwarg manual: if set to `True`, meshes (and objects built upon them) are not set up.
+        """
+        msg = "{:s} initialisation begin\n".format(self.__class__.__name__)
+        op.print_debug(op.indent + 80*'*' + '\n' + op.indent + msg + 80*'*' + '\n')
+        self.di = create_directory(op.di)
 
         # Read args and kwargs
         self.op = op
         self.stabilisation = op.stabilisation
         self.approach = op.approach
         self.nonlinear = nonlinear
-<<<<<<< HEAD
-        self.checkpointing = checkpointing
-=======
         self.checkpointing = kwargs.pop('checkpointing', False)
         self.print_progress = kwargs.pop('print_progress', True)
         self.manual = kwargs.pop('manual', False)
->>>>>>> origin/master
 
         # Timestepping export details
         self.num_timesteps = int(np.round(op.end_time/op.dt, 0))
@@ -65,9 +68,6 @@ class AdaptiveProblemBase(object):
         physical_constants['g_grav'].assign(op.g)
 
         # Setup problem
-<<<<<<< HEAD
-        self.setup_all(meshes)
-=======
         if not hasattr(self, 'num_cells'):
             self.num_cells = [[], ]
         if not hasattr(self, 'num_vertices'):
@@ -79,7 +79,6 @@ class AdaptiveProblemBase(object):
         self.set_meshes(meshes)
         if not self.manual:
             self.setup_all(**kwargs)
->>>>>>> origin/master
         implemented_steppers = {
             'CrankNicolson': CrankNicolson,
             'SteadyState': SteadyState,
@@ -90,7 +89,7 @@ class AdaptiveProblemBase(object):
             raise NotImplementedError("Time integrator {:s} not implemented".format(op.timestepper))
         self.integrator = implemented_steppers[self.op.timestepper]
         if op.timestepper == 'SteadyState':
-            assert op.end_time < op.dt
+            assert op.end_time <= op.dt
 
         # Mesh movement
         self.mesh_movers = [None for i in range(self.num_meshes)]
@@ -99,18 +98,6 @@ class AdaptiveProblemBase(object):
         self.checkpoint = []
 
         # Storage for diagnostics over mesh adaptation loop
-<<<<<<< HEAD
-        self.num_cells = [[mesh.num_cells() for mesh in self.meshes], ]
-        self.num_vertices = [[mesh.num_vertices() for mesh in self.meshes], ]
-        self.dofs = [[np.array(V.dof_count).sum() for V in self.V], ]
-        self.indicators = [{} for mesh in self.meshes]
-        self.estimators = [{} for mesh in self.meshes]
-        self.qois = []
-        self.st_complexities = [np.nan]
-        self.outer_iteration = 0
-
-    def setup_all(self, meshes):
-=======
         self.indicators = [{} for i in range(self.num_meshes)]
         self._have_indicated_error = False
         if not hasattr(self, 'estimators'):
@@ -195,45 +182,13 @@ class AdaptiveProblemBase(object):
                 self.max_ar[-1].append(np.nan)
 
     def setup_all(self, restarted=False, **kwargs):
->>>>>>> origin/master
         """
         Setup everything which isn't explicitly associated with either the forward or adjoint
         problem.
         """
-        from thetis.callback import CallbackManager
-
-        op = self.op
-        op.print_debug(op.indent + "SETUP: Building meshes...")
-        self.set_meshes(meshes)
-        op.print_debug(op.indent + "SETUP: Creating function spaces...")
         self.set_finite_elements()
         self.create_function_spaces()
-        self.jacobian_signs = [interpolate(sign(JacobianDeterminant(mesh)), P0) for mesh, P0 in zip(self.meshes, self.P0)]
-        op.print_debug(op.indent + "SETUP: Creating solutions...")
         self.create_solutions()
-<<<<<<< HEAD
-        op.print_debug(op.indent + "SETUP: Creating fields...")
-        self.set_fields(init=1)
-        op.print_debug(op.indent + "SETUP: Setting stabilisation parameters...")
-        self.set_stabilisation()
-        op.print_debug(op.indent + "SETUP: Setting boundary conditions...")
-        self.set_boundary_conditions()
-        op.print_debug(op.indent + "SETUP: Creating CallbackManagers...")
-        self.callbacks = [CallbackManager() for mesh in self.meshes]
-        op.print_debug(op.indent + "SETUP: Creating output files...")
-        self.di = create_directory(op.di)
-        self.create_outfiles()
-        op.print_debug(op.indent + "SETUP: Creating intermediary spaces...")
-        self.create_intermediary_spaces()
-
-        # Various empty lists and dicts
-        self.equations = [AttrDict() for mesh in self.meshes]
-        self.error_estimators = [AttrDict() for mesh in self.meshes]
-        self.timesteppers = [AttrDict() for mesh in self.meshes]
-        self.kernels = [None for mesh in self.meshes]
-
-    def set_meshes(self, meshes):
-=======
         self.set_fields(init=True, reinit=False)
         self.set_boundary_conditions()
         self.create_outfiles(restarted=restarted)
@@ -244,26 +199,9 @@ class AdaptiveProblemBase(object):
         self.timesteppers = [AttrDict() for i in range(self.num_meshes)]
 
     def get_plexes(self):
->>>>>>> origin/master
         """
-        Build a mesh associated with each mesh.
-
-        NOTE: If a single mesh is passed to the constructor then it is symlinked into each slot
-              rather than explicitly copied. This rears its head in :attr:`run_dwr`, where a the
-              enriched meshes are built from a single mesh hierarchy.
+        :return: DMPlex associated with the ith mesh.
         """
-<<<<<<< HEAD
-        self.meshes = meshes or [self.op.default_mesh for i in range(self.num_meshes)]
-        self.mesh_velocities = [None for i in range(self.num_meshes)]
-        msg = self.op.indent + "SETUP: Mesh {:d} has {:d} elements"
-        for i, mesh in enumerate(self.meshes):
-            bnd_len = compute_boundary_length(mesh)
-            mesh.boundary_len = bnd_len
-            self.op.print_debug(msg.format(i, mesh.num_cells()))
-            # if self.op.approach in ('lagrangian', 'ale', 'monge_ampere'):  # TODO
-            #     coords = mesh.coordinates
-            #     self.mesh_velocities[i] = Function(coords.function_space(), name="Mesh velocity")
-=======
         if hasattr(self, '_plexes') and self._plexes != []:
             return
         self._plexes = []
@@ -284,7 +222,6 @@ class AdaptiveProblemBase(object):
     @property
     def plex(self):
         return self.plexes[0]
->>>>>>> origin/master
 
     def set_finite_elements(self):
         raise NotImplementedError("To be implemented in derived class")
@@ -297,6 +234,7 @@ class AdaptiveProblemBase(object):
         """
         if self.have_intermediaries or self.op.approach not in ('monge_ampere', 'hybrid'):
             return
+        self.op.print_debug("SETUP: Creating intermediary spaces...")
         mesh_copies = [Mesh(mesh.coordinates.copy(deepcopy=True)) for mesh in self.meshes]
         spaces = [FunctionSpace(mesh, self.finite_element) for mesh in mesh_copies]
         self.intermediary_meshes = mesh_copies
@@ -304,11 +242,27 @@ class AdaptiveProblemBase(object):
         self.have_intermediaries = True
 
     def create_function_spaces(self):
-        raise NotImplementedError("To be implemented in derived class")
+        """
+        Build various useful finite element spaces.
+
+        NOTE: The prognostic spaces should be created in the inherited class.
+        """
+        self.op.print_debug("SETUP: Creating function spaces...")
+        self.P0 = [FunctionSpace(mesh, "DG", 0) for mesh in self.meshes]
+        self.P0_vec = [VectorFunctionSpace(mesh, "DG", 0) for mesh in self.meshes]
+        self.P0_ten = [TensorFunctionSpace(mesh, "DG", 0) for mesh in self.meshes]
+        self.P1 = [FunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
+        self.P1_vec = [VectorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
+        self.P1_ten = [TensorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
+        self.P1DG = [FunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
+        self.P1DG_vec = [VectorFunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
+
+        # Store mesh orientations
+        self.jacobian_signs = [
+            interpolate(sign(JacobianDeterminant(P0.mesh())), P0) for P0 in self.P0
+        ]
 
     def create_solutions(self):
-<<<<<<< HEAD
-=======
         """
         Set up :class:`Function`s in prognostic spaces defined on each mesh, which will hold
         forward and adjoint solutions.
@@ -343,30 +297,21 @@ class AdaptiveProblemBase(object):
             self.set_fields_step(i, init, reinit, **kwargs)
 
     def set_fields_step(self, i):
->>>>>>> origin/master
         raise NotImplementedError("To be implemented in derived class")
 
-    def set_fields(self):
-        raise NotImplementedError("To be implemented in derived class")
+    def free_fields_step(self, i):
+        """Free the memory associated with fields on mesh i."""
+        self.fields[i] = AttrDict()
 
-<<<<<<< HEAD
-    def set_stabilisation(self):
-        for i in range(self.num_meshes):
-            self.set_stabilisation_step(i)
-
-    def set_stabilisation_step(self, i):
-        raise NotImplementedError("To be implemented in derived class")
-
-=======
->>>>>>> origin/master
     def set_boundary_conditions(self):
-        """Set boundary conditions *for all models*"""
-        self.boundary_conditions = [self.op.set_boundary_conditions(self, i) for i in range(self.num_meshes)]
+        """
+        Set boundary conditions *for all models*.
+        """
+        self.op.print_debug("SETUP: Setting boundary conditions...")
+        self.boundary_conditions = [
+            self.op.set_boundary_conditions(self, i) for i in range(self.num_meshes)
+        ]
 
-<<<<<<< HEAD
-    def create_outfiles(self):
-        raise NotImplementedError("To be implemented in derived class")
-=======
     def create_outfiles(self, restarted=False):
         if not self.op.plot_pvd:
             return
@@ -377,7 +322,6 @@ class AdaptiveProblemBase(object):
         else:
             self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
             self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
->>>>>>> origin/master
 
     def set_initial_condition(self):
         self.op.set_initial_condition(self)
@@ -385,31 +329,59 @@ class AdaptiveProblemBase(object):
     def set_terminal_condition(self):
         self.op.set_terminal_condition(self)
 
-    def create_equations(self, i, adjoint=False):
-        if adjoint:
-            self.create_adjoint_equations(i)
-        else:
-            self.create_forward_equations(i)
+    def create_forward_equations(self):
+        for i in range(self.num_meshes):
+            self.create_forward_equations_step(i)
 
-    def create_forward_equations(self, i):
+    def create_adjoint_equations(self):
+        for i in range(self.num_meshes):
+            self.create_adjoint_equations_step(i)
+
+    def create_forward_equations_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
-    def create_adjoint_equations(self, i):
+    def create_adjoint_equations_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
-    def create_error_estimators(self, i):
+    def free_forward_equations_step(self, i):
+        """Free the memory associated with forward equations defined on mesh i."""
         raise NotImplementedError("To be implemented in derived class")
 
-    def create_timesteppers(self, i, adjoint=False):
-        if adjoint:
-            self.create_adjoint_timesteppers(i)
-        else:
-            self.create_forward_timesteppers(i)
-
-    def create_forward_timesteppers(self, i):
+    def free_adjoint_equations_step(self, i):
+        """Free the memory associated with adjoint equations defined on mesh i."""
         raise NotImplementedError("To be implemented in derived class")
 
-    def create_adjoint_timesteppers(self, i):
+    def create_error_estimators(self):
+        for i in range(self.num_meshes):
+            self.create_error_estimators_step(i)
+
+    def create_error_estimators_step(self, i):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def free_error_estimators_step(self, i):
+        """Free the memory associated with error estimators defined on mesh i."""
+        raise NotImplementedError("To be implemented in derived class")
+
+    def create_forward_timesteppers(self):
+        for i in range(self.num_meshes):
+            self.create_forward_timesteppers_step(i)
+
+    def create_adjoint_timesteppers(self):
+        for i in range(self.num_meshes):
+            self.create_adjoint_timesteppers_step(i)
+
+    def create_forward_timesteppers_step(self, i):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def create_adjoint_timesteppers_step(self, i):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def free_forward_timesteppers_step(self, i):
+        """Free the memory associated with forward timesteppers defined on mesh i."""
+        raise NotImplementedError("To be implemented in derived class")
+
+    def free_adjoint_timesteppers_step(self, i):
+        """Free the memory associated with adjoint timesteppers defined on mesh i."""
         raise NotImplementedError("To be implemented in derived class")
 
     def add_callbacks(self, i, **kwargs):
@@ -428,10 +400,18 @@ class AdaptiveProblemBase(object):
 
     def project_forward_solution(self, i, j):
         """Project forward solution from mesh `i` to mesh `j`."""
+        if self.fwd_solutions[i] is None:
+            raise ValueError("Nothing to project.")
+        elif self.fwd_solutions[j] is None:
+            self.fwd_solutions[j] = Function(self.V[j], name="Forward solution")
         self.project(self.fwd_solutions, i, j)
 
     def project_adjoint_solution(self, i, j):
         """Project adjoint solution from mesh `i` to mesh `j`."""
+        if self.adj_solutions[i] is None:
+            raise ValueError("Nothing to project.")
+        elif self.adj_solutions[j] is None:
+            self.adj_solutions[j] = Function(self.V[j], name="Adjoint solution")
         self.project(self.adj_solutions, i, j)
 
     def project_fields(self, fields, i):
@@ -446,15 +426,15 @@ class AdaptiveProblemBase(object):
         else:
             self.transfer_forward_solution()
 
-    def transfer_forward_solution(self, i):
+    def transfer_forward_solution(self, i, **kwargs):
         if i == 0:
-            self.set_initial_condition()
+            self.set_initial_condition(**kwargs)
         else:
             self.project_forward_solution(i-1, i)
 
-    def transfer_adjoint_solution(self, i):
+    def transfer_adjoint_solution(self, i, **kwargs):
         if i == self.num_meshes - 1:
-            self.set_terminal_condition()
+            self.set_terminal_condition(**kwargs)
         else:
             self.project_adjoint_solution(i+1, i)
 
@@ -486,45 +466,31 @@ class AdaptiveProblemBase(object):
         This function is designed for use under Monge-Ampere type mesh movement methods.
         """
         for f, f_int in zip(self.fwd_solutions[i].split(), self.intermediary_solutions[i].split()):
-<<<<<<< HEAD
-            f.assign(f_int) #.dat.data[:] = f_int.dat.data
-=======
             f.assign(f_int)
->>>>>>> origin/master
 
-    def store_plexes(self, di=None):
-        """Save meshes to disk using DMPlex format."""
-        from firedrake.petsc import PETSc
+    def save_meshes(self, fname='plex', fpath=None):
+        """
+        Save meshes to disk using DMPlex format in HDF5 files.
 
-<<<<<<< HEAD
-        di = di or os.path.join(self.di, self.approach)
-        fname = os.path.join(di, 'plex_{:d}.h5')
-=======
         :kwarg fname: filename of HDF5 files (with an '_<index>' to be appended).
         :kwarg fpath: directory in which to save the HDF5 files.
         """
         self.op.print_debug("I/O: Saving meshes to file...")
         fpath = fpath or self.di
         self.op.print_debug(self.op.indent + "I/O: Storing plex to {:s}...".format(fname))
->>>>>>> origin/master
         for i, mesh in enumerate(self.meshes):
-            assert os.path.isdir(di)
-            viewer = PETSc.Viewer().createHDF5(fname.format(i), 'w')
-            try:
-                viewer(mesh._topology_dm)
-            except AttributeError:
-                viewer(mesh._plex)  # backwards compatability
+            save_mesh(mesh, '{:s}_{:d}'.format(fname, i), fpath)
 
-    def load_plexes(self, fname):
-        """Load meshes in DMPlex format."""
-        from firedrake.petsc import PETSc
+    def load_meshes(self, fname='plex', fpath=None):
+        """
+        Load meshes in DMPlex format in HDF5 files.
 
+        :kwarg fname: filename of HDF5 files (with an '_<index>' to be appended).
+        :kwarg fpath: filepath to where the HDF5 files are to be loaded from.
+        """
+        self.op.print_debug("I/O: Loading meshes from file...")
+        fpath = fpath or self.di
         for i in range(self.num_meshes):
-<<<<<<< HEAD
-            newplex = PETSc.DMPlex().create()
-            newplex.createFromFile('_'.join([fname, '{:d}.h5'.format(i)]))
-            self.meshes[i] = Mesh(newplex)
-=======
             self.op.print_debug(self.op.indent + "I/O: Loading plex from {:s}...".format(fname))
             self.meshes[i] = load_mesh('{:s}_{:d}'.format(fname, i), fpath)
 
@@ -545,7 +511,6 @@ class AdaptiveProblemBase(object):
         self.free_adjoint_timesteppers_step(i)
         self.op.print_debug("FREE: Removing adjoint equations on mesh {:d}...".format(i))
         self.free_adjoint_equations_step(i)
->>>>>>> origin/master
 
     def solve(self, adjoint=False, **kwargs):
         """
@@ -568,13 +533,10 @@ class AdaptiveProblemBase(object):
         R = range(self.num_meshes-1, -1, -1) if reverse else range(self.num_meshes)
         for i in R:
             self.transfer_forward_solution(i)
-            self.setup_solver_forward(i)
+            self.setup_solver_forward_step(i)
             self.solve_forward_step(i, **kwargs)
-<<<<<<< HEAD
-=======
             if not keep:
                 self.free_solver_forward_step(i)
->>>>>>> origin/master
 
     def solve_adjoint(self, reverse=True, keep=False, **kwargs):
         """
@@ -583,13 +545,10 @@ class AdaptiveProblemBase(object):
         R = range(self.num_meshes-1, -1, -1) if reverse else range(self.num_meshes)
         for i in R:
             self.transfer_adjoint_solution(i)
-            self.setup_solver_adjoint(i)
+            self.setup_solver_adjoint_step(i)
             self.solve_adjoint_step(i, **kwargs)
-<<<<<<< HEAD
-=======
             if not keep:
                 self.free_solver_adjoint_step(i)
->>>>>>> origin/master
 
     def quantity_of_interest(self):
         """
@@ -600,10 +559,6 @@ class AdaptiveProblemBase(object):
         else:
             raise NotImplementedError("Should be implemented in derived class.")
 
-<<<<<<< HEAD
-    def save_to_checkpoint(self, f, mode='memory'):
-        """Extremely simple checkpointing scheme with a simple stack of copied fields."""
-=======
     def save_to_checkpoint(self, i, f, mode='memory', **kwargs):
         """
         Extremely simple checkpointing scheme with a simple stack.
@@ -615,26 +570,18 @@ class AdaptiveProblemBase(object):
         :kwarg mode: toggle whether to save checkpoints in memory or on disk.
         :kwarg fpath: filepath to checkpoint stored on disk.
         """
->>>>>>> origin/master
         assert mode in ('memory', 'disk')
         if mode == 'memory':
             self.checkpoint.append(f.copy(deepcopy=True))
         else:
-            raise NotImplementedError("Checkpointing to disk not yet implemented.")
-            # TODO: add a string to the stack which provides the (auto generated) file name
+            fpath = kwargs.get('fpath', self.op.di)
+            if i is None:
+                raise ValueError("Please provide mesh number")
+            chk = len(self.checkpoint)
+            self.export_state(i, fpath, index_str=chk)
+            self.checkpoint.append(chk)
         self.op.print_debug("CHECKPOINT SAVE: {:3d} currently stored".format(len(self.checkpoint)))
 
-<<<<<<< HEAD
-    def collect_from_checkpoint(self, mode='memory', **kwargs):
-        """
-        Extremely simple checkpointing scheme which pops off the top of a stack of copied fields.
-        """
-        assert mode in ('memory', 'disk')
-        if mode == 'disk':
-            # delete = kwargs.get('delete', True)
-            raise NotImplementedError("Checkpointing to disk not yet implemented.")
-            # TODO: pop file name from stack, load file, delete if requested
-=======
     def collect_from_checkpoint(self, i, mode='memory', delete=True, **kwargs):
         """
         Extremely simple checkpointing scheme which pops off the top of a stack.
@@ -655,9 +602,7 @@ class AdaptiveProblemBase(object):
             fpath = kwargs.get('fpath', self.op.di)
             chk = self.checkpoint.pop(-1)
             self.load_state(i, fpath, index_str=chk, delete=delete)
->>>>>>> origin/master
         self.op.print_debug("CHECKPOINT LOAD: {:3d} currently stored".format(len(self.checkpoint)))
-        return self.checkpoint.pop(-1)
 
     def get_qoi_kernels(self, i):
         """
@@ -700,16 +645,7 @@ class AdaptiveProblemBase(object):
             assert monitors[i] is not None
             args = (Mesh(self.meshes[i].coordinates.copy(deepcopy=True)), monitors[i])
             self.mesh_movers[i] = MeshMover(*args, **kwargs)
-        self.op.print_debug("MESH MOVEMENT: Done!")
 
-<<<<<<< HEAD
-    def move_mesh(self, i, init = False):
-        # TODO: documentation
-        if self.op.approach in ('lagrangian', 'ale'):  # TODO: Make more robust (apply BCs etc.)
-            self.move_mesh_ale(i)
-        elif self.mesh_movers[i] is not None:
-            self.move_mesh_monge_ampere(i, init)
-=======
     def move_mesh(self, i, init=False, reinit=False):
         """
         Move the mesh using an r-adaptive or hybrid method of choice.
@@ -720,7 +656,6 @@ class AdaptiveProblemBase(object):
             raise NotImplementedError  # TODO
         elif self.mesh_movers[i] is not None:
             return self.move_mesh_monge_ampere(i, init, reinit)
->>>>>>> origin/master
 
     def move_lagrangian_mesh(self, i):
         """
@@ -732,33 +667,6 @@ class AdaptiveProblemBase(object):
         dt = op.dt
         coords = mesh.coordinates
 
-<<<<<<< HEAD
-        # Crank-Nicolson  # TODO: Assemble once
-        if hasattr(self.op, 'get_velocity'):
-            coord_space = coords.function_space()
-            coords_old = Function(coord_space).assign(coords)
-            test = TestFunction(coord_space)
-
-            F = inner(test, coords)*dx - inner(test, coords_old)*dx
-            F -= 0.5*dt*inner(test, self.op.get_velocity(coords_old, t))*dx
-            F -= 0.5*dt*inner(test, self.op.get_velocity(coords, t))*dx
-
-            params = {
-                'mat_type': 'aij',
-                'snes_type': 'newtonls',
-                'snes_rtol': 1.0e-03,
-                # 'ksp_type': 'gmres',
-                'ksp_type': 'preonly',
-                # 'pc_type': 'sor',
-                'pc_type': 'lu',
-                'pc_type_factor_mat_solver_type': 'mumps',
-            }
-            solve(F == 0, coords, solver_parameters=params)
-
-        # Forward Euler
-        else:
-            coords.interpolate(coords + dt*self.mesh_velocities[i])
-=======
         assert hasattr(op, 'get_velocity')
         assert op.timestepper == 'CrankNicolson'
         theta = Constant(op.implicitness_theta)  # Crank-Nicolson implicitness
@@ -784,7 +692,6 @@ class AdaptiveProblemBase(object):
             'pc_type_factor_mat_solver_type': 'mumps',
         }
         solve(F == 0, coords, solver_parameters=params)  # TODO: Assemble once
->>>>>>> origin/master
 
         # Check for inverted elements
         Q = quality(mesh, initial_signs=self.jacobian_signs[i]).dat.data
@@ -807,16 +714,10 @@ class AdaptiveProblemBase(object):
         num_inverted = len(Q[Q < 0])
         if num_inverted > 0:
             import warnings
-<<<<<<< HEAD
-            warnings.warn("WARNING: Mesh has {:d} inverted element(s)!".format(num_inverted))
-
-    def move_mesh_monge_ampere(self, i, init):  # TODO: Annotation
-=======
             warnings.warn("Mesh has {:d} inverted element(s)!".format(num_inverted))
         return restarted
 
     def move_mesh_monge_ampere(self, i, init, reinit):  # TODO: Annotation
->>>>>>> origin/master
         """
         Move the physical mesh using a monitor based approach driven by solutions of a Monge-Ampere
         type equation.
@@ -838,37 +739,18 @@ class AdaptiveProblemBase(object):
         # Compute new physical mesh coordinates
         self.op.print_debug("MESH MOVEMENT: Establishing mesh transformation...")
         self.mesh_movers[i].adapt()
-        self.op.print_debug("MESH MOVEMENT: Done!")
 
         # Update intermediary mesh coordinates
         self.op.print_debug("MESH MOVEMENT: Updating intermediary mesh coordinates...")
         self.intermediary_meshes[i].coordinates.assign(self.mesh_movers[i].x)
-<<<<<<< HEAD
-        self.op.print_debug("MESH MOVEMENT: Done!")
-=======
->>>>>>> origin/master
 
         # Project a copy of the current solution onto mesh defined on new coordinates
         self.op.print_debug("MESH MOVEMENT: Projecting solutions onto intermediary mesh...")
         self.project_to_intermediary_mesh(i)
-        self.op.print_debug("MESH MOVEMENT: Done!")
 
         # Update physical mesh coordinates
         self.op.print_debug("MESH MOVEMENT: Updating physical mesh coordinates...")
         self.meshes[i].coordinates.assign(self.intermediary_meshes[i].coordinates)
-<<<<<<< HEAD
-        self.op.print_debug("MESH MOVEMENT: Done!")
-
-        # Copy over projected solution data
-        self.op.print_debug("MESH MOVEMENT: Transferring solution data from intermediary mesh...")
-        self.copy_data_from_intermediary_mesh(i)  # FIXME: Needs annotation
-        self.op.print_debug("MESH MOVEMENT: Done!")
-
-        # Re-interpolate fields
-        self.op.print_debug("MESH MOVEMENT: Re-interpolating fields...")
-        self.set_fields(init)
-        self.op.print_debug("MESH MOVEMENT: Done!")
-=======
 
         # Copy over projected solution data
         self.op.print_debug("MESH MOVEMENT: Transferring solution data from intermediary mesh...")
@@ -1229,4 +1111,3 @@ class AdaptiveProblemBase(object):
 
     def clear_tape(self):
         pass
->>>>>>> origin/master

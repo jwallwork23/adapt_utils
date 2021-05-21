@@ -342,6 +342,7 @@ class MeshMover(object):
             i = self.equidistribution.snes.getIterationNumber()
             print_output(f"r-adaptation converged in {i+1} iterations")
             return
+
         assert self.nonlinear_method == 'relaxation'
         for i in range(maxit):
 

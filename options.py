@@ -3,18 +3,14 @@ from thetis import *
 from thetis.configuration import *
 
 import os
-<<<<<<< HEAD
-from . import misc
-=======
 import sys
 
 from . import misc
 from .mesh import MeshStats
 from .params import *
->>>>>>> origin/master
 
 
-__all__ = ["Options"]
+__all__ = ["Options", "CoupledOptions", "ReynoldsNumberArray"]
 
 
 class Options(FrozenConfigurable):
@@ -27,51 +23,10 @@ class Options(FrozenConfigurable):
         ['dg-dg', 'dg-cg', 'cg-cg'],
         default_value='dg-dg',
         help="""
-        Mixed finite element pair to use for the shallow water system. Choose from:
+        Mixed finite element pair to use for the hydrodynamics system. Choose from:
           'cg-cg': Taylor-Hood                    (P2-P1);
           'dg-dg': Equal order DG                 (PpDG-PpDG);
           'dg-cg': Mixed continuous-discontinuous (P1DG-P2),
-<<<<<<< HEAD
-        where p is the polynomial order specified by :attr:`degree`.""").tag(config=True)
-    tracer_family = Enum(
-        ['dg', 'cg'],
-        default_value='dg',
-        help="""
-        Finite element pair to use for the tracer transport model. Choose from:
-          'cg': Continuous Galerkin    (Pp);
-          'dg': Discontinuous Galerkin (PpDG),
-        where p is the polynomial order specified by :attr:`degree_tracer`.""").tag(config=True)
-    sediment_family = Unicode('dg', help="""
-        Finite element pair to use for the sediment transport model. Choose from:
-          'cg': Continuous Galerkin    (Pp);
-          'dg': Discontinuous Galerkin (PpDG),
-        where p is the polynomial order specified by :attr:`degree_sediment`.""").tag(config=True)
-    degree = NonNegativeInteger(1, help="""
-        Polynomial order for shallow water finite element pair :attr:`family'.""").tag(config=True)
-    degree_tracer = NonNegativeInteger(1, help="""
-        Polynomial order for tracer finite element pair :attr:`tracer_family'.""").tag(config=True)
-    degree_bathymetry = NonNegativeInteger(1, help="""
-        Polynomial order for tracer finite element pair :attr:`tracer_family'.""").tag(config=True)
-    degree_sediment = NonNegativeInteger(1, help="""
-        Polynomial order for sediment finite element pair :attr:`sediment_family'.""").tag(config=True)
-    degree_increase = NonNegativeInteger(0, help="""
-        When defining an enriched shallow water finite element space, how much should the
-        polynomial order of the finite element space by incremented? (NOTE: zero is an option)
-        """).tag(config=True)
-    degree_increase_tracer = NonNegativeInteger(1, help="""
-        When defining an enriched tracer finite element space, how much should the
-        polynomial order of the finite element space by incremented? (NOTE: zero is an option)
-        """).tag(config=True)
-    degree_increase_sediment = NonNegativeInteger(1, help="""
-        When defining an enriched sediment finite element space, how much should the
-        polynomial order of the finite element space by incremented? (NOTE: zero is an option)
-        """).tag(config=True)
-    periodic = Bool(False, help="Is mesh periodic?").tag(config=True)
-
-    # Time discretisation
-    timestepper = Enum(
-        ['SteadyState', 'CrankNicolson', ],  # TODO: Consider more timesteppers
-=======
         where p is the polynomial order specified by :attr:`degree`.
         """).tag(config=True)
     degree = NonNegativeInteger(1, help="""
@@ -93,7 +48,6 @@ class Options(FrozenConfigurable):
     # Time discretisation
     timestepper = Enum(
         ['SteadyState', 'CrankNicolson'],
->>>>>>> origin/master
         default_value='CrankNicolson',
         help="Time integration scheme used.").tag(config=True)
     dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
@@ -133,18 +87,11 @@ class Options(FrozenConfigurable):
 
     # Stabilisation
     stabilisation = Unicode(None, allow_none=True, help="""
-<<<<<<< HEAD
-        Stabilisation approach, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if not None.
-        """).tag(config=True)  # TODO: restrict input
-    use_automatic_sipg_parameter = Bool(True, help="""
-        Toggle automatic generation of symmetric interior penalty method.""").tag(config=True)
-=======
         Stabilisation approach to use for hydrodynamic model.
         """).tag(config=True)
     anisotropic_stabilisation = Bool(True, help="""
         Account for mesh anisotropy by using an alternative cell size measure to `CellSize`.
         """).tag(config=True)
->>>>>>> origin/master
 
     # Solver parameters
     solver_parameters = PETScSolverParameters({}, help="""
@@ -172,16 +119,6 @@ class Options(FrozenConfigurable):
 
     # --- Adaptation
 
-<<<<<<< HEAD
-    approach = Unicode('fixed_mesh', help="Mesh adaptive approach.").tag(config=True)
-    num_adapt = NonNegativeInteger(4, help="Number of mesh adaptations per remesh.").tag(config=True)
-
-    # Metric based
-    rescaling = PositiveFloat(0.85, help="""
-        Scaling parameter for target number of vertices.""").tag(config=True)
-    convergence_rate = PositiveInteger(6, help="""
-        Convergence rate parameter used in approach of [Carpio et al. 2013].""").tag(config=True)
-=======
     approach = Unicode('fixed_mesh', help="Mesh adaptation approach.").tag(config=True)
 
     # Metric based
@@ -191,7 +128,6 @@ class Options(FrozenConfigurable):
     convergence_rate = PositiveFloat(6, help="""
         Convergence rate parameter used in approach of [Carpio et al. 2013].
         """).tag(config=True)
->>>>>>> origin/master
     h_min = PositiveFloat(1.0e-10, help="Minimum tolerated element size.").tag(config=True)
     h_max = PositiveFloat(5.0e+00, help="Maximum tolerated element size.").tag(config=True)
     max_anisotropy = PositiveFloat(1.0e+03, help="Maximum tolerated anisotropy.").tag(config=True)
@@ -202,7 +138,7 @@ class Options(FrozenConfigurable):
         Target complexity / inverse desired error for normalisation, as appropriate.
         """).tag(config=True)
     norm_order = NonNegativeFloat(None, allow_none=True, help="""
-        Degree p of Lp norm used in spatial normalisation. Use 'None' to specify infinity norm.
+        Degree p of Lp norm used in spatial normalisation. Use `None` to specify infinity norm.
         """).tag(config=True)
     intersect_boundary = Bool(False, help="Intersect with initial boundary metric.").tag(config=True)
 
@@ -227,20 +163,6 @@ class Options(FrozenConfigurable):
         Reinitialise the fields after the first mesh movement but before the simulation starts.
         """).tag(config=True)
 
-<<<<<<< HEAD
-    # Hessian recovery
-    hessian_recovery = Enum(
-        ['dL2', 'parts'],
-        default_value='dL2',
-        help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
-    hessian_solver_parameters = PETScSolverParameters(
-        {
-            'snes_rtol': 1e8,
-            'ksp_rtol': 1e-5,
-            'ksp_gmres_restart': 20,
-            'pc_type': 'sor',
-        }, help="Solver parameters for Hessian recovery.").tag(config=True)
-=======
     # Recovery
     gradient_recovery = Enum(['L2', 'ZZ'], default_value='L2', help="""
         Hessian recovery technique, from:
@@ -265,7 +187,6 @@ class Options(FrozenConfigurable):
             'L2': l2_projection_params,
         },
         help="Solver parameters for Hessian recovery.").tag(config=True)
->>>>>>> origin/master
     hessian_time_combination = Enum(
         ['integrate', 'intersect'],
         default_value='integrate',
@@ -276,10 +197,6 @@ class Options(FrozenConfigurable):
 
     # Goal-oriented adaptation
     region_of_interest = List(default_value=[], help="""
-<<<<<<< HEAD
-    Spatial region related to quantity of interest""").tag(config=True)
-    estimate_error = Bool(False, help="For use in Thetis solver object.").tag(config=True)  # TODO: unused
-=======
         Spatial region related to quantity of interest.
         """).tag(config=True)
     solve_enriched_forward = Bool(False, help="""
@@ -297,17 +214,15 @@ class Options(FrozenConfigurable):
           * 'PR'   : patch recovery;
           * 'DQ'   : difference quotients.
         """).tag(config=True)
->>>>>>> origin/master
 
     # Adaptation loop
+    min_adapt = NonNegativeInteger(0, help="""
+        Minimum number of mesh adaptations in outer loop.
+        """).tag(config=True)
+    max_adapt = NonNegativeInteger(4, help="""
+        Maximum number of mesh adaptations in outer loop.
+        """).tag(config=True)
     element_rtol = PositiveFloat(0.005, help="""
-<<<<<<< HEAD
-        Relative tolerance for convergence in mesh element count""").tag(config=True)
-    qoi_rtol = PositiveFloat(0.005, help="""
-        Relative tolerance for convergence in quantity of interest.""").tag(config=True)
-    estimator_rtol = PositiveFloat(0.005, help="""
-        Relative tolerance for convergence in error estimator.""").tag(config=True)
-=======
         Relative tolerance for convergence in mesh element count
         """).tag(config=True)
     qoi_rtol = PositiveFloat(0.005, allow_none=True, help="""
@@ -316,7 +231,6 @@ class Options(FrozenConfigurable):
     estimator_rtol = PositiveFloat(0.005, allow_none=True, help="""
         Relative tolerance for convergence in error estimator.
         """).tag(config=True)
->>>>>>> origin/master
     target_base = PositiveFloat(10.0, help="""
         Base for exponential increase/decay of target complexity/error within outer mesh adaptation
         loop.
@@ -328,8 +242,8 @@ class Options(FrozenConfigurable):
 
     def __init__(self, mesh=None, fpath=None, di=None, **kwargs):
         """
-        Upon initialising the class, any kwargs will be added and a output directory path will be created
-        as determined by :attr:`approach` as `outputs/<approach>/`.
+        Upon initialising the class, any kwargs will be added and a output directory path will be
+        created as determined by :attr:`approach` as `outputs/<approach>/`.
 
         :kwarg mesh: a mesh to use as the :attr:`default_mesh` instead of the default one defined in
             the subclass.
@@ -419,10 +333,10 @@ class Options(FrozenConfigurable):
     def set_qoi_kernel_tracer(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def exact_solution(self, fs):
+    def analytical_solution(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def exact_qoi(self):  # TODO: surely it needs an arg
+    def analytical_qoi(self):
         raise NotImplementedError("Should be implemented in derived class.")
 
     def get_update_forcings(self, prob, i, **kwargs):
@@ -441,19 +355,13 @@ class Options(FrozenConfigurable):
             return
         return export_func
 
-    def print_debug(self, msg):
-        """Print a string `msg` only if debugging is on."""
-        if self.debug:
-            print_output(msg)
+    def print_debug(self, msg, mode='basic'):
+        """
+        Print a string `msg` only if debugging is on.
 
-    # TODO: USEME
-    def get_mesh_velocity(self):
+        :kwarg mode: if 'full' is specified, the debugging statement will only be printed if
+            :attr:`debug_mode` is set to 'full'.
         """
-<<<<<<< HEAD
-        Prescribed a mesh velocity.
-        """
-        if self.prescribed_velocity == "zero":
-=======
         if not self.debug:
             return
         if mode == 'full' and self.debug_mode in ('basic', 'light'):
@@ -622,19 +530,15 @@ class CoupledOptions(Options):
         'avg' or 'int' in the middle. These relate to the way in which the metrics arising from the
         adaptation fields are to be combined. The former stands for metric averaging and the latter
         stands for metric intersection.
->>>>>>> origin/master
 
-            # Eulerian case (fixed mesh)
-            self.mesh_velocity = lambda mesh: Constant(as_vector([0.0, 0.0]))
+        e.g. 'elevation__int__speed'.
 
-        elif self.prescribed_velocity == "fluid":
+        The special cases of 'all_avg' and 'all_int' correspond to averaging and intersecting
+        metrics arising from the three primary scalar hydrodynamics fields. That is, the former is
+        equivalent to:
 
-            # Lagrangian case (move mesh with fluid)
-            velocity_file = File(os.path.join(self.di, 'fluid_velocity.pvd'))
+        'elevation__avg__velocity_x__avg__velocity_y'.
 
-<<<<<<< HEAD
-            def mesh_velocity(mesh):  # TODO: Make these available as options
-=======
         Note that while metric averaging is commutative, metric intersection is not (although the
         differences due to ordering are negligible in practice).
         """).tag(config=True)
@@ -701,23 +605,11 @@ class CoupledOptions(Options):
     def set_bathymetry(self, fs):
         """Should be implemented in derived class."""
         return Function(fs).assign(self.base_bathymetry)
->>>>>>> origin/master
 
-                # Get fluid velocity
-                coord_space = mesh.coordinates.function_space()
-                self.set_velocity(coord_space)
-                v = Function(coord_space, name="Mesh velocity")
-                v.assign(self.fluid_velocity)
+    def set_advective_velocity_factor(self, fs):
+        """Should be implemented in derived class."""
+        return Constant(1.0)
 
-<<<<<<< HEAD
-                # No constraints on boundary
-                bc = None
-                bbc = None
-
-                if self.prescribed_velocity_bc is None:
-                    velocity_file.write(v)
-                    return self.fluid_velocity
-=======
     def set_viscosity(self, fs):
         """Should be implemented in derived class."""
         return self.base_viscosity
@@ -725,44 +617,19 @@ class CoupledOptions(Options):
     def set_diffusivity(self, fs):
         """Should be implemented in derived class."""
         return self.base_diffusivity
->>>>>>> origin/master
 
-                # Use fluid velocity in domain interior
-                n = FacetNormal(mesh)
-                trial, test = TrialFunction(coord_space), TestFunction(coord_space)
-                a = dot(test, trial)*dx
-                L = dot(test, self.fluid_velocity)*dx
+    def set_inflow(self, fs):
+        """Should be implemented in derived class."""
+        return
 
-                if self.prescribed_velocity_bc == 'noslip':
+    def set_coriolis(self, fs):
+        """Should be implemented in derived class."""
+        return
 
-                    # Enforce no boundary movement
-                    bc = DirichletBC(coord_space, Constant([0.0, 0.0]), 'on_boundary')
+    def set_tracer_source(self, fs):
+        """Should be implemented in derived class."""
+        return
 
-<<<<<<< HEAD
-                elif self.prescribed_velocity_bc == 'freeslip':
-
-                    # Enforce no velocity normal to boundaries
-                    a_bc = dot(test, n)*dot(trial, n)*ds
-                    L_bc = dot(test, n)*Constant(0.0)*ds
-                    bc = [EquationBC(a == L, v, 'on_boundary')]
-
-                    # Allow tangential movement ...
-                    s = as_vector([n[1], -n[0]])
-                    a_bc = dot(test, s)*dot(trial, s)*ds
-                    L_bc = dot(test, s)*dot(self.fluid_velocity, s)*ds
-                    edges = set(mesh.exterior_facets.unique_markers)
-                    if len(edges) > 1:  # ... but only up until the end of boundary segments
-                        corners = [(i, j) for i in edges for j in edges.difference([i])]
-                        bbc = DirichletBC(coord_space, 0, corners)
-                    bc.append(EquationBC(a_bc == L_bc, v, 'on_boundary', bcs=bbc))
-
-                elif self.prescribed_velocity_bc == 'sponge':  # TODO: Generalise
-
-                    # Sponge out boundary movement
-                    x, y = SpatialCoordinate(mesh)
-                    alpha = 100
-                    L = dot(test, exp(-alpha*((x-0.5)**2+(y-0.5)**2))*self.fluid_velocity)*dx
-=======
     def set_quadratic_drag_coefficient(self, fs):
         """Should be implemented in derived class."""
         return
@@ -773,25 +640,24 @@ class CoupledOptions(Options):
 
     def get_velocity(self, t):
         raise NotImplementedError("Should be implemented in derived class.")
->>>>>>> origin/master
 
-                else:
-                    raise ValueError("Prescribed boundary method {:s} not recognised.".format(self.prescribed_velocity_bc))
+    def get_eta_tilde(self, prob, i):
+        u, eta = prob.fwd_solutions[i].split()
+        if not self.wetting_and_drying:
+            return eta
+        bathymetry_displacement = prob.equations[i].shallow_water.depth.wd_bathymetry_displacement
+        return eta + bathymetry_displacement(eta)
 
-                solve(a == L, v, bcs=bc)
-                self.fluid_velocity.assign(v)
-                velocity_file.write(v)
-                return self.fluid_velocity
+    def get_export_func(self, prob, i, **kwargs):
+        if self.wetting_and_drying:
+            eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
+            self.eta_tilde_file._topology = None
 
-            self.mesh_velocity = mesh_velocity
+        def export_func():
+            if self.wetting_and_drying:
+                eta_tilde.project(self.get_eta_tilde(prob, i))
+                self.eta_tilde_file.write(eta_tilde)
 
-<<<<<<< HEAD
-        elif self.prescribed_velocity == "rezoning":
-            raise NotImplementedError  # TODO
-        else:
-            raise ValueError("Mesh velocity {:s} not recognised.".format(self.prescribed_velocity))
-        return self.mesh_velocity
-=======
         return export_func
 
     def check_mesh_reynolds_number(self, nu, characteristic_velocity=None, mesh=None, index=None):
@@ -912,4 +778,3 @@ class ReynoldsNumberArray(object):
 
     def max(self, i):
         return self._max[i]
->>>>>>> origin/master
