@@ -12,15 +12,8 @@ parser.add_argument("-n", help="Resolution of initial mesh.")
 parser.add_argument("-dt", help="Timestep.")
 parser.add_argument("-end_time", help="Simulation end time.")
 
-<<<<<<< HEAD
-parser.add_argument("-conservative", help="Toggle conservative tracer equation")
 parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
 parser.add_argument("-stabilisation", help="Stabilisation method")
-parser.add_argument("-anisotropic_stabilisation", help="Toggle anisotropic stabilisation")
-=======
-parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
-parser.add_argument("-stabilisation", help="Stabilisation method")
->>>>>>> origin/master
 parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 
 parser.add_argument("-approach", help="Mesh adaptation approach")
@@ -40,14 +33,7 @@ kwargs = {
     # Solver
     'tracer_family': args.family or 'cg',
     'stabilisation_tracer': args.stabilisation or 'supg',
-<<<<<<< HEAD
-    'anisotropic_stabilisation': False if args.anisotropic_stabilisation == "0" else True,
-    'use_automatic_sipg_parameter': False,  # We have an inviscid problem
     'use_limiter_for_tracers': bool(args.limiters or False),
-    'use_tracer_conservative_form': bool(args.conservative or False),  # FIXME?
-=======
-    'use_limiter_for_tracers': bool(args.limiters or False),
->>>>>>> origin/master
 
     # Mesh adaptation
     'approach': args.approach or 'hessian',
@@ -73,19 +59,11 @@ if args.end_time is not None:
 tp = AdaptiveProblem(op)
 tp.run()
 
-<<<<<<< HEAD
-final_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
-final_l1_norm = norm(final_sol, norm_type='L1')
-final_l2_norm = norm(final_sol, norm_type='L2')
-tp.set_initial_condition()
-init_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
-=======
 final_sol = tp.fwd_solutions_tracer[-1].copy(deepcopy=True)
 final_l1_norm = norm(final_sol, norm_type='L1')
 final_l2_norm = norm(final_sol, norm_type='L2')
 tp.set_initial_condition(i=-1)
 init_sol = tp.fwd_solutions_tracer[-1].copy(deepcopy=True)
->>>>>>> origin/master
 init_l1_norm = norm(init_sol, norm_type='L1')
 init_l2_norm = norm(init_sol, norm_type='L2')
 abs_l2_error = errornorm(init_sol, final_sol, norm_type='L2')

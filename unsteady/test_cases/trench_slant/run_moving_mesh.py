@@ -18,6 +18,7 @@ from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.unsteady.test_cases.trench_slant.options import TrenchSlantOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
+
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
@@ -53,28 +54,24 @@ kwargs = {
     'stabilisation_sediment': 'lax_friedrichs',
 }
 
-
 op = TrenchSlantOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
 
-def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
 
+def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
 
     NOTE: Defined on the *computational* mesh.
-
     """
     P1 = FunctionSpace(mesh, "CG", 1)
 
-    # eta = swp.solution.split()[1]
     b = swp.fwd_solutions_bathymetry[0]
-    bath_gradient = recovery.construct_gradient(b)
-    bath_hess = recovery.construct_hessian(b, op=op)
+    bath_gradient = recovery.recover_gradient(b)
+    bath_hess = recovery.recover_hessian(b, op=op)
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
     frob_bath_norm = Function(b.function_space()).project(frob_bath_hess/max(frob_bath_hess.dat.data[:]))
-    current_mesh = b.function_space().mesh()
     l2_bath_grad = Function(b.function_space()).project(local_norm(bath_gradient))
     bath_dx_l2_norm = Function(b.function_space()).interpolate(l2_bath_grad/max(l2_bath_grad.dat.data[:]))
 
@@ -84,6 +81,7 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
     mon_init = project(Constant(1.0) + comp_new2, P1)
 
     return mon_init
+
 
 swp.set_monitor_functions(gradient_interface_monitor)
 
@@ -95,12 +93,13 @@ new_mesh = RectangleMesh(16*5*4, 5*4, 16, 1.1)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_bathymetry(bath, "adapt_output/hydrodynamics_trench_slant_bath_"+str(alpha) + "_" + str(beta) + '_' + str(gamma) + '-' + str(nx))
+fpath = "hydrodynamics_trench_slant_bath_" + str(alpha) + "_" + str(beta) + "_" + str(gamma) + "_" + str(fac_x)
+export_bathymetry(bath, os.path.join("adapt_output", fpath), op=op)
 
 bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
 
-print(nx)
-print(ny)
+print(fac_x)
+print(fac_y)
 print(alpha)
 print('L2')
 print(fire.errornorm(bath, bath_real))

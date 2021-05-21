@@ -3,45 +3,14 @@ Migrating Trench Test case
 =======================
 
 Solves the initial hydrodynamics simulation of a migrating trench.
-<<<<<<< HEAD
-
-[1] Clare et al. 2020. “Hydro-morphodynamics 2D Modelling Using a Discontinuous
-    Galerkin Discretisation.” EarthArXiv. January 9. doi:10.31223/osf.io/tpqvy.
-
-=======
->>>>>>> origin/master
 """
 from thetis import *
-from firedrake.petsc import PETSc
 
 import argparse
 import time
 
+from adapt_utils.io import export_hydrodynamics
 
-<<<<<<< HEAD
-def export_final_state(inputdir, uv, elev,):
-    """
-    Export fields to be used in a subsequent simulation
-    """
-    if not os.path.exists(inputdir):
-        os.makedirs(inputdir)
-    print_output("Exporting fields for subsequent simulation")
-    chk = DumbCheckpoint(inputdir + "/velocity", mode=FILE_CREATE)
-    chk.store(uv, name="velocity")
-    File(inputdir + '/velocityout.pvd').write(uv)
-    chk.close()
-    chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_CREATE)
-    chk.store(elev, name="elevation")
-    File(inputdir + '/elevationout.pvd').write(elev)
-    chk.close()
-
-    plex = elev.function_space().mesh()._plex
-    viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
-    viewer(plex)
-
-res = 0.4
-=======
->>>>>>> origin/master
 
 # --- Parse arguments
 
@@ -89,14 +58,8 @@ uv_init = as_vector((0.51, 0.0))
 # Choose directory to output results
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-<<<<<<< HEAD
-outputdir = 'outputs' + st
-
-print_output('Exporting to '+outputdir)
-=======
 outputdir = os.path.join(os.path.dirname(__file__), 'outputs' + st)
 print_output('Exporting to ' + outputdir)
->>>>>>> origin/master
 
 # Define parameters
 t_end = 500
@@ -117,13 +80,7 @@ options.use_lax_friedrichs_tracer = False
 options.nikuradse_bed_roughness = ksp
 options.horizontal_viscosity = Constant(1e-6)
 options.timestepper_type = 'CrankNicolson'
-<<<<<<< HEAD
-options.timestepper_options.implicitness_theta = 1.0
-options.norm_smoother = Constant(0.1)
-
-=======
 options.timestepper_options.implicitness_theta = 1.0  # i.e. Implicit Euler
->>>>>>> origin/master
 if not hasattr(options.timestepper_options, 'use_automatic_timestep'):
     options.timestep = 0.25 if res < 4 else 0.125
 left_bnd_id = 1
@@ -137,9 +94,5 @@ solver_obj.assign_initial_conditions(uv=uv_init, elev=elev_init)
 # Run model
 solver_obj.iterate()
 uv, elev = solver_obj.fields.solution_2d.split()
-<<<<<<< HEAD
-export_final_state("hydrodynamics_trench" + str(res), uv, elev)
-=======
 fpath = "hydrodynamics_trench_{:.4f}".format(res)
 export_hydrodynamics(uv, elev, fpath)
->>>>>>> origin/master

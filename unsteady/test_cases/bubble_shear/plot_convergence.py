@@ -11,15 +11,6 @@ characteristics = {
     "fixed_mesh": {"label": "Uniform refinement", "marker": "*"},
     "integrate": {"label": "Integration", "marker": "v"},
     "intersect": {"label": "Intersection", "marker": "^"},
-<<<<<<< HEAD
-}
-levels = 2
-approaches = ['fixed_mesh']
-dofs = {'integrate': None, 'intersect': None}
-l2_error = {'integrate': None, 'intersect': None}
-cons_error = {'integrate': None, 'intersect': None}
-time = {'integrate': None, 'intersect': None}
-=======
     "on_the_fly": {"label": "On-the-fly", "marker": "x"},
     "metric_advection": {"label": "Metric advection", "marker": "+"},
 }
@@ -30,7 +21,6 @@ dofs = {'integrate': None, 'intersect': None, 'on_the_fly': None, 'metric_advect
 l2_error = {'integrate': None, 'intersect': None, 'on_the_fly': None, 'metric_advection': None}
 cons_error = {'integrate': None, 'intersect': None, 'on_the_fly': None, 'metric_advection': None}
 time = {'integrate': None, 'intersect': None, 'on_the_fly': None, 'metric_advection': None}
->>>>>>> origin/master
 average_dofs = {}
 plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
 
@@ -52,27 +42,16 @@ for approach in characteristics:
         continue
     di = os.path.join(os.path.dirname(__file__), 'outputs', 'hessian', approach)
     fname = os.path.join(di, "convergence_{:d}.h5")
-<<<<<<< HEAD
-    approaches.append(approach)
-=======
->>>>>>> origin/master
     for i in range(levels):
         if not os.path.isfile(fname.format(i)):
             print("Cannot find convergence data {:s}".format(fname.format(i)))
             continue
         with h5py.File(fname.format(i), 'r') as outfile:
-<<<<<<< HEAD
-=======
             alldofs[approach] = concat(alldofs[approach], [np.array(outfile['dofs'])])
->>>>>>> origin/master
             dofs[approach] = concat(dofs[approach], [np.average(outfile['dofs'][0])])
             time[approach] = concat(time[approach], np.array(outfile['time']))
             l2_error[approach] = concat(l2_error[approach], np.array(outfile['l2_error']))
             cons_error[approach] = concat(cons_error[approach], np.array(outfile['cons_error']))
-<<<<<<< HEAD
-
-# Plot L2 error
-=======
     if alldofs[approach] is not None:
         approaches.append(approach)
 
@@ -100,18 +79,10 @@ bbox = legend.get_window_extent().transformed(fig2.dpi_scale_trans.inverted())
 savefig('legend_dofs', plot_dir, bbox_inches=bbox, extensions=['pdf'], tight=False)
 
 # Plot L2 error vs. mean DoFs
->>>>>>> origin/master
 fig, axes = plt.subplots()
 for approach in approaches:
     axes.semilogx(dofs[approach], l2_error[approach], **characteristics[approach])
 axes.set_xlabel("Mean spatial DoFs")
-<<<<<<< HEAD
-axes.set_ylabel(r"Relative $\mathcal L_2$ error (\%)")
-axes.grid(True)
-savefig("l2_error", plot_dir, extensions=["pdf"])
-
-# Plot conservation error
-=======
 axes.set_ylabel(r"Relative $L^2$ error")
 yticks = [20, 40, 60, 80]
 axes.set_yticks(yticks)
@@ -121,18 +92,10 @@ axes.grid(True, which='both')
 savefig("l2_error", plot_dir, extensions=["pdf"])
 
 # Plot conservation error vs. mean DoFs
->>>>>>> origin/master
 fig, axes = plt.subplots()
 for approach in approaches:
     axes.semilogx(dofs[approach], cons_error[approach], **characteristics[approach])
 axes.set_xlabel("Mean spatial DoFs")
-<<<<<<< HEAD
-axes.set_ylabel(r"$\mathcal L_1$ conservation error (\%)")
-axes.grid(True)
-savefig("cons_error", plot_dir, extensions=["pdf"])
-
-# Plot CPU time
-=======
 axes.set_ylabel(r"$L^1$ conservation error (\%)")
 axes.grid(True)
 savefig("cons_error", plot_dir, extensions=["pdf"])
@@ -154,18 +117,14 @@ axes.grid(True, which='both')
 savefig("l2_error_time", plot_dir, extensions=["pdf"])
 
 # Plot CPU time vs. DoFs
->>>>>>> origin/master
 fig, axes = plt.subplots()
 for approach in approaches:
     axes.loglog(dofs[approach], time[approach], **characteristics[approach])
 axes.set_xlabel("Mean spatial DoFs")
 axes.set_ylabel(r"CPU time [$\mathrm s$]")
-<<<<<<< HEAD
-=======
 yticks = [100, 1000, 10000]
 axes.set_yticks(yticks)
 axes.set_ylim([60, 10000])
->>>>>>> origin/master
 axes.grid(True, which='both')
 savefig("time", plot_dir, extensions=["pdf"])
 

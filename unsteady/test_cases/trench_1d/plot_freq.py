@@ -85,11 +85,7 @@ for yaxis in (host, par1):
     yticks = yaxis.get_yticks()
     yaxis.set_yticklabels([r"{{{:.0f}}}\%".format(yt) for yt in yticks])
 host.set_xlabel("Mesh movement frequency")
-<<<<<<< HEAD
-host.set_ylabel(r"$\ell_2$ error / uniform mesh")
-=======
 host.set_ylabel(r"$\ell^2$ error / uniform mesh")
->>>>>>> origin/master
 par1.set_ylabel("CPU time / uniform mesh")
 host.axis["left"].label.set_color(p1.get_color())
 par1.axis["right"].label.set_color(p2.get_color())

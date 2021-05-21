@@ -48,10 +48,6 @@ kwargs = {
     'family': 'dg-dg',
     'stabilisation': None,
     'stabilisation_sediment': None,
-<<<<<<< HEAD
-    'use_automatic_sipg_parameter': True,
-=======
->>>>>>> origin/master
 }
 
 op = TrenchSlantOptions(**kwargs)
@@ -63,7 +59,6 @@ swp = AdaptiveProblem(op)
 t1 = time.time()
 swp.solve_forward()
 t2 = time.time()
-
 if os.getenv('REGRESSION_TEST') is not None:
     sys.exit(0)
 
@@ -78,6 +73,7 @@ print("total time: ")
 print(t2-t1)
 print(fac_x)
 bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
+
 
 print('L2')
 print(fire.errornorm(bath, bath_real))

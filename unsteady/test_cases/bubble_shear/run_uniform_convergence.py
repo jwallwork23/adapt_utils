@@ -13,15 +13,8 @@ from adapt_utils.unsteady.test_cases.bubble_shear.options import BubbleOptions
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
-<<<<<<< HEAD
-parser.add_argument("-conservative", help="Toggle conservative tracer equation")
 parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
 parser.add_argument("-stabilisation", help="Stabilisation method")
-parser.add_argument("-anisotropic_stabilisation", help="Use anisotropic stabilisation.")
-=======
-parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
-parser.add_argument("-stabilisation", help="Stabilisation method")
->>>>>>> origin/master
 
 parser.add_argument("-debug", help="Toggle debugging mode.")
 args = parser.parse_args()
@@ -32,14 +25,7 @@ args = parser.parse_args()
 kwargs = {
     'tracer_family': args.family or 'cg',
     'stabilisation_tracer': args.stabilisation or 'supg',
-<<<<<<< HEAD
-    'anisotropic_stabilisation': False if args.anisotropic_stabilisation == "0" else True,
-    'use_automatic_sipg_parameter': False,  # We have an inviscid problem
     'use_limiter_for_tracers': bool(args.limiters or False),
-    'use_tracer_conservative_form': bool(args.conservative or False),  # FIXME?
-=======
-    'use_limiter_for_tracers': bool(args.limiters or False),
->>>>>>> origin/master
     'debug': bool(args.debug or False),
 }
 l2_error = []

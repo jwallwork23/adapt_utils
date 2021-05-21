@@ -6,11 +6,7 @@ dir:
 	@mkdir -p resources
 
 mesh:
-<<<<<<< HEAD
-	@echo "Generating Delauney meshes of turbine array domain..."
-=======
 	@echo "Generating Delauney meshes..."
->>>>>>> origin/master
 	@python3 meshgen.py 0
 	@cd resources && gmsh -2 channel_0.geo
 	@python3 meshgen.py 1

@@ -1,21 +1,12 @@
 from thetis import *
 from thetis.configuration import *
-import matplotlib
-
-matplotlib.rc('text', usetex=True)
-matplotlib.rc('font', family='serif')
 from thetis.options import ModelOptions2d
-
-import numpy as np
 
 from adapt_utils.io import initialise_hydrodynamics
 from adapt_utils.options import CoupledOptions
 from adapt_utils.sediment.sediments_model import SedimentModel
 
-<<<<<<< HEAD
-=======
 
->>>>>>> origin/master
 __all__ = ["TrenchSedimentOptions"]
 
 
@@ -71,13 +62,10 @@ class TrenchSedimentOptions(CoupledOptions):
         self.family = 'dg-dg'
 
     def set_up_morph_model(self, input_dir, mesh=None):
-<<<<<<< HEAD
-        self.base_diffusivity = 0.18011042551606954
-=======
         self.base_diffusivity = Constant(0.18011042551606954)
->>>>>>> origin/master
         self.porosity = Constant(0.4)
         self.ks = Constant(0.025)
+
         self.wetting_and_drying = False
         self.conservative = False
         self.slope_eff = True
@@ -155,66 +143,18 @@ class TrenchSedimentOptions(CoupledOptions):
             return Constant(1.0)
 
     def set_initial_condition_sediment(self, prob):
-        prob.fwd_solutions_sediment[0].interpolate(Constant(0.0)) #self.sediment_model.equiltracer)
+        prob.fwd_solutions_sediment[0].interpolate(Constant(0.0))
 
     def set_initial_condition_bathymetry(self, prob):
         prob.fwd_solutions_bathymetry[0].interpolate(
             self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space())
         )
 
-    def get_update_forcings(self, prob, i, adjoint):
-        return None
-
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
-        #self.eta_tilde_file._topology = None
-        if self.plot_timeseries:
-            u, eta = prob.fwd_solutions[i].split()
-            b = prob.bathymetry[i]
-            wd = Function(prob.P1DG[i], name="Heaviside approximation")
 
         def export_func():
             eta_tilde.project(self.get_eta_tilde(prob, i))
-            #self.eta_tilde_file.write(eta_tilde)
             u, eta = prob.fwd_solutions[i].split()
-            #if self.plot_timeseries:
-
-                # Store modified bathymetry timeseries
-            #    wd.project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha))
-            #    self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
 
         return export_func
-
-    def initialise_fields(self, inputdir, outputdir):
-        """
-        Initialise simulation with results from a previous simulation
-        """
-        from firedrake.petsc import PETSc
-        #try:
-        #    import firedrake.cython.dmplex as dmplex
-        #except:
-        #    import firedrake.dmplex as dmplex  # Older version
-        # mesh
-        with timed_stage('mesh'):
-            # Load
-            newplex = PETSc.DMPlex().create()
-            newplex.createFromFile(inputdir + '/myplex.h5')
-            mesh = Mesh(newplex)
-
-        DG_2d = FunctionSpace(mesh, "DG", 1)
-        # elevation
-        with timed_stage('initialising elevation'):
-            chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_READ)
-            elev_init = Function(DG_2d, name="elevation")
-            chk.load(elev_init)
-            File(outputdir + "/elevation_imported.pvd").write(elev_init)
-            chk.close()
-        # velocity
-        with timed_stage('initialising velocity'):
-            chk = DumbCheckpoint(inputdir + "/velocity", mode=FILE_READ)
-            V = VectorFunctionSpace(mesh, "DG", 1)
-            uv_init = Function(V, name="velocity")
-            chk.load(uv_init)
-            File(outputdir + "/velocity_imported.pvd").write(uv_init)
-            chk.close()
-        return elev_init, uv_init,

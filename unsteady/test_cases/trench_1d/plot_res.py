@@ -26,11 +26,7 @@ for res in resolutions:
 fig, axes = plt.subplots(figsize=(6, 5))
 axes.semilogx(nx, total_err, '-o')
 axes.set_xlabel(r"Element count in $x$-direction")
-<<<<<<< HEAD
-axes.set_ylabel(r"Relative $\ell_2$ error")
-=======
 axes.set_ylabel(r"Relative $\ell^2$ error")
->>>>>>> origin/master
 yticks = [0, 10, 20, 30, 40]
 axes.set_yticks(yticks)
 axes.set_yticklabels([r"{{{:.0f}}}\%".format(yt) for yt in yticks])
@@ -60,11 +56,7 @@ axes.plot(nx, disc_err, '-o')
 axes.set_xscale('log')
 axes.set_yscale('log')
 axes.set_xlabel(r"Element count in $x$-direction")
-<<<<<<< HEAD
-axes.set_ylabel(r"Relative $\ell_2$ error")
-=======
 axes.set_ylabel(r"Relative $\ell^2$ error")
->>>>>>> origin/master
 axes.set_xticks([10, 100])
 yticks = [0.01, 0.1, 1, 10, 100]
 axes.set_yticks(yticks)

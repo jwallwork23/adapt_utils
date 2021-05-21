@@ -1,11 +1,7 @@
-<<<<<<< HEAD
-all: uniform intersect integrate
-=======
 all: dir uniform intersect integrate on_the_fly metric_advection
 
 dir:
 	mkdir -p plots
->>>>>>> origin/master
 
 uniform:
 	python3 run_uniform_convergence.py
@@ -15,8 +11,6 @@ intersect:
 
 integrate:
 	python3 run_adaptation_loop.py -hessian_time_combination integrate -max_level 4
-<<<<<<< HEAD
-=======
 
 on_the_fly:
 	python3 run_on_the_fly.py 0
@@ -29,4 +23,3 @@ metric_advection:
 	python3 run_on_the_fly.py 1 -metric_advection 1 -num_meshes 100
 	python3 run_on_the_fly.py 2 -metric_advection 1 -num_meshes 100
 	python3 run_on_the_fly.py 3 -metric_advection 1 -num_meshes 100
->>>>>>> origin/master

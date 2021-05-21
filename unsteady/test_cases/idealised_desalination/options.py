@@ -33,17 +33,10 @@ class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
             self.default_mesh = Mesh(mesh_file)
 
         # Hydrodynamics
-<<<<<<< HEAD
-        self.base_diffusivity = 10.0
-        self.base_bathymetry = 50.0
-        self.characteristic_speed = Constant(1.15)  # Max fluid speed
-        self.characteristic_diffusion = Constant(self.base_diffusivity)
-=======
         self.base_diffusivity = Constant(10.0)
         self.base_bathymetry = 50.0
         self.characteristic_speed = Constant(1.15)  # Max fluid speed
         self.characteristic_diffusion = self.base_diffusivity
->>>>>>> origin/master
 
         # Time integration
         self.start_time = 0.0
@@ -56,10 +49,6 @@ class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
         self.degree_tracer = 1
         self.tracer_family = 'cg'
         self.stabilisation_tracer = 'supg'
-<<<<<<< HEAD
-        self.anisotropic_stabilisation = True
-=======
->>>>>>> origin/master
         self.use_limiter_for_tracers = False
 
         # Source (outlet pipe)

@@ -13,15 +13,8 @@ from adapt_utils.unsteady.test_cases.bubble_shear.options import BubbleOptions
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-n", help="Resolution of initial mesh.")
-<<<<<<< HEAD
-parser.add_argument("-conservative", help="Toggle conservative tracer equation")
 parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
 parser.add_argument("-stabilisation", help="Stabilisation method")
-parser.add_argument("-anisotropic_stabilisation", help="Toggle anisotropic stabilisation")
-=======
-parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
-parser.add_argument("-stabilisation", help="Stabilisation method")
->>>>>>> origin/master
 parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 parser.add_argument("-mode", help="Choose from 'h' and 'm'")
 parser.add_argument("-debug", help="Toggle debugging mode.")
@@ -35,14 +28,7 @@ kwargs = {
     # Spatial discretisation
     'tracer_family': args.family or 'cg',
     'stabilisation_tracer': args.stabilisation or 'supg',
-<<<<<<< HEAD
-    'use_automatic_sipg_parameter': False,  # We have an inviscid problem
-    'anisotropic_stabilisation': False if args.anisotropic_stabilisation == "0" else True,
     'use_limiter_for_tracers': bool(args.limiters or False),
-    'use_tracer_conservative_form': bool(args.conservative or False),  # FIXME?
-=======
-    'use_limiter_for_tracers': bool(args.limiters or False),
->>>>>>> origin/master
 
     # Mesh movement
     'nonlinear_method': 'relaxation',
@@ -81,15 +67,6 @@ def monitor(mesh):
 mesh_mover = MeshMover(tp.meshes[0], monitor, method='monge_ampere', op=op)
 mesh_mover.adapt()
 tp.__init__(op, meshes=[Mesh(mesh_mover.x)])
-<<<<<<< HEAD
-# for i in range(op.max_adapt):
-#     tp.set_initial_condition()
-#     M = tp.get_static_hessian_metric('tracer')
-#     space_normalise(M, op=op)
-#     enforce_element_constraints(M, op=op)
-#     tp.__init__(op, meshes=[adapt(tp.meshes[0], M)])
-=======
->>>>>>> origin/master
 
 
 # --- Solve the tracer transport problem
