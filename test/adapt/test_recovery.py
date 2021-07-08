@@ -242,6 +242,15 @@ def test_hessian_bowl(dim, interp, recovery, plot_mesh=False):
     if dim != 2:
         raise ValueError("Cannot plot in {:d} dimensions".format(dim))
 
+    # Plot errors spatially
+    fig, axes = plt.subplots(figsize=(5, 6))
+    err = Function(FunctionSpace(mesh, "CG", 1))
+    for i in range(2):
+        for j in range(2):
+            err.interpolate(abs(H[i, j] - I[i, j]))
+            tricontourf(err, axes=axes)
+            savefig("error_{:s}_{:d}_{:d}".format(recovery, i, j), "outputs/hessian", extensions=["pdf"])
+
     # Plot errors on scatterplot
     H_arr = np.abs(H.dat.data - I.dat.data)
     ones = np.ones(len(H_arr))

@@ -89,7 +89,6 @@ def test_adjoint(monitor, nonlinear_method, ctrl, bnd, qoi):
         r = dot(x, x)
         return Constant(1.0) + alpha*pow(cosh(beta*(r - gamma)), -2)
 
-
     def bell(mesh=None, x=None):
         """
         An analytically defined monitor function which concentrates mesh density in
