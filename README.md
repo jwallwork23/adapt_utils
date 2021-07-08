@@ -51,16 +51,13 @@ version of Firedrake, please follow the instructions [here][7].
     * Test case:
       * `steady/test_cases/turbine_array` (Section 4).
     
-  * M. C. A. Clare, J. G. Wallwork, S. C. Kramer, H. Weller, C. J. Cotter, M. D. Piggott, <em> 'On the Use of Mesh Movement Methods to Help Overcome the Multi-Scale Challenges Associated with Hydro-Morphodynamic Modelling'</em>, Submitted to Journal of Computational Physics (2020).
+ * M. C. A. Clare, J. G. Wallwork, S. C. Kramer, H. Weller, C. J. Cotter, M. D. Piggott, <em> 'Multi-scale hydro-morphodynamic modelling using mesh movement methods'</em>, Submitted to International Journal on Geomathematics.
     * [Preprint][11]: DOI: 10.31223/osf.io/tpqvy.
     * Code:
-      * `adapt_utils` [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4110708.svg)](https://doi.org/10.5281/zenodo.4110708) (`v2.2`).
+      * `adapt_utils` [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4779070.svg)](https://doi.org/10.5281/zenodo.4779070).
       * Firedrake: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4110204.svg)](https://doi.org/10.5281/zenodo.4110204).
-      * Thetis: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4110172.svg)](https://doi.org/10.5281/zenodo.4110172).
-    * Test cases:
-      * `unsteady/test_cases/trench_1d` (Section 4.1);
-      * `unsteady/test_cases/trench_slant` (Section 4.2);
-      * `unsteady/test_cases/beach_slope` (Section 4.3).
+      * Thetis: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4778411.svg)](https://doi.org/10.5281/zenodo.4778411).
+    * Test cases: `unsteady/test_cases/trench_1d` (Section 4.1); `unsteady/test_cases/trench_slant` (Section 4.1); `unsteady/test_cases/beach_slope` (Section 4.2); `unsteady/test_cases/tsunami_bump` (Section 4.3). For the versions in the paper use `hydro_morpho_paper` branch.
 
   * J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, <em>'Goal-Oriented Error Estimation and Mesh Adaptation for Tracer Transport Modelling'</em>, Submitted to Computer Aided Design (2021).
     * [Preprint][12]: DOI: 10.31223/X56021.

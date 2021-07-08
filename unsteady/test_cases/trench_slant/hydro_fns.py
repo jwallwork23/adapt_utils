@@ -2,7 +2,8 @@ import thetis as th
 import time
 import datetime
 import numpy as np
-
+import os
+from firedrake.petsc import PETSc
 
 def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
                        elev_init, average_size, dt, t_end, wetting_and_drying=False,
@@ -137,12 +138,34 @@ def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
     str2 = '{'
     if len(right_string) > 0:
         for i in range(len(right_string)):
-            str2 += "'" + str(right_string[i]) + "': constant_out" + str(i) + ","
+            str2 += "'"+ str(right_string[i]) + "': constant_out" + str(i) + ","
         str2 = str2[0:len(str2)-1] + "}"
         exec('swe_bnd[right_bnd_id] = ' + str2)
-
+   
     solver_obj.bnd_functions['shallow_water'] = swe_bnd
+   
+    print(swe_bnd)
+    solver_obj.assign_initial_conditions(uv = uv_init, elev= elev_init)
+    
+    return solver_obj, update_forcings_hydrodynamics, outputdir
 
-    solver_obj.assign_initial_conditions(uv=uv_init, elev=elev_init)
 
-    return solver_obj, update_forcings_hydrodynamics
+def export_final_state(inputdir, uv, elev,):
+    """
+    Export fields to be used in a subsequent simulation
+    """
+    if not os.path.exists(inputdir):
+        os.makedirs(inputdir)
+    th.print_output("Exporting fields for subsequent simulation")
+    chk = th.DumbCheckpoint(inputdir + "/velocity", mode=th.FILE_CREATE)
+    chk.store(uv, name="velocity")
+    th.File(inputdir + '/velocityout.pvd').write(uv)
+    chk.close()
+    chk = th.DumbCheckpoint(inputdir + "/elevation", mode=th.FILE_CREATE)
+    chk.store(elev, name="elevation")
+    th.File(inputdir + '/elevationout.pvd').write(elev)
+    chk.close()
+    
+    plex = elev.function_space().mesh()._topology_dm
+    viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
+    viewer(plex)

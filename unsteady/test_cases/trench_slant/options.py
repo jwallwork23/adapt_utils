@@ -3,19 +3,25 @@ from thetis.configuration import *
 from thetis.options import ModelOptions2d
 
 from adapt_utils.io import initialise_hydrodynamics
-from adapt_utils.options import CoupledOptions
-from adapt_utils.sediment.sediments_model import SedimentModel
+from adapt_utils.unsteady.options import CoupledOptions
+from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
 
+import numpy as np
 
 __all__ = ["TrenchSlantOptions"]
 
 
 class TrenchSlantOptions(CoupledOptions):
+    """
+    Parameters for test case adapted from test case in [1].
 
-    def __init__(self, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir=None, output_dir=None, **kwargs):
+    [1] Clare et al. "Hydro-morphodynamics 2D modelling using a discontinuous Galerkin
+    discretisation." Computers & Geosciences 146 (2021).
+    """
+
+    def __init__(self, friction='nik_solver', nx=1, ny=1, input_dir=None, output_dir=None, **kwargs):
         self.timestepper = 'CrankNicolson'
         super(TrenchSlantOptions, self).__init__(**kwargs)
-        self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), np.int(np.ceil(5*ny)), 16, 1.1)
         self.plot_pvd = True
         self.num_hours = 15
@@ -24,7 +30,7 @@ class TrenchSlantOptions(CoupledOptions):
             self.di = output_dir
 
         # Physical
-        self.base_viscosity = Constant(1e-6)
+        self.base_viscosity = 1e-6
         self.wetting_and_drying = False
         self.solve_sediment = True
         self.solve_exner = True
@@ -34,14 +40,13 @@ class TrenchSlantOptions(CoupledOptions):
         except AssertionError:
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
-        self.average_size = Constant(160e-6)  # Average sediment size
-        self.friction_coeff = Constant(0.025)
+        self.average_size = 160e-6  # Average sediment size
+        self.friction_coeff = 0.025
         self.ksp = Constant(3*self.average_size)
         self.norm_smoother = Constant(0.1)
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
-        self.stabilisation_sediment = 'lax_friedrichs'
 
         # Initial
         self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=output_dir, op=self)
@@ -67,11 +72,11 @@ class TrenchSlantOptions(CoupledOptions):
     def set_up_morph_model(self, input_dir, mesh=None):
 
         # Physical
-        self.base_diffusivity = Constant(0.18011042551606954)
+        self.base_diffusivity = 0.18011042551606954
 
         self.porosity = Constant(0.4)
         self.ks = Constant(0.025)
-        self.average_size = Constant(160*(10**(-6)))  # Average sediment size
+        self.average_size = 160*(10**(-6))  # Average sediment size
 
         self.wetting_and_drying = False
         self.conservative = False
@@ -120,6 +125,11 @@ class TrenchSlantOptions(CoupledOptions):
                              conditional(le(x, 9.5), (0.1*(y-0.55)) + depth_trench, conditional(le(x, 11), (0.1*(y-0.55)) - (1/1.5)*depth_diff*(x-11) + depth_riv, (0.1*(y-0.55)) + depth_riv))))
         return interpolate(-trench, fs)
 
+    def set_viscosity(self, fs):
+        self.viscosity = Function(fs)
+        self.viscosity.assign(self.base_viscosity)
+        return self.viscosity
+
     def set_boundary_conditions(self, prob, i):
         inflow_tag = 1
         outflow_tag = 2
@@ -139,6 +149,18 @@ class TrenchSlantOptions(CoupledOptions):
         u.project(self.uv_init)
         eta.project(self.elev_init)
 
+    def set_sediment_source(self, fs):
+        if self.suspended:
+            return self.sediment_model.ero_term
+        else:
+            return None
+
+    def set_sediment_sink(self, fs):
+        if self.suspended:
+            return self.sediment_model.depo_term
+        else:
+            return None
+
     def set_advective_velocity_factor(self, fs):
         if self.convective_vel_flag:
             return self.sediment_model.corr_factor_model.corr_vel_factor
@@ -151,11 +173,8 @@ class TrenchSlantOptions(CoupledOptions):
     def set_initial_condition_bathymetry(self, prob):
         prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))
 
+    def get_update_forcings(self, prob, i, adjoint):
+        return None
+
     def get_export_func(self, prob, i):
-        eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
-
-        def export_func():
-            eta_tilde.project(self.get_eta_tilde(prob, i))
-            u, eta = prob.fwd_solutions[i].split()
-
-        return export_func
+        return None
