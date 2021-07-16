@@ -66,7 +66,7 @@ kwargs['control_parameters'] = op.control_parameters
 for control in op.active_controls:
     size = np.shape(op.control_parameters[control])
     std = np.std(op.control_parameters[control])
-    kwargs['control_parameters'][control] += np.random.normal(loc=0, scale=std/2, size=size)
+    kwargs['control_parameters'][control] += np.random.normal(loc=0, scale=std, size=size)
 kwargs['control_parameters']['slip'] = np.abs(kwargs['control_parameters']['slip'])
 tape_tag = 0
 op = TohokuOkadaBasisOptions(**kwargs)
@@ -74,7 +74,6 @@ op._data_to_interpolate = eta
 op.active_controls = active_controls
 op.create_topography(annotate=True, interpolate=True, tag=tape_tag)
 print("QoI = {:.4e}".format(op.J.val))
-assert np.isclose(op.J.val, 7.1307e-01, rtol=1.0e-04)  # from previous run
 op.J_progress = []
 op.dJdm_progress = []
 
@@ -102,7 +101,6 @@ assert np.isclose(J, op.J.val)
 g = gradient(op.input_vector)
 assert len(g) == len(op.input_vector)
 print("J = {:.4e}  ||dJdm|| = {:.4e}".format(op.J_progress[-1], op.dJdm_progress[-1]))
-assert np.isclose(op.dJdm_progress[-1], 4.6331e-03, rtol=1.0e-04)  # from previous run
 
 # Plot optimum and initial guess
 eta_pert = op.fault.dtopo.dZ.copy()
@@ -153,7 +151,8 @@ bounds = [bound for subfault in op.subfaults for bound in [(0, np.Inf), (-np.Inf
 opt_parameters = {
     'maxiter': 40000,
     'disp': True,
-    'pgtol': 1.0e-08,
+    'pgtol': 1.0e-8,
+    'factr': 10.0,
     'callback': opt_cb,
     'bounds': bounds,
     'fprime': gradient,
