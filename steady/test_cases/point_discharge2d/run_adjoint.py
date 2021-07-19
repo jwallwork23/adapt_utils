@@ -53,21 +53,24 @@ alignment = 'offset' if offset else 'aligned'
 op.di = create_directory(os.path.join(op.di, op.stabilisation_tracer or family, alignment))
 op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
 
-# TODO: Limiters?
-
 
 # --- Solve forward
 
 tp = AdaptiveSteadyProblem(op, print_progress=False)
 n = FacetNormal(tp.mesh)
 D = tp.fields[0].horizontal_diffusivity
-h = D.copy(deepcopy=True)
-h.assign(0.1)
+# timestamp = perf_counter()
+# tp.solve_forward()
+# myprint("{:.4f}".format(perf_counter() - timestamp), time)
 
-timestamp = perf_counter()
-tp.solve_forward()
-myprint("{:.4f}".format(perf_counter() - timestamp), time)
 
+# --- Analytical gradient
+
+with stop_annotating():
+    G = op.analytical_gradient(D)
+    print("Analytical gradient = {:.4e}".format(G))
+
+exit(0)
 
 # --- Solve discrete adjoint
 
@@ -89,44 +92,7 @@ export_field(adj, "Adjoint tracer", "discrete_adjoint", fpath=op.di, plexname=No
 solutions = [adj]
 
 
-def reduced_functional(m):
-    """
-    Evaluate the reduced functional for diffusivity `m`.
-    """
-    op.base_diffusivity = m.dat.data[0]
-    tp.__init__(op, print_progress=False)
-    tp.solve_forward()
-    return tp.quantity_of_interest()
-
-
-def gradient_discrete(m):
-    """
-    Evaluate the gradient of the reduced functional using the discrete adjoint solution.
-    """
-    c_star = adj
-    # op.base_diffusivity = m.dat.data[0]
-    # tp.__init__(op, print_progress=False)
-    # tp.solve_forward()
-    # tp._solve_discrete_adjoint()
-    c = tp.fwd_solution_tracer
-    # c_star = tp.adj_solution_tracer
-    return assemble(-h*inner(grad(c_star), grad(c))*dx)
-
-
-# Taylor test discrete adjoint
-if taylor:
-    Jhat = reduced_functional
-    dJdm = gradient_discrete(m)
-    # dJdm = dJdm.dat.data[0]*h.dat.data[0]
-    print("Discrete adjoint gradient = {:.4e}".format(dJdm))
-    # Jhat = ReducedFunctional(J, m)
-    # dJdm = None
-    minconv = taylor_test(Jhat, D, h, dJdm=dJdm)
-    assert minconv >= 1.94
-
-
-# --- Solve continuous adjoint
-
+# --- Continuous adjoint
 
 def gradient_continuous(m):
     """
@@ -139,17 +105,10 @@ def gradient_continuous(m):
     tp.solve_adjoint()
     c = tp.fwd_solution_tracer
     c_star = tp.adj_solution_tracer
-    return assemble(-h*inner(grad(c_star), grad(c))*dx)
+    return assemble(-inner(grad(c_star), grad(c))*dx)
 
 
-# Taylor test continuous adjoint
-if taylor:
-    Jhat = reduced_functional
-    dJdm = gradient_continuous(D)
-    print("Continuous adjoint gradient = {:.4e}".format(dJdm))
-    minconv = taylor_test(Jhat, D, h, dJdm=dJdm)
-    assert minconv >= 1.94
-
+print("Continuous adjoint gradient = {:.4e}".format(gradient_continuous(D)))
 timestamp = perf_counter()
 tp.solve_adjoint()
 myprint("Time for continuous solve: {:.4f}s".format(perf_counter() - timestamp), time)

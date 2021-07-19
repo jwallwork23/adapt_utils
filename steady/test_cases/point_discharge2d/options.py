@@ -182,8 +182,8 @@ class PointDischarge2dOptions(CoupledOptions):
         q = 1
         rr = sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0))
         rr = max_value(rr, r)  # (Bessel fn explodes at (x0, y0))
-        gradient = -(D**(-2) + 0.5*u*(x-x0)*D**(-3))*exp(Pe*(x-x0))*bessk0(Pe*rr)
-        gradient += (0.5*u*rr*D**(-3))*exp(Pe*(x-x0))*bessk1(Pe*rr)
+        gradient = -(D**(-2) + 0.5*u[0]*(x-x0)*D**(-3))*exp(Pe*(x-x0))*bessk0(Pe*rr)
+        gradient += (0.5*u[0]*rr*D**(-3))*exp(Pe*(x-x0))*bessk1(Pe*rr)
         gradient *= 0.5*q/pi
         kernel = self.set_qoi_kernel(mesh)
         return assemble(kernel*gradient*dx(degree=self.qoi_quadrature_degree))
