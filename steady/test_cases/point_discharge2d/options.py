@@ -82,7 +82,7 @@ class PointDischarge2dOptions(CoupledOptions):
         boundary_conditions = {
             'tracer': {
                 1: {'value': zero},
-                2: {},
+                2: {'diff_flux': zero},
                 3: {'diff_flux': zero},
                 4: {'diff_flux': zero},
             }
@@ -113,7 +113,7 @@ class PointDischarge2dOptions(CoupledOptions):
                 'lax_friedrichs_anisotropic': 0.05606303,
             },
         }
-        if self.anisotropic_stabilisation:
+        if self.anisotropic_stabilisation and stabilisation is not None:
             stabilisation += '_anisotropic'
         stabilisation = None if stabilisation is None else stabilisation.lower()
         calibrated_r = calibration_results[self.tracer_family][stabilisation]

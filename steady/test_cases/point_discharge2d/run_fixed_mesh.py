@@ -1,3 +1,5 @@
+from firedrake import *
+
 import argparse
 import os
 
@@ -22,8 +24,9 @@ args = parser.parse_args()
 
 family = args.family or 'cg'
 assert family in ('cg', 'dg')
+level = int(args.level or 0)
 kwargs = {
-    'level': int(args.level or 0),
+    'level': level,
     'anisotropic_stabilisation': bool(args.anisotropic_stabilisation or False),
     'plot_pvd': True,
     'debug': bool(args.debug or False),
@@ -36,7 +39,7 @@ op.anisotropic_stabilisation = False if args.anisotropic_stabilisation == '0' el
 op.di = os.path.join(op.di, op.stabilisation_tracer or family)
 op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
 if args.load_mesh is not None:
-    op.default_mesh = load_mesh("mesh", fpath=op.di)
+    op.default_mesh = load_mesh("mesh", fpath=args.load_mesh)
 
 # TODO: Limiters?
 
@@ -49,3 +52,13 @@ tp.solve_forward()
 # Export to HDF5
 op.plot_pvd = False
 export_field(tp.fwd_solution_tracer, "Tracer", "finite_element", fpath=op.di, op=op)
+
+mh = MeshHierarchy(tp.mesh, 5-level)
+Q = FunctionSpace(mh[-1], tp.Q[0].ufl_element())
+c = Function(Q)
+prolong(tp.fwd_solution_tracer, c)
+op.stabilisation_tracer = None
+analytical = op.analytical_solution(Q)
+
+# Compute discretisation error
+print(f"Relative error = {errornorm(analytical, c)/norm(analytical)*100}%")
