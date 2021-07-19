@@ -30,6 +30,7 @@ kwargs = {
     'anisotropic_stabilisation': bool(args.anisotropic_stabilisation or False),
     'plot_pvd': True,
     'debug': bool(args.debug or False),
+    'direct': False,
 }
 op = PointDischarge2dOptions(approach=args.load_mesh or 'fixed_mesh', **kwargs)
 op.tracer_family = family
