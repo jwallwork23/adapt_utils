@@ -3,7 +3,7 @@ from firedrake import *
 import numpy as np
 import os
 
-from adapt_utils.maths import bessk0
+from adapt_utils.maths import bessk0, bessk1
 from adapt_utils.options import CoupledOptions
 from adapt_utils.params import *
 
@@ -171,3 +171,19 @@ class PointDischarge2dOptions(CoupledOptions):
         sol = 0.5*q/(pi*D)*exp(Pe*(x-x0))*bessk0(Pe*rr)
         kernel = self.set_qoi_kernel(mesh)
         return assemble(kernel*sol*dx(degree=self.qoi_quadrature_degree))
+
+    def analytical_gradient(self, D, mesh=None):
+        mesh = mesh or self.default_mesh
+        x, y = SpatialCoordinate(mesh)
+        x0, y0, r = self.source_loc[0]
+        u = Constant(as_vector(self.base_velocity))
+        Pe = 0.5*u[0]/D
+        # q = 0.01  # sediment discharge of source (kg/s)
+        q = 1
+        rr = sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0))
+        rr = max_value(rr, r)  # (Bessel fn explodes at (x0, y0))
+        gradient = -(D**(-2) + 0.5*u*(x-x0)*D**(-3))*exp(Pe*(x-x0))*bessk0(Pe*rr)
+        gradient += (0.5*u*rr*D**(-3))*exp(Pe*(x-x0))*bessk1(Pe*rr)
+        gradient *= 0.5*q/pi
+        kernel = self.set_qoi_kernel(mesh)
+        return assemble(kernel*gradient*dx(degree=self.qoi_quadrature_degree))
