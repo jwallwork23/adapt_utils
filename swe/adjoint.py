@@ -65,41 +65,23 @@ class AdjointShallowWaterTerm(ShallowWaterTerm):
         velocity on the complement of Γ₂ and Dirichlet conditions for the elevation on the
         complement of Γ₁.
         """
-        homogeneous = False
         funcs = bnd_conditions.get(bnd_id)
         if funcs is not None and 'elev' not in funcs and 'un' not in funcs:
             raise Exception('Unsupported bnd type: {:}'.format(funcs.keys()))
 
-        if homogeneous:
-
-            # Homogeneous boundary conditions as given in [1].
-            if 'elev' in funcs and 'un' in funcs:  # Γ₁ ∪ Γ₂
-                eta_star_ext = Constant(0.0)
-                u_star_ext = Constant(0.0)*self.normal
-            elif 'elev' in funcs:  # Γ₁
-                eta_star_ext = Constant(0.0)
-                u_star_ext = u_star_in  # assume symmetry
-            elif 'un' in funcs:  # Γ₂
-                eta_star_ext = eta_star_in  # assume symmetry
-                u_star_ext = Constant(0.0)*self.normal
-            else:  # funcs is None, ∂Ω \ (Γ₁ ∪ Γ₂)
-                eta_star_ext = eta_star_in  # assume symmetry
-                u_star_ext = u_star_in  # assume symmetry
-        else:
-
-            # Inhomogeneous boundary conditions obtained via integration by parts
-            if 'elev' in funcs and 'un' in funcs:  # Γ₁ ∪ Γ₂
-                eta_star_ext = eta_star_in  # assume symmetry
-                u_star_ext = u_star_in  # assume symmetry
-            elif 'elev' not in funcs:  # ∂Ω \ Γ₂
-                eta_star_ext = eta_star_in  # assume symmetry
-                u_star_ext = Constant(0.0)*self.normal
-            elif 'un' not in funcs:  # ∂Ω \ Γ₁
-                eta_star_ext = Constant(0.0)
-                u_star_ext = u_star_in  # assume symmetry
-            else:  # funcs is None, ∂Ω \ (Γ₁ ∪ Γ₂)
-                eta_star_ext = Constant(0.0)
-                u_star_ext = Constant(0.0)*self.normal
+        # Homogeneous boundary conditions as given in [1].
+        if 'elev' in funcs and 'un' in funcs:  # Γ₁ ∪ Γ₂
+            eta_star_ext = Constant(0.0)
+            u_star_ext = u_star_in  # assume symmetry
+        elif 'elev' in funcs:  # Γ₁
+            eta_star_ext = Constant(0.0)
+            u_star_ext = u_star_in  # assume symmetry
+        elif 'un' in funcs:  # Γ₂
+            eta_star_ext = Constant(0.0)
+            u_star_ext = Constant(0.0)*self.normal
+        else:  # funcs is None, ∂Ω \ (Γ₁ ∪ Γ₂)
+            eta_star_ext = Constant(0.0)
+            u_star_ext = u_star_in  # assume symmetry
 
         return eta_star_ext, u_star_ext
 
