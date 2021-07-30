@@ -72,8 +72,8 @@ version of Firedrake, please follow the instructions [here][7].
 
   * J. G. Wallwork, <em>'Mesh Adaptation and Adjoint Methods for Finite Element Coastal Ocean Modelling'</em>, PhD thesis, Imperial College London (2021).
     * Test cases:
-      * `test/interp` (Sections 2.8 and 3.4);
-      * `steady/test_cases/point_discharge2d` (Sections 2.7, 3.6, 7.3 and 7.5);
+      * `test/interp` (Sections 2.8);
+      * `steady/test_cases/point_discharge2d` (Sections 2.7, 3.6 and 7.5);
       * `case_studies/tohoku/inversion/1d` (Section 4.4);
       * `case_studies/tohoku/inversion/okada` (Sections 4.4 and 4.5);
       * `test/adapt` (Sections 5.8 and 6.4);
@@ -82,6 +82,8 @@ version of Firedrake, please follow the instructions [here][7].
       * `steady/test_cases/turbine_array` (Sections 7.3 and 7.5);
       * `steady/test_cases/idealised_desalination` (Section 7.7);
       * `case_studies/tohoku/hazard` (Section 7.8).
+      
+      See also Jupyter notebooks [here][8].
 
 
 ### User instructions
