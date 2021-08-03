@@ -12,6 +12,7 @@ from thetis import *
 import datetime
 import os
 import time
+import pandas as pd
 
 from adapt_utils.adapt import recovery
 from adapt_utils.io import initialise_bathymetry, export_bathymetry
@@ -19,31 +20,23 @@ from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.beach_slope.options import BeachOptions
 
+# number of mesh elements
 fac_x = 0.2
 fac_y = 0.5
 
-dt_exp = 72
+# mesh movement frequency
+dt_exp = 16
 
+# monitor function parameters
 alpha = 5
 beta = 0
 gamma = 1
 
-kappa = 200
-
+# set output directory name
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 di = os.path.dirname(__file__)
 outputdir = os.path.join(di, 'outputs' + st)
-
-# to create the input hydrodynamics directiory please run beach_tidal_hydro.py
-# setting fac_x and fac_y to be the same values as above
-
-# we have included the hydrodynamics input dir for fac_x = 0.2 and fac_y = 0.5 as an example
-
-# Note to recreate subdomain errors in options.py self.dt_per_mesh_movement = 72 and for whole
-# domain errors self.dt_per_mesh_movement = 648
-
-inputdir = os.path.join(di, 'hydrodynamics_beach_l_sep_nx_' + str(int(fac_x*220)) + '_' + str(int(fac_y*10)))
 
 tol_value = 1e-3
 
@@ -53,7 +46,6 @@ kwargs = {
     'nx': fac_x,
     'ny': fac_y,
     'plot_pvd': True,
-    'input_dir': inputdir,
     'output_dir': outputdir,
     'nonlinear_method': 'relaxation',
     'r_adapt_rtol': tol_value,
@@ -70,7 +62,7 @@ assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
 
 
-def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kappa):
+def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
 
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
@@ -98,44 +90,51 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kapp
     comp_new2 = interpolate(conditional(comp_new > Constant(0.0), comp_new, Constant(0.0)), P1)
     mon_init = project(Constant(1.0) + comp_new2, P1)
 
-    H = Function(P1)
-    tau = TestFunction(P1)
-
-    a = (inner(tau, H)*dx)+(K*inner(tau.dx(1), H.dx(1))*dx) - inner(tau, mon_init)*dx
-    solve(a == 0, H)
-
-    return H
-
+    return mon_init
 
 swp.set_monitor_functions(gradient_interface_monitor)
 
 t1 = time.time()
+# run model
 swp.solve_forward()
 t2 = time.time()
 
 print(t2-t1)
 
-new_mesh = RectangleMesh(880, 20, 220, 10)
+print(dt_exp)
+
+print(fac_x)
+print(fac_y)
+print(alpha)
+print(beta)
+print(gamma)
+
+# export full bathymetry
+new_mesh = RectangleMesh(1400, 20, 350, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-# export final bathymetry to readable format
 fpath = "hydrodynamics_beach_bath_mov_{:d}_{:d}_{:d}_{:d}_{:d}"
-fpath = fpath.format(op.dt_per_export, int(fac_x*220), alpha, beta, gamma)
+fpath = fpath.format(op.dt_per_export, int(fac_x*350), alpha, beta, gamma)
 export_bathymetry(bath, os.path.join("adapt_output", fpath), op=op)
 
-bath_real = initialise_bathymetry(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_440_10')
+bath_real = initialise_bathymetry(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_700_2')
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
 
-V = FunctionSpace(new_mesh, 'CG', 1)
+# export bathymetry along central y-axis
+xaxisthetis1 = []
+baththetis1 = []
 
-x, y = SpatialCoordinate(new_mesh)
+for i in np.linspace(0, 349, 350):
+    xaxisthetis1.append(i)
+    baththetis1.append(-bath.at([i, 5]))
+df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
+df.to_csv("adapt_output/final_result_check_nx" + str(alpha) + '_' + str(beta) + '_'  + str(gamma) + '_' +  str(fac_x) + "_ny" + str(fac_y) + ".csv", index = False)
 
-bath_mod = Function(V).interpolate(conditional(x > 70, bath, Constant(0.0)))
-bath_real_mod = Function(V).interpolate(conditional(x > 70, bath_real, Constant(0.0)))
+df_real = pd.read_csv('fixed_output/final_result_check_nx2_ny2.csv')
 
-print('subdomain')
+error = sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df))])
 
-print(fire.errornorm(bath_mod, bath_real_mod))
+print(error)

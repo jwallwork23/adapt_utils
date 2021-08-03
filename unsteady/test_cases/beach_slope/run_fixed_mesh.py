@@ -21,7 +21,7 @@ from adapt_utils.unsteady.solver import AdaptiveProblem
 
 def export_final_state(inputdir, bathymetry_2d):
     """
-    Export bathymetry and mesh
+    Export fields to be used in a subsequent simulation
     """
     if not os.path.exists(inputdir):
         os.makedirs(inputdir)
@@ -32,16 +32,12 @@ def export_final_state(inputdir, bathymetry_2d):
     File(inputdir + '/bathout.pvd').write(bathymetry_2d)
     chk.close()
 
-    plex = bathymetry_2d.function_space().mesh()._plex
-    viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
-    viewer(plex)
-
 def initialise_fields(mesh2d, inputdir):
     """
-    Initialise true value bathymetry
+    Initialise simulation with results from a previous simulation
     """
     V = FunctionSpace(mesh2d, 'CG', 1)
-
+    # elevation
     with timed_stage('initialising bathymetry'):
         chk = DumbCheckpoint(inputdir + "/bathymetry", mode=FILE_READ)
         bath = Function(V, name="bathymetry")
@@ -49,29 +45,21 @@ def initialise_fields(mesh2d, inputdir):
         chk.close()
     return bath
 
-t1 = time.time()
-
+# number of mesh elements
 fac_x = 0.2
 fac_y = 0.5
 
+# set output directory name
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 di = os.path.dirname(__file__)
 outputdir = os.path.join(di, 'outputs' + st)
-
-# to create the input hydrodynamics directiory please run beach_tidal_hydro.py
-# setting fac_x and fac_y to be the same values as above
-
-# we have included the hydrodynamics input dir for fac_x = 0.2 and fac_y = 0.5 as an example
-
-inputdir = os.path.join(di, 'hydrodynamics_beach_l_sep_nx_' + str(int(fac_x*220)) + '_' + str(int(fac_y*10)))
 
 kwargs = {
     'approach': 'fixed_mesh',
     'nx': fac_x,
     'ny': fac_y,
     'plot_pvd': True,
-    'input_dir': inputdir,
     'output_dir': outputdir,
     # Spatial discretisation
     'family': 'dg-dg',
@@ -87,6 +75,7 @@ if os.getenv('REGRESSION_TEST') is not None:
     op.end_time = op.dt*op.dt_per_export
 swp = AdaptiveProblem(op)
 
+# run model
 t1 = time.time()
 swp.solve_forward()
 t2 = time.time()
@@ -95,24 +84,32 @@ if os.getenv('REGRESSION_TEST') is not None:
 
 print(t2-t1)
 
-new_mesh = RectangleMesh(880, 20, 220, 10)
+print(fac_x)
+print(fac_y)
+
+# export full bathymetry
+new_mesh = RectangleMesh(1400, 20, 350, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("fixed_output/hydrodynamics_beach_bath_fixed_"+str(int(nx*220)) + '_' + str(ny), bath)
+export_final_state("fixed_output/hydrodynamics_beach_bath_fixed_"+str(int(fac_x*350)) + '_' + str(fac_y), bath)
 
-bath_real = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_440_10')
+bath_real = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_700_2')
 
-print('whole domain error')
 print(fire.errornorm(bath, bath_real))
 
-V = FunctionSpace(new_mesh, 'CG', 1)
+# export bathymetry along central y-axis
+xaxisthetis1 = []
+baththetis1 = []
 
-x, y = SpatialCoordinate(new_mesh)
+for i in np.linspace(0, 349, 350):
+    xaxisthetis1.append(i)
+    baththetis1.append(-bath.at([i, 5]))
+df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
+df.to_csv("fixed_output/final_result_check_nx" + str(fac_x) + "_ny" + str(fac_y) + ".csv", index = False)
 
-bath_mod = Function(V).interpolate(conditional(x > 70, bath, Constant(0.0)))
-bath_real_mod = Function(V).interpolate(conditional(x > 70, bath_real, Constant(0.0)))
+df_real = pd.read_csv('fixed_output/final_result_check_nx2_ny2.csv')
 
-print('subdomain error')
+error = sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df))])
 
-print(fire.errornorm(bath_mod, bath_real_mod))
+print(error)
